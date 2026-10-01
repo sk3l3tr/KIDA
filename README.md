@@ -11,10 +11,6 @@
 
 > KIDA is the intelligent agent at the heart of your server, quietly watching over the server, automating operations, and keeping everything under control.
 
-<div style="height: 5rem; text-align: center;">
-    <img src="resources/KIDA.png" style="border-radius: 50%;"/>
-</div>
-
 # What is KIDA
 
 # Using KIDA
