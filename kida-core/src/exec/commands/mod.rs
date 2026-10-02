@@ -1,3 +1,5 @@
+pub mod system_info;
+
 use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 pub async fn health(request: CommandRequest) -> CommandResponse {
