@@ -24,18 +24,29 @@ jobs:
 
       - name: Prepare artifacts
         run: |
+          rm -rf dist
           mkdir -p dist
+
+          test -f target/release/kida-core
+          test -f target/release/kida-cli
 
           cp target/release/kida-core dist/kida-core
           cp target/release/kida-cli dist/kida-cli
 
-          chmod +x dist/kida-core
-          chmod +x dist/kida-cli
+          chmod 755 dist/kida-core
+          chmod 755 dist/kida-cli
 
       - name: Generate checksums
         run: |
           cd dist
           sha256sum kida-core kida-cli > SHA256SUMS
+
+      - name: Verify artifacts
+        run: |
+          file dist/kida-core
+          file dist/kida-cli
+          ./dist/kida-cli --help || true
+          sha256sum -c dist/SHA256SUMS
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
