@@ -1,5 +1,11 @@
-use axum::{Router, routing::get};
+use axum::{Router, extract::Json, routing::post};
+
 use tokio::net::TcpListener;
+
+use crate::{
+    comm::protocol::{CommandRequest, CommandResponse},
+    executor,
+};
 
 pub struct HttpServer {
     host: String,
@@ -15,13 +21,11 @@ impl HttpServer {
     }
 
     pub async fn start(&self) -> std::io::Result<()> {
-        let app = Router::new().route("/health", get(health));
+        let app = Router::new().route("/command", post(command));
 
         let address = format!("{}:{}", self.host, self.port);
 
-        let listener = TcpListener::bind(&address).await?;
-
-        println!("HTTP server listening on http://{}", address);
+        let listener = TcpListener::bind(address).await?;
 
         axum::serve(listener, app)
             .await
@@ -29,6 +33,6 @@ impl HttpServer {
     }
 }
 
-async fn health() -> &'static str {
-    "ok"
+async fn command(Json(request): Json<CommandRequest>) -> Json<CommandResponse> {
+    Json(executor::execute(request).await)
 }

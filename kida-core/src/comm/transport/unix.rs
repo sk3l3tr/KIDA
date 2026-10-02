@@ -1,4 +1,9 @@
-use tokio::net::UnixListener;
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::{UnixListener, UnixStream},
+};
+
+use crate::{comm::protocol::CommandRequest, executor};
 
 pub struct UnixSocketServer {
     path: String,
@@ -14,23 +19,36 @@ impl UnixSocketServer {
 
         let listener = UnixListener::bind(&self.path)?;
 
-        println!("Listening on {}", self.path);
-
         loop {
-            match listener.accept().await {
-                Ok((stream, addr)) => {
-                    println!("New client connected from {:?}", addr);
+            let (stream, _) = listener.accept().await?;
 
-                    tokio::spawn(async move {
-                        // handle stream
-                        drop(stream);
-                    });
+            tokio::spawn(async move {
+                if let Err(error) = handle_connection(stream).await {
+                    eprintln!("Unix connection error: {error}");
                 }
-
-                Err(e) => {
-                    eprintln!("Failed to accept connection: {}", e);
-                }
-            }
+            });
         }
     }
+}
+
+async fn handle_connection(stream: UnixStream) -> Result<(), Box<dyn std::error::Error>> {
+    let (reader, mut writer) = stream.into_split();
+
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+
+    while reader.read_line(&mut line).await? > 0 {
+        let request: CommandRequest = serde_json::from_str(line.trim())?;
+
+        let response = executor::execute(request).await;
+
+        let response = serde_json::to_string(&response)?;
+
+        writer.write_all(response.as_bytes()).await?;
+        writer.write_all(b"\n").await?;
+
+        line.clear();
+    }
+
+    Ok(())
 }
