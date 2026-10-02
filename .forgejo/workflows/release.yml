@@ -45,8 +45,11 @@ jobs:
         run: |
           file dist/kida-core
           file dist/kida-cli
-          ./dist/kida-cli --help || true
-          sha256sum -c dist/SHA256SUMS
+
+          ./dist/kida-cli --help
+
+          cd dist
+          sha256sum -c SHA256SUMS
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
