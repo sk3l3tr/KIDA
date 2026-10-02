@@ -1,0 +1,38 @@
+name: Build KIDA Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: kida
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build release
+        run: |
+          cargo build --release
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p dist
+
+          cp target/release/kida-core dist/kida-core
+          cp target/release/kida-cli dist/kida-cli
+
+          chmod +x dist/kida-core
+          chmod +x dist/kida-cli
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum kida-core kida-cli > SHA256SUMS
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kida-linux-x86_64
+          path: dist/
