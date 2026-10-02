@@ -1,7 +1,9 @@
 use crate::{
     comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
     exec::commands::{
-        self, docker_containers_list, system_health, system_info, system_reboot, system_shutdown,
+        self,
+        docker::docker_containers_list,
+        sys::{system_health, system_info, system_reboot, system_shutdown},
     },
 };
 

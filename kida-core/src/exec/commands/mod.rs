@@ -1,8 +1,5 @@
-pub mod docker_containers_list;
-pub mod system_health;
-pub mod system_info;
-pub mod system_reboot;
-pub mod system_shutdown;
+pub mod docker;
+pub mod sys;
 
 use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
