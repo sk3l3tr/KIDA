@@ -51,8 +51,24 @@ jobs:
           cd dist
           sha256sum -c SHA256SUMS
 
-      - name: Upload artifacts
-        uses: https://data.forgejo.org/actions/upload-artifact@v3
-        with:
-          name: kida-linux-x86_64
-          path: dist/
+      - name: Publish package
+        env:
+          FORGEJO_TOKEN: ${{ secrets.KIDA_PACKAGE_TOKEN }}
+          VERSION: ${{ forgejo.ref_name }}
+        run: |
+          BASE_URL="http://git.atlantis.arpa/api/packages/<TU_USUARIO>/generic/kida/${VERSION}"
+
+          curl --fail --show-error \
+            --user "<TU_USUARIO>:${FORGEJO_TOKEN}" \
+            --upload-file dist/kida-core \
+            "${BASE_URL}/kida-core"
+
+          curl --fail --show-error \
+            --user "<TU_USUARIO>:${FORGEJO_TOKEN}" \
+            --upload-file dist/kida-cli \
+            "${BASE_URL}/kida-cli"
+
+          curl --fail --show-error \
+            --user "<TU_USUARIO>:${FORGEJO_TOKEN}" \
+            --upload-file dist/SHA256SUMS \
+            "${BASE_URL}/SHA256SUMS"
