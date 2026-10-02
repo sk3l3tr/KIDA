@@ -1,3 +1,4 @@
+pub mod docker_containers_list;
 pub mod system_health;
 pub mod system_info;
 pub mod system_reboot;
