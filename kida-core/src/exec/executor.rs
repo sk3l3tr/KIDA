@@ -2,7 +2,7 @@ use crate::{
     comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
     exec::commands::{
         self,
-        docker::docker_containers_list,
+        docker::{docker_container_stop, docker_containers_list},
         sys::{system_health, system_info, system_reboot, system_shutdown},
     },
 };
@@ -17,6 +17,7 @@ pub async fn execute(request: CommandRequest) -> CommandResponse {
         "system.reboot" => system_reboot::exec(request).await,
 
         "docker.containers.list" => docker_containers_list::exec(request).await,
+        "docker.container.stop" => docker_container_stop::exec(request).await,
 
         _ => CommandResponse {
             id: request.id,
