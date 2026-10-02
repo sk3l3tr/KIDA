@@ -1,12 +1,15 @@
 use crate::{
     comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
-    exec::commands::{self, system_info},
+    exec::commands::{self, system_health, system_info, system_reboot, system_shutdown},
 };
 
 pub async fn execute(request: CommandRequest) -> CommandResponse {
     match request.command.as_str() {
         "health" => commands::health(request).await,
         "system.info" => system_info::exec(request).await,
+        "system.health" => system_health::exec(request).await,
+        "system.shutdown" => system_shutdown::exec(request).await,
+        "system.reboot" => system_reboot::exec(request).await,
 
         _ => CommandResponse {
             id: request.id,
