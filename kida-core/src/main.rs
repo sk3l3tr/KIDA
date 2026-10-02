@@ -6,7 +6,7 @@ use comm::transport::{http::HttpServer, unix::UnixSocketServer};
 const UNIX_SOCKET_PATH: &str = "/tmp/kida.sock";
 
 const HTTP_HOST: &str = "127.0.0.1";
-const HTTP_PORT: u16 = 8080;
+const HTTP_PORT: u16 = 8989;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -25,7 +25,7 @@ fn print_banner() {
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 
-    888    d8P  8888888 8888888b.        d8888  v0.0.1
+    888    d8P  8888888 8888888b.        d8888  v0.0.2
     888   d8P     888   888  \"Y88b      d88888  AGENT
     888  d8P      888   888    888     d88P888
     888d88K       888   888    888    d88P 888

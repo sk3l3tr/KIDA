@@ -1,5 +1,5 @@
 ```
-888    d8P  8888888 8888888b.        d8888  v0.0.1
+888    d8P  8888888 8888888b.        d8888  v0.0.2
 888   d8P     888   888  "Y88b      d88888
 888  d8P      888   888    888     d88P888
 888d88K       888   888    888    d88P 888
@@ -32,5 +32,13 @@ sudo env \
 ```
 
 # Using KIDA
+
+KIDA CORE tiene 2 formas de comunicación: HTTP y Unix socket. En ambos casos, el formato de entrada es JSON. Algunos ejemplos son:
+
+```bash
+curl -X POST http://127.0.0.1:8989/command -H 'Content-Type: application/json' -d '{"id": "1", "command": "system.health", "params": {}}'
+
+echo '{"id": "1", "command": "system.health", "params": {}}' | socat - UNIX-CONNECT:/tmp/kida.sock
+```
 
 # License and trademarks
