@@ -14,7 +14,7 @@ jobs:
 
       - name: Build release
         run: |
-          sudo docker run --rm \
+          docker run --rm \
             --user "$(id -u):$(id -g)" \
             -e CARGO_HOME=/tmp/cargo \
             -v "$PWD:/workspace" \
