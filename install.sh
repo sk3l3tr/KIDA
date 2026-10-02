@@ -1,49 +1,76 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
 FORGEJO="http://git.atlantis.arpa"
-OWNER="TU_USUARIO"
-REPO="kida"
+OWNER="sk3l3t0r"
+PACKAGE="kida"
 
-ARCH="$(uname -m)"
+VERSION="${KIDA_VERSION:-}"
+TOKEN="${KIDA_TOKEN:-}"
 
-if [ "$ARCH" != "x86_64" ]; then
-    echo "Unsupported architecture: $ARCH"
+if [[ $EUID -ne 0 ]]; then
+    echo "Run this installer as root."
     exit 1
 fi
 
-VERSION="${KIDA_VERSION:-latest}"
-
-if [ "$VERSION" = "latest" ]; then
-    VERSION="$(
-        curl -fsSL \
-            "$FORGEJO/api/v1/repos/$OWNER/$REPO/releases/latest" |
-        sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p'
-    )"
-fi
-
-if [ -z "$VERSION" ]; then
-    echo "Unable to determine latest KIDA version."
+if [[ -z "$VERSION" ]]; then
+    echo "KIDA_VERSION is required."
     exit 1
 fi
 
-echo "Installing KIDA $VERSION..."
-
-BASE="$FORGEJO/$OWNER/$REPO/releases/download/$VERSION"
-
+BASE_URL="${FORGEJO}/api/packages/${OWNER}/generic/${PACKAGE}/${VERSION}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-curl -fsSL "$BASE/kida-core-linux-x86_64" \
-    -o "$TMP/kida-core"
+AUTH=()
+if [[ -n "$TOKEN" ]]; then
+    AUTH=(-u "${OWNER}:${TOKEN}")
+fi
 
-curl -fsSL "$BASE/kida-cli-linux-x86_64" \
-    -o "$TMP/kida"
+echo "Installing KIDA ${VERSION}..."
 
-chmod +x "$TMP/kida-core" "$TMP/kida"
+for FILE in kida-core kida-cli SHA256SUMS; do
+    curl -fsSL \
+        "${AUTH[@]}" \
+        "${BASE_URL}/${FILE}" \
+        -o "${TMP}/${FILE}"
+done
 
-install -m 755 "$TMP/kida-core" /usr/local/bin/kida-core
-install -m 755 "$TMP/kida" /usr/local/bin/kida
+cd "$TMP"
+sha256sum -c SHA256SUMS
 
+install -m 755 kida-core /usr/local/bin/kida-core
+install -m 755 kida-cli /usr/local/bin/kida
+
+cat > /etc/systemd/system/kida.service <<'EOF'
+[Unit]
+Description=KIDA Agent
+After=network.target docker.service
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/kida-core
+
+Restart=on-failure
+RestartSec=3
+
+RuntimeDirectory=kida
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now kida
+
+sleep 1
+
+echo
+systemctl --no-pager --full status kida || true
+
+echo
 echo "KIDA installed successfully."
+echo "CLI:   /usr/local/bin/kida"
+echo "Agent: /usr/local/bin/kida-core"
