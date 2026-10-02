@@ -53,22 +53,36 @@ jobs:
 
       - name: Publish package
         env:
-          FORGEJO_TOKEN: ${{ secrets.KIDA_PACKAGE_TOKEN }}
+          PACKAGE_TOKEN: ${{ secrets.KIDA_PACKAGE_TOKEN }}
           VERSION: ${{ forgejo.ref_name }}
+          FORGEJO_USER: sk3l3t0r
         run: |
-          BASE_URL="http://git.atlantis.arpa/api/packages/<TU_USUARIO>/generic/kida/${VERSION}"
+          set -euo pipefail
 
-          curl --fail --show-error \
-            --user "<TU_USUARIO>:${FORGEJO_TOKEN}" \
-            --upload-file dist/kida-core \
-            "${BASE_URL}/kida-core"
+          test -n "${PACKAGE_TOKEN}" || {
+            echo "KIDA_PACKAGE_TOKEN is empty"
+            exit 1
+          }
 
-          curl --fail --show-error \
-            --user "<TU_USUARIO>:${FORGEJO_TOKEN}" \
-            --upload-file dist/kida-cli \
-            "${BASE_URL}/kida-cli"
+          BASE_URL="http://git.atlantis.arpa/api/packages/${FORGEJO_USER}/generic/kida/${VERSION}"
 
-          curl --fail --show-error \
-            --user "<TU_USUARIO>:${FORGEJO_TOKEN}" \
-            --upload-file dist/SHA256SUMS \
-            "${BASE_URL}/SHA256SUMS"
+          for FILE in kida-core kida-cli SHA256SUMS; do
+            echo "Publishing ${FILE}..."
+
+            HTTP_CODE=$(curl \
+              --silent \
+              --show-error \
+              --output /tmp/forgejo-response \
+              --write-out "%{http_code}" \
+              --user "${FORGEJO_USER}:${PACKAGE_TOKEN}" \
+              --upload-file "dist/${FILE}" \
+              "${BASE_URL}/${FILE}")
+
+            if [ "${HTTP_CODE}" != "201" ]; then
+              echo "Failed publishing ${FILE}: HTTP ${HTTP_CODE}"
+              cat /tmp/forgejo-response
+              exit 1
+            fi
+          done
+
+          echo "KIDA ${VERSION} published successfully."
