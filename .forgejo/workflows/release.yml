@@ -19,8 +19,8 @@ jobs:
             -e CARGO_HOME=/tmp/cargo \
             -v "$PWD:/workspace" \
             -w /workspace \
-            rust:1.90-bookworm \
-            cargo build --release
+            rust:1.98.1-bookworm \
+            cargo build --release --locked
 
       - name: Prepare artifacts
         run: |
