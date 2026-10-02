@@ -13,6 +13,24 @@
 
 # What is KIDA
 
+# Installing KIDA
+
+Local installation for development:
+
+```bash
+curl -fsSL \
+  --user 'YOUR_USER:YOUR_TOKEN' \
+  http://git.atlantis.arpa/sk3l3t0r/kida/raw/branch/master/install.sh \
+  -o /tmp/kida-install.sh
+```
+
+```bash
+sudo env \
+  KIDA_VERSION=KIDA_VERSION \
+  KIDA_TOKEN='YOUR_TOKEN' \
+  bash /tmp/kida-install.sh
+```
+
 # Using KIDA
 
 # License and trademarks

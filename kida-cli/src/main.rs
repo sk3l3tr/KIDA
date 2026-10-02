@@ -86,17 +86,30 @@ fn print_data(data: serde_json::Value) {
 fn print_help() {
     println!(
         "\
-KIDA CLI
+>< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
+>< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
+
+888    d8P  8888888 8888888b.        d8888  v0.0.1
+888   d8P     888   888  \"Y88b      d88888  CLI
+888  d8P      888   888    888     d88P888
+888d88K       888   888    888    d88P 888
+8888888b      888   888    888   d88P  888
+888  Y88b     888   888    888  d88P   888
+888   Y88b    888   888  .d88P d8888888888
+888    Y88b 8888888 8888888P\" d88P     888
+
+>< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
+>< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 
 Usage:
-  kida <command> [params...]
+  $ kida <command> [params...]
 
-Examples:
-  kida health
-  kida system.info
-  kida system.health
-  kida system.shutdown
-  kida system.shutdown now
-  kida system.reboot now"
+Commands:
+  - health
+  - system.info
+  - system.health
+  - system.shutdown
+  - system.shutdown now
+  - system.reboot now"
     );
 }
