@@ -89,14 +89,14 @@ fn print_help() {
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 
-888    d8P  8888888 8888888b.        d8888  v0.0.2
-888   d8P     888   888  \"Y88b      d88888  CLI
-888  d8P      888   888    888     d88P888
-888d88K       888   888    888    d88P 888
-8888888b      888   888    888   d88P  888
-888  Y88b     888   888    888  d88P   888
-888   Y88b    888   888  .d88P d8888888888
-888    Y88b 8888888 8888888P\" d88P     888
+    888    d8P  8888888 8888888b.        d8888  v0.0.2
+    888   d8P     888   888  \"Y88b      d88888  CLI
+    888  d8P      888   888    888     d88P888
+    888d88K       888   888    888    d88P 888
+    8888888b      888   888    888   d88P  888
+    888  Y88b     888   888    888  d88P   888
+    888   Y88b    888   888  .d88P d8888888888
+    888    Y88b 8888888 8888888P\" d88P     888
 
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
@@ -104,12 +104,25 @@ fn print_help() {
 Usage:
   $ kida <command> [params...]
 
-Commands:
+KIDA commands:
   - health
+
+SYS commands:
   - system.info
   - system.health
   - system.shutdown
   - system.shutdown now
-  - system.reboot now"
+  - system.reboot now
+
+Docker commands:
+  - docker.containers.list
+  - docker.container.start <id or name>
+  - docker.container.stop <id or name>
+  - docker.container.restart <id or name>
+  - docker.container.delete <id or name>
+
+>< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
+>< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
+  "
     );
 }
