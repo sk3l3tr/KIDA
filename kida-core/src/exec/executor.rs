@@ -1,8 +1,11 @@
-use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
+use crate::{
+    comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
+    exec::commands,
+};
 
 pub async fn execute(request: CommandRequest) -> CommandResponse {
     match request.command.as_str() {
-        "health" => health(request).await,
+        "health" => commands::health(request).await,
 
         _ => CommandResponse {
             id: request.id,
@@ -10,14 +13,5 @@ pub async fn execute(request: CommandRequest) -> CommandResponse {
             data: None,
             error: Some(format!("Unknown command: {}", request.command)),
         },
-    }
-}
-
-async fn health(request: CommandRequest) -> CommandResponse {
-    CommandResponse {
-        id: request.id,
-        status: CommandStatus::Ok,
-        data: None,
-        error: None,
     }
 }

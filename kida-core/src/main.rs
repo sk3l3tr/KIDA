@@ -1,5 +1,5 @@
 mod comm;
-mod executor;
+mod exec;
 
 use comm::transport::{http::HttpServer, unix::UnixSocketServer};
 
