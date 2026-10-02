@@ -15,4 +15,12 @@
 
 # Using KIDA CORE
 
+KIDA tiene 2 formas de comunicación: HTTP y Unix socket. En ambos casos, el formato de entrada es JSON. Algunos ejemplos son:
+
+```bash
+curl -X POST http://127.0.0.1:8080/command -H 'Content-Type: application/json' -d '{"id": "1", "command": "system.health", "params": {}}'
+
+echo '{"id": "1", "command": "system.health", "params": {}}' | socat - UNIX-CONNECT:/tmp/kida.sock
+```
+
 # License and trademarks
