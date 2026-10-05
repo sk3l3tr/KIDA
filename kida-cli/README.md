@@ -13,6 +13,117 @@
 
 # What is KIDA CLI
 
+KIDA CLI is the terminal interface for checking and managing the server where
+KIDA is running. After installing KIDA, the command is available as `kida`.
+
 # Using KIDA CLI
+
+The general command format is:
+
+```text
+kida <command> [subcommand] [argument]
+```
+
+Run `kida --help` to see the available commands. Help is also available at any
+level of the command hierarchy:
+
+```bash
+kida system --help
+kida docker --help
+kida docker container --help
+```
+
+## Check KIDA
+
+Check whether KIDA is available and responding:
+
+```bash
+kida health
+```
+
+## System commands
+
+### View system information
+
+Display information about the operating system, hardware, CPU, memory, disks,
+and graphics devices:
+
+```bash
+kida system info
+```
+
+### View system health
+
+Display the overall hardware health and the available temperature and fan
+readings:
+
+```bash
+kida system health
+```
+
+### Shut down the system
+
+Schedule a system shutdown by passing one of these time formats:
+
+- `now` shuts down immediately.
+- `+N` shuts down in `N` minutes, such as `+15`.
+- `HH:MM` shuts down at the specified 24-hour time, such as `23:30`.
+
+Examples:
+
+```bash
+kida system shutdown now
+kida system shutdown +15
+kida system shutdown 23:30
+```
+
+> **Warning:** This command powers off the server. Check the time carefully
+> before running it.
+
+## Docker commands
+
+### List containers
+
+List Docker containers and their current status, including stopped containers:
+
+```bash
+kida docker containers list
+```
+
+### Manage a container
+
+Use either the container name or container ID:
+
+```bash
+kida docker container start <id-or-name>
+kida docker container stop <id-or-name>
+kida docker container restart <id-or-name>
+kida docker container delete <id-or-name>
+```
+
+For example:
+
+```bash
+kida docker container start web
+kida docker container restart 8f2c1a4b7d90
+kida docker container stop web
+kida docker container delete web
+```
+
+> **Warning:** Deleting a container is permanent. Stop it first and verify its
+> name or ID before deleting it.
+
+## Output and errors
+
+Command results are printed directly in the terminal. Structured information,
+such as system details or the container list, is displayed in a readable JSON
+format.
+
+If a command is incomplete or unknown, KIDA CLI displays the expected usage.
+If KIDA is unavailable or a command cannot be completed, it prints an error and
+returns a non-zero exit status.
+
+Commands use spaces between each level. Dotted forms such as `system.info` or
+`docker.containers.list` are not accepted.
 
 # License and trademarks

@@ -1,30 +1,17 @@
 mod cli;
 mod client;
+mod mapper;
 mod protocol;
 
 use std::process::ExitCode;
 
-use cli::{ParseResult, parse};
+use clap::Parser;
+use cli::Cli;
 use client::{ClientError, KidaClient};
-use protocol::{CommandResponse, CommandStatus};
+use protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 fn main() -> ExitCode {
-    let request = match parse() {
-        ParseResult::Request(request) => request,
-
-        ParseResult::Help => {
-            print_help();
-            return ExitCode::SUCCESS;
-        }
-
-        ParseResult::MissingCommand => {
-            eprintln!("Missing command.");
-            eprintln!();
-            print_help();
-
-            return ExitCode::from(2);
-        }
-    };
+    let request = CommandRequest::from(Cli::parse().command);
 
     let client = KidaClient::default();
 
@@ -81,48 +68,4 @@ fn print_data(data: serde_json::Value) {
             Err(_) => println!("{value}"),
         },
     }
-}
-
-fn print_help() {
-    println!(
-        "\
->< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
->< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
-
-    888    d8P  8888888 8888888b.        d8888  v0.0.2
-    888   d8P     888   888  \"Y88b      d88888  CLI
-    888  d8P      888   888    888     d88P888
-    888d88K       888   888    888    d88P 888
-    8888888b      888   888    888   d88P  888
-    888  Y88b     888   888    888  d88P   888
-    888   Y88b    888   888  .d88P d8888888888
-    888    Y88b 8888888 8888888P\" d88P     888
-
->< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
->< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
-
-Usage:
-  $ kida <command> [params...]
-
-KIDA commands:
-  - health
-
-SYS commands:
-  - system.info
-  - system.health
-  - system.shutdown
-  - system.shutdown now
-  - system.reboot now
-
-Docker commands:
-  - docker.containers.list
-  - docker.container.start <id or name>
-  - docker.container.stop <id or name>
-  - docker.container.restart <id or name>
-  - docker.container.delete <id or name>
-
->< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
->< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
-  "
-    );
 }
