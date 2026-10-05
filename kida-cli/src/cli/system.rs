@@ -8,4 +8,8 @@ pub enum SystemCommand {
         #[arg(value_name = "time")]
         time: String,
     },
+    Reboot {
+        #[arg(value_name = "time")]
+        time: String,
+    },
 }

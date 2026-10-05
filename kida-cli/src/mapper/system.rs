@@ -10,6 +10,7 @@ impl From<SystemCommand> for CommandRequest {
             SystemCommand::Info => request("system.info", empty_params()),
             SystemCommand::Health => request("system.health", empty_params()),
             SystemCommand::Shutdown { time } => request("system.shutdown", json!({ "when": time })),
+            SystemCommand::Reboot { time } => request("system.reboot", json!({"when": time})),
         }
     }
 }
