@@ -1,6 +1,8 @@
 mod comm;
 mod conf;
+mod docker;
 mod exec;
+mod system;
 
 use comm::transport::{http::HttpServer, unix::UnixSocketServer};
 use conf::{ConfigManager, DEFAULT_CONFIG_PATH};
@@ -25,7 +27,7 @@ fn print_banner() {
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< >< ><
 
-    888    d8P  8888888 8888888b.        d8888  v0.0.2
+    888    d8P  8888888 8888888b.        d8888  v0.0.3
     888   d8P     888   888  \"Y88b      d88888  AGENT
     888  d8P      888   888    888     d88P888
     888d88K       888   888    888    d88P 888

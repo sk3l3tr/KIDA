@@ -1,30 +1,36 @@
-use std::process::Command;
-
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
-pub async fn exec(request: CommandRequest) -> CommandResponse {
-    let container = match get_container(&request.params) {
-        Ok(container) => container,
+use crate::docker::DockerService;
 
-        Err(error) => {
+pub async fn exec(request: CommandRequest) -> CommandResponse {
+    let container = match request
+        .params
+        .get("container")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some(container) => container,
+
+        None => {
             return CommandResponse {
                 id: request.id,
                 status: CommandStatus::Error,
                 data: None,
-                error: Some(error),
+                error: Some("Missing required parameter: container".to_string()),
             };
         }
     };
 
-    match restart_container(&container) {
+    match DockerService::restart(container) {
         Ok(()) => CommandResponse {
             id: request.id,
             status: CommandStatus::Ok,
             data: Some(json!({
                 "container": container,
-                "status": "restarted",
+                "status": "restarted"
             })),
             error: None,
         },
@@ -36,32 +42,4 @@ pub async fn exec(request: CommandRequest) -> CommandResponse {
             error: Some(error),
         },
     }
-}
-
-fn get_container(params: &Value) -> Result<String, String> {
-    params
-        .get("container")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|container| !container.is_empty())
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| "Missing required parameter: container".to_string())
-}
-
-fn restart_container(container: &str) -> Result<(), String> {
-    let output = Command::new("docker")
-        .args(["restart", container])
-        .output()
-        .map_err(|e| format!("Cannot execute docker restart: {e}"))?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-
-        return Err(format!(
-            "docker restart failed for '{container}': {}",
-            error.trim()
-        ));
-    }
-
-    Ok(())
 }
