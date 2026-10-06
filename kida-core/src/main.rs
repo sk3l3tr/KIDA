@@ -1,19 +1,19 @@
 mod comm;
+mod conf;
 mod exec;
 
 use comm::transport::{http::HttpServer, unix::UnixSocketServer};
-
-const UNIX_SOCKET_PATH: &str = "/tmp/kida.sock";
-
-const HTTP_HOST: &str = "127.0.0.1";
-const HTTP_PORT: u16 = 8989;
+use conf::{ConfigManager, DEFAULT_CONFIG_PATH};
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     print_banner();
 
-    let unix_server = UnixSocketServer::new(UNIX_SOCKET_PATH);
-    let http_server = HttpServer::new(HTTP_HOST, HTTP_PORT);
+    let config_manager = ConfigManager::load_or_create(DEFAULT_CONFIG_PATH)?;
+    let config = config_manager.get();
+
+    let unix_server = UnixSocketServer::new(&config.unix.socket_path);
+    let http_server = HttpServer::new(&config.http.host, config.http.port);
 
     tokio::try_join!(unix_server.start(), http_server.start(),)?;
 
