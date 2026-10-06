@@ -2,7 +2,7 @@ use serde_json::json;
 
 use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
-use crate::system::RebootService;
+use crate::system::SystemPower;
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
     let when = request
@@ -11,7 +11,7 @@ pub async fn exec(request: CommandRequest) -> CommandResponse {
         .and_then(|value| value.as_str())
         .unwrap_or("+1");
 
-    match RebootService::reboot(when) {
+    match SystemPower::reboot(when) {
         Ok(result) => CommandResponse {
             id: request.id,
             status: CommandStatus::Ok,

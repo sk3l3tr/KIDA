@@ -1,15 +1,15 @@
 use serde_json::json;
 
 use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
-use crate::system::SystemCollectorService;
+use crate::system::SystemCollector;
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
-    match SystemCollectorService::collect_hwmon() {
+    match SystemCollector::collect_hwmon() {
         Ok(sensors) => CommandResponse {
             id: request.id,
             status: CommandStatus::Ok,
             data: Some(json!({
-                "overall": SystemCollectorService::calculate_overall_status(&sensors),
+                "overall": SystemCollector::calculate_overall_status(&sensors),
                 "sensors": sensors,
             })),
             error: None,

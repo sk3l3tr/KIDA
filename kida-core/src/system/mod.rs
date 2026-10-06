@@ -1,11 +1,6 @@
-mod collector_service;
+mod collector;
 mod model;
-mod reboot_service;
-mod shutdown_service;
-mod system_info_service;
+mod power;
 
-pub use shutdown_service::{ShutdownResult, ShutdownService};
-
-pub use collector_service::SystemCollectorService;
-pub use reboot_service::{RebootResult, RebootService};
-pub use system_info_service::SystemInfoService;
+pub use collector::SystemCollector;
+pub use power::SystemPower;

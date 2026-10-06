@@ -1,12 +1,76 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use serde_json::{Value, json};
+use sysinfo::{Disks, System};
 
-pub struct SystemCollectorService;
-impl SystemCollectorService {
+use super::model::*;
+
+pub struct SystemCollector;
+
+impl SystemCollector {
+    pub fn info() -> SystemInfo {
+        let mut system = System::new_all();
+        system.refresh_all();
+
+        let disks = Disks::new_with_refreshed_list()
+            .list()
+            .iter()
+            .map(|disk| DiskInfo {
+                name: disk.name().to_string_lossy().into_owned(),
+                mount_point: disk.mount_point().to_string_lossy().into_owned(),
+                file_system: disk.file_system().to_string_lossy().into_owned(),
+                total_bytes: disk.total_space(),
+                available_bytes: disk.available_space(),
+                removable: disk.is_removable(),
+            })
+            .collect();
+
+        let cpu = system.cpus().first();
+
+        SystemInfo {
+            hostname: System::host_name(),
+
+            os: OsInfo {
+                name: System::name(),
+                version: System::os_version(),
+                long_version: System::long_os_version(),
+            },
+
+            kernel: KernelInfo {
+                version: System::kernel_version(),
+                long_version: Some(System::kernel_long_version()),
+            },
+
+            architecture: System::cpu_arch(),
+
+            hardware: HardwareInfo {
+                model: read_trimmed("/sys/devices/virtual/dmi/id/product_name"),
+                vendor: read_trimmed("/sys/devices/virtual/dmi/id/sys_vendor"),
+            },
+
+            cpu: CpuInfo {
+                brand: cpu.map(|cpu| cpu.brand().to_string()),
+                vendor: cpu.map(|cpu| cpu.vendor_id().to_string()),
+                logical_cores: system.cpus().len(),
+                physical_cores: System::physical_core_count(),
+            },
+
+            memory: MemoryInfo {
+                total_bytes: system.total_memory(),
+                available_bytes: system.available_memory(),
+                used_bytes: system.used_memory(),
+            },
+
+            graphics: get_graphics(),
+
+            disks,
+        }
+    }
+
     pub fn collect_hwmon() -> Result<Vec<Value>, String> {
         let root = Path::new("/sys/class/hwmon");
 
@@ -45,6 +109,7 @@ impl SystemCollectorService {
         if warning { "WARNING" } else { "OK" }
     }
 }
+
 fn collect_temperatures(path: &Path, device_name: &str, sensors: &mut Vec<Value>) {
     for index in 1..=32 {
         let input_path = path.join(format!("temp{index}_input"));
@@ -149,13 +214,36 @@ fn temperature_status(
     "OK"
 }
 
+fn read_trimmed(path: &str) -> Option<String> {
+    fs::read_to_string(path)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
 fn read_string(path: PathBuf) -> Option<String> {
     fs::read_to_string(path)
         .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn read_i64(path: PathBuf) -> Option<i64> {
     read_string(path)?.parse().ok()
+}
+
+fn get_graphics() -> Vec<String> {
+    let Some(output) = Command::new("lspci").arg("-mm").output().ok() else {
+        return Vec::new();
+    };
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| {
+            line.contains("VGA compatible controller")
+                || line.contains("3D controller")
+                || line.contains("Display controller")
+        })
+        .map(str::to_string)
+        .collect()
 }
