@@ -1,3 +1,4 @@
+mod backup;
 mod comm;
 mod conf;
 mod docker;

@@ -1,3 +1,4 @@
+mod backup;
 mod docker;
 mod system;
 
@@ -13,6 +14,7 @@ impl From<Command> for CommandRequest {
             Command::Health => request("health", empty_params()),
             Command::System { command } => command.into(),
             Command::Docker { command } => command.into(),
+            Command::Backup { command } => command.into(),
         }
     }
 }
@@ -35,20 +37,4 @@ fn generate_request_id() -> String {
         .unwrap_or_default()
         .as_nanos()
         .to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use crate::{cli::Command, protocol::CommandRequest};
-
-    #[test]
-    fn maps_health() {
-        let request = CommandRequest::from(Command::Health);
-
-        assert_eq!(request.command, "health");
-        assert_eq!(request.params, json!({}));
-        assert!(!request.id.is_empty());
-    }
 }

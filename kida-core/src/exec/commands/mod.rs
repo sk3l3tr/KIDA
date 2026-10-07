@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod docker;
 pub mod sys;
 

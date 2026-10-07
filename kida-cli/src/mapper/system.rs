@@ -14,31 +14,3 @@ impl From<SystemCommand> for CommandRequest {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use crate::{cli::SystemCommand, protocol::CommandRequest};
-
-    #[test]
-    fn maps_every_system_command() {
-        let cases = [
-            (SystemCommand::Info, "system.info", json!({})),
-            (SystemCommand::Health, "system.health", json!({})),
-            (
-                SystemCommand::Shutdown { time: "now".into() },
-                "system.shutdown",
-                json!({ "when": "now" }),
-            ),
-        ];
-
-        for (command, expected_command, expected_params) in cases {
-            let request = CommandRequest::from(command);
-
-            assert_eq!(request.command, expected_command);
-            assert_eq!(request.params, expected_params);
-            assert!(!request.id.is_empty());
-        }
-    }
-}

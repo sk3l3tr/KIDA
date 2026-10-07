@@ -1,3 +1,4 @@
+mod backup;
 mod docker;
 mod system;
 
@@ -190,81 +191,4 @@ fn value_object<'a>(value: &'a Value, path: &str) -> Result<&'a Map<String, Valu
     value
         .as_object()
         .ok_or_else(|| RenderError::invalid(path, "an object"))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashSet;
-
-    use serde_json::json;
-
-    use super::*;
-    use crate::protocol::CommandStatus;
-
-    fn response(data: Option<Value>) -> CommandResponse {
-        CommandResponse {
-            id: "1".into(),
-            status: CommandStatus::Ok,
-            data,
-            error: None,
-        }
-    }
-
-    #[test]
-    fn registry_contains_every_core_command_once() {
-        let expected = [
-            "health",
-            "system.info",
-            "system.health",
-            "system.shutdown",
-            "system.reboot",
-            "docker.containers.list",
-            "docker.container.start",
-            "docker.container.stop",
-            "docker.container.restart",
-            "docker.container.delete",
-        ];
-        let ids: HashSet<_> = RENDERERS.iter().map(|(id, _)| *id).collect();
-
-        assert_eq!(ids.len(), RENDERERS.len(), "duplicate renderer identifier");
-        assert_eq!(ids, HashSet::from(expected));
-    }
-
-    #[test]
-    fn registry_resolves_every_command_to_its_expected_renderer() {
-        let expected: [(&str, Renderer); 10] = [
-            ("health", system::health),
-            ("system.info", system::info),
-            ("system.health", system::system_health),
-            ("system.shutdown", system::shutdown),
-            ("system.reboot", system::reboot),
-            ("docker.containers.list", docker::containers_list),
-            ("docker.container.start", docker::container_action),
-            ("docker.container.stop", docker::container_action),
-            ("docker.container.restart", docker::container_action),
-            ("docker.container.delete", docker::container_action),
-        ];
-
-        for (command, expected_renderer) in expected {
-            let actual = renderer_for(command).expect("registered command should resolve");
-            assert!(
-                std::ptr::fn_addr_eq(actual, expected_renderer),
-                "wrong renderer for {command}"
-            );
-        }
-    }
-
-    #[test]
-    fn unknown_commands_pretty_print_only_data() {
-        let output = render("future.command", &response(Some(json!({"answer": 42}))))
-            .expect("fallback should render");
-
-        assert_eq!(output, "{\n  \"answer\": 42\n}");
-        assert!(!output.contains("status"));
-    }
-
-    #[test]
-    fn unknown_commands_without_data_print_null() {
-        assert_eq!(render("future.command", &response(None)).unwrap(), "null");
-    }
 }

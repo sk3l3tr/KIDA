@@ -2,6 +2,7 @@ use crate::{
     comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
     exec::commands::{
         self,
+        backup::backup_list,
         docker::{
             docker_container_delete, docker_container_restart, docker_container_start,
             docker_container_stop, docker_containers_list,
@@ -24,6 +25,8 @@ pub async fn execute(request: CommandRequest) -> CommandResponse {
         "docker.container.start" => docker_container_start::exec(request).await,
         "docker.container.restart" => docker_container_restart::exec(request).await,
         "docker.container.delete" => docker_container_delete::exec(request).await,
+
+        "backup.list" => backup_list::exec(request).await,
 
         _ => CommandResponse {
             id: request.id,
