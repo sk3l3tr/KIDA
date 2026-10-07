@@ -46,6 +46,26 @@ impl BackupRepository {
 
         Ok(jobs)
     }
+
+    pub fn create(&self, job: &BackupJob) -> Result<(), BackupError> {
+        fs::create_dir_all(&self.directory)?;
+
+        let path = self.directory.join(format!("{}.toml", job.id));
+
+        if path.exists() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                format!("backup job '{}' already exists", job.id),
+            )
+            .into());
+        }
+
+        let content = toml::to_string_pretty(job).map_err(BackupError::SerializeConfig)?;
+
+        fs::write(path, content)?;
+
+        Ok(())
+    }
 }
 
 fn is_toml(path: &Path) -> bool {

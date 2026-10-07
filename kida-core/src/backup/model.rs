@@ -29,6 +29,26 @@ pub struct BackupJob {
     pub retention: Option<RetentionPolicy>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct NewBackupJob {
+    pub name: String,
+
+    pub sources: Vec<PathBuf>,
+    pub targets: Vec<BackupTarget>,
+
+    #[serde(default)]
+    pub compression: Compression,
+
+    #[serde(default)]
+    pub lifecycle: Lifecycle,
+
+    #[serde(default)]
+    pub schedule: Option<Value>,
+
+    #[serde(default)]
+    pub retention: Option<RetentionPolicy>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackupTarget {
     pub path: PathBuf,

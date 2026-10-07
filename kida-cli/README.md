@@ -113,6 +113,20 @@ kida docker container delete web
 > **Warning:** Deleting a container is permanent. Stop it first and verify its
 > name or ID before deleting it.
 
+## Backup commands
+
+### Create a backup job
+
+Create a backup job from a TOML configuration file:
+
+```bash
+kida backup create -f /path/to/backup-job.toml
+```
+
+Relative paths are resolved against KIDA CLI's current working directory before
+being sent to KIDA Core. Absolute paths are passed unchanged. KIDA CLI does not
+read or validate the file, which must be accessible from KIDA Core's filesystem.
+
 ## Output and errors
 
 Command results are printed directly in the terminal in a compact,

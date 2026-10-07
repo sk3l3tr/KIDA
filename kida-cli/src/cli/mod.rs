@@ -31,3 +31,61 @@ pub enum Command {
         command: BackupCommand,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use clap::{Parser, error::ErrorKind};
+    use serde_json::json;
+
+    use super::*;
+    use crate::protocol::CommandRequest;
+
+    #[test]
+    fn parses_backup_create_with_required_short_file_option() {
+        let cli = Cli::try_parse_from([
+            "kida",
+            "backup",
+            "create",
+            "-f",
+            "/home/user/nextcloud.toml",
+        ])
+        .expect("backup create should parse");
+
+        assert_eq!(
+            cli.command,
+            Command::Backup {
+                command: BackupCommand::Create {
+                    file: "/home/user/nextcloud.toml".to_string(),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn backup_create_requires_file_option() {
+        let error = Cli::try_parse_from(["kida", "backup", "create"])
+            .expect_err("backup create without -f should fail");
+
+        assert_eq!(error.kind(), ErrorKind::MissingRequiredArgument);
+    }
+
+    #[test]
+    fn resolves_relative_backup_file_before_building_the_request() {
+        let relative = "path/that/does/not/exist/backup-job.toml";
+        let expected = env::current_dir()
+            .expect("current directory should be available")
+            .join(relative)
+            .into_os_string()
+            .into_string()
+            .expect("test path should be valid UTF-8");
+
+        let cli = Cli::try_parse_from(["kida", "backup", "create", "-f", relative])
+            .expect("relative backup path should parse");
+        let request = CommandRequest::from(cli.command);
+
+        assert_eq!(request.command, "backup.create");
+        assert_eq!(request.params, json!({ "file": expected }));
+    }
+}
