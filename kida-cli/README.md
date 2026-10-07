@@ -115,6 +115,38 @@ kida docker container delete web
 
 ## Backup commands
 
+### List backup jobs
+
+List every backup job configured in KIDA Core:
+
+```bash
+kida backup list
+```
+
+Each job includes its sources, targets, lifecycle operations, schedule, and
+retention policy. For example:
+
+```text
+Name: Nextcloud
+ID: 8e1dba64-36c2-4eac-937c-d23a283256ec
+Compression: tar_zstd
+Schedule:
+  {
+    "cron": "0 3 * * *"
+  }
+Sources:
+  - /srv/nextcloud
+Targets:
+  - /mnt/backups (required, filesystem UUID: 2d89-55c1)
+Lifecycle:
+  Pre-backup: None
+  Post-backup: None
+Retention:
+  Max age: 30d
+  Keep last: 7
+  Protected restore points: None
+```
+
 ### Create a backup job
 
 Create a backup job from a TOML configuration file:
