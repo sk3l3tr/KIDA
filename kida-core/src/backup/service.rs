@@ -42,4 +42,10 @@ impl BackupService {
 
         Ok(job)
     }
+
+    pub fn delete(identifier: &str) -> Result<BackupJob, BackupError> {
+        let repository = BackupRepository::new("/etc/kida/backups.d");
+
+        repository.delete(identifier)
+    }
 }

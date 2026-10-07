@@ -22,6 +22,7 @@ const RENDERERS: &[(&str, Renderer)] = &[
     ("docker.container.restart", docker::container_action),
     ("docker.container.delete", docker::container_action),
     ("backup.create", backup::create),
+    ("backup.delete", backup::delete),
 ];
 
 #[derive(Debug, PartialEq, Eq)]

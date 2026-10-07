@@ -127,6 +127,20 @@ Relative paths are resolved against KIDA CLI's current working directory before
 being sent to KIDA Core. Absolute paths are passed unchanged. KIDA CLI does not
 read or validate the file, which must be accessible from KIDA Core's filesystem.
 
+### Delete a backup job
+
+Delete a backup job by its ID or name:
+
+```bash
+kida backup delete --id <id-code>
+kida backup delete --name <name>
+```
+
+Exactly one selector must be provided.
+
+> **Warning:** Deleting a backup job is permanent. Verify its name or ID before
+> deleting it.
+
 ## Output and errors
 
 Command results are printed directly in the terminal in a compact,

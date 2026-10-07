@@ -1,6 +1,6 @@
 use std::{env, path::Path};
 
-use clap::Subcommand;
+use clap::{ArgGroup, Subcommand};
 
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum BackupCommand {
@@ -8,6 +8,18 @@ pub enum BackupCommand {
     Create {
         #[arg(short = 'f', value_name = "file", value_parser = absolute_file_path)]
         file: String,
+    },
+    #[command(group(
+        ArgGroup::new("selector")
+            .required(true)
+            .multiple(false)
+            .args(["id", "name"])
+    ))]
+    Delete {
+        #[arg(long, value_name = "id-code")]
+        id: Option<String>,
+        #[arg(long, value_name = "name")]
+        name: Option<String>,
     },
 }
 

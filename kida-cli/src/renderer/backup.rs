@@ -10,6 +10,14 @@ pub(super) fn create(response: &CommandResponse) -> Result<String, RenderError> 
     Ok(format!("Backup job {name} created (ID: {id})."))
 }
 
+pub(super) fn delete(response: &CommandResponse) -> Result<String, RenderError> {
+    let data = data(response)?;
+    let id = string(data, "id", "data.id")?;
+    let name = string(data, "name", "data.name")?;
+
+    Ok(format!("Backup job {name} deleted (ID: {id})."))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
@@ -51,5 +59,31 @@ mod tests {
     fn rejects_missing_or_invalid_name() {
         assert!(create(&response(json!({"id": "backup-1"}))).is_err());
         assert!(create(&response(json!({"id": "backup-1", "name": false}))).is_err());
+    }
+
+    #[test]
+    fn renders_deleted_backup_job() {
+        let output = crate::renderer::render(
+            "backup.delete",
+            &response(json!({
+                "id": "backup-1",
+                "name": "Nextcloud"
+            })),
+        )
+        .expect("valid response should render");
+
+        assert_eq!(output, "Backup job Nextcloud deleted (ID: backup-1).");
+    }
+
+    #[test]
+    fn delete_rejects_missing_or_invalid_id() {
+        assert!(delete(&response(json!({"name": "Nextcloud"}))).is_err());
+        assert!(delete(&response(json!({"id": 1, "name": "Nextcloud"}))).is_err());
+    }
+
+    #[test]
+    fn delete_rejects_missing_or_invalid_name() {
+        assert!(delete(&response(json!({"id": "backup-1"}))).is_err());
+        assert!(delete(&response(json!({"id": "backup-1", "name": false}))).is_err());
     }
 }

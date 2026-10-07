@@ -72,6 +72,57 @@ mod tests {
     }
 
     #[test]
+    fn parses_backup_delete_with_id() {
+        let cli = Cli::try_parse_from(["kida", "backup", "delete", "--id", "backup-1"])
+            .expect("backup delete with an ID should parse");
+
+        assert_eq!(
+            cli.command,
+            Command::Backup {
+                command: BackupCommand::Delete {
+                    id: Some("backup-1".to_string()),
+                    name: None,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn parses_backup_delete_with_name() {
+        let cli = Cli::try_parse_from(["kida", "backup", "delete", "--name", "Nextcloud"])
+            .expect("backup delete with a name should parse");
+
+        assert_eq!(
+            cli.command,
+            Command::Backup {
+                command: BackupCommand::Delete {
+                    id: None,
+                    name: Some("Nextcloud".to_string()),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn backup_delete_requires_exactly_one_selector() {
+        let missing = Cli::try_parse_from(["kida", "backup", "delete"])
+            .expect_err("backup delete without a selector should fail");
+        assert_eq!(missing.kind(), ErrorKind::MissingRequiredArgument);
+
+        let conflicting = Cli::try_parse_from([
+            "kida",
+            "backup",
+            "delete",
+            "--id",
+            "backup-1",
+            "--name",
+            "Nextcloud",
+        ])
+        .expect_err("backup delete with both selectors should fail");
+        assert_eq!(conflicting.kind(), ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
     fn resolves_relative_backup_file_before_building_the_request() {
         let relative = "path/that/does/not/exist/backup-job.toml";
         let expected = env::current_dir()
