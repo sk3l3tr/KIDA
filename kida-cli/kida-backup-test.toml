@@ -1,0 +1,8 @@
+name = "test-backup"
+compression = "tar_zstd"
+
+sources = ["/etc/hosts"]
+
+[[targets]]
+path = "/tmp/backups"
+required = true

@@ -76,15 +76,22 @@ impl Default for Compression {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LifecycleCommand {
+    pub command: String,
+
+    #[serde(default)]
+    pub params: Value,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Lifecycle {
     #[serde(default)]
-    pub pre_backup: Vec<Value>,
+    pub pre_backup: Vec<LifecycleCommand>,
 
     #[serde(default)]
-    pub post_backup: Vec<Value>,
+    pub post_backup: Vec<LifecycleCommand>,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetentionPolicy {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,4 +102,30 @@ pub struct RetentionPolicy {
 
     #[serde(default)]
     pub protected_restore_points: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum BackupTargetStatus {
+    Ok,
+    Failed,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BackupTargetResult {
+    pub path: PathBuf,
+    pub status: BackupTargetStatus,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BackupRunResult {
+    pub job_id: String,
+    pub artifact_name: String,
+    pub checksum: String,
+    pub size: u64,
+    pub targets: Vec<BackupTargetResult>,
 }

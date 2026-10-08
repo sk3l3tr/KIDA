@@ -11,7 +11,6 @@ use crate::{cli::Command, protocol::CommandRequest};
 impl From<Command> for CommandRequest {
     fn from(command: Command) -> Self {
         match command {
-            Command::Health => request("health", empty_params()),
             Command::System { command } => command.into(),
             Command::Docker { command } => command.into(),
             Command::Backup { command } => command.into(),

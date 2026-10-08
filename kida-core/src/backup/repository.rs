@@ -107,6 +107,43 @@ impl BackupRepository {
         )
         .into())
     }
+
+    pub fn get(&self, identifier: &str) -> Result<BackupJob, BackupError> {
+        if !self.directory.exists() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("Backup job not found: {identifier}"),
+            )
+            .into());
+        }
+
+        for entry in fs::read_dir(&self.directory)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if !is_toml(&path) {
+                continue;
+            }
+
+            let content = fs::read_to_string(&path)?;
+
+            let job: BackupJob =
+                toml::from_str(&content).map_err(|source| BackupError::InvalidConfig {
+                    path: path.clone(),
+                    source,
+                })?;
+
+            if job.id == identifier || job.name == identifier {
+                return Ok(job);
+            }
+        }
+
+        Err(Error::new(
+            ErrorKind::NotFound,
+            format!("Backup job not found: {identifier}"),
+        )
+        .into())
+    }
 }
 
 fn is_toml(path: &Path) -> bool {
