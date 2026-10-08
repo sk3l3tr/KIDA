@@ -1,6 +1,5 @@
 mod backup;
 mod docker;
-mod kida;
 mod system;
 
 mod error;
@@ -15,7 +14,6 @@ use error::RenderError;
 type Renderer = fn(&CommandResponse) -> Result<String, RenderError>;
 
 const RENDERERS: &[(&str, Renderer)] = &[
-    ("health", kida::health),
     ("system.info", system::info),
     ("system.health", system::health),
     ("system.shutdown", system::shutdown),

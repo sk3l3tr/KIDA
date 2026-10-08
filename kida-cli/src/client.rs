@@ -7,8 +7,6 @@ use std::{
 
 use crate::protocol::{CommandRequest, CommandResponse};
 
-pub const DEFAULT_SOCKET_PATH: &str = "/tmp/kida.sock";
-
 #[derive(Debug)]
 pub enum ClientError {
     AgentUnavailable,
@@ -28,10 +26,6 @@ impl KidaClient {
         Self {
             socket_path: socket_path.into(),
         }
-    }
-
-    pub fn default() -> Self {
-        Self::new(DEFAULT_SOCKET_PATH)
     }
 
     pub fn send(&self, request: &CommandRequest) -> Result<CommandResponse, ClientError> {

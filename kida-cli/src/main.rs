@@ -11,11 +11,15 @@ use cli::Cli;
 use client::{ClientError, KidaClient};
 use protocol::{CommandRequest, CommandResponse, CommandStatus};
 
+use crate::protocol::ResponseResult;
+
+pub const DEFAULT_SOCKET_PATH: &str = "/tmp/kida.sock";
+
 fn main() -> ExitCode {
     let request = CommandRequest::from(Cli::parse().command);
     let command = request.command.clone();
 
-    let client = KidaClient::default();
+    let client = KidaClient::new(DEFAULT_SOCKET_PATH);
 
     match client.send(&request) {
         Ok(response) => {
@@ -47,12 +51,6 @@ fn main() -> ExitCode {
             ExitCode::from(3)
         }
     }
-}
-
-struct ResponseResult {
-    stdout: Option<String>,
-    stderr: Option<String>,
-    exit_code: ExitCode,
 }
 
 fn handle_response(command: &str, response: &CommandResponse) -> ResponseResult {
