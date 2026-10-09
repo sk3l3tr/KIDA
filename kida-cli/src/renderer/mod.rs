@@ -35,6 +35,7 @@ const RENDERERS: &[(&str, Renderer)] = &[
     ("backup.config.create", backup::config::create),
     ("backup.config.delete", backup::config::delete),
     ("backup.config.list", backup::config::list),
+    ("backup.run", backup::run::run),
 ];
 
 pub fn render(command: &str, response: &CommandResponse) -> Result<String, RenderError> {

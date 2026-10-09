@@ -120,7 +120,7 @@ kida docker container delete web
 List every backup job configured in KIDA Core:
 
 ```bash
-kida backup list
+kida backup config list
 ```
 
 Each job includes its sources, targets, lifecycle operations, schedule, and
@@ -152,7 +152,7 @@ Retention:
 Create a backup job from a TOML configuration file:
 
 ```bash
-kida backup create -f /path/to/backup-job.toml
+kida backup config create -f /path/to/backup-job.toml
 ```
 
 Relative paths are resolved against KIDA CLI's current working directory before
@@ -164,14 +164,30 @@ read or validate the file, which must be accessible from KIDA Core's filesystem.
 Delete a backup job by its ID or name:
 
 ```bash
-kida backup delete --id <id-code>
-kida backup delete --name <name>
+kida backup config delete --id <id-code>
+kida backup config delete --name <name>
 ```
 
 Exactly one selector must be provided.
 
 > **Warning:** Deleting a backup job is permanent. Verify its name or ID before
 > deleting it.
+
+### Run a backup job
+
+Queue a configured backup job by its ID or name:
+
+```bash
+kida backup run --id <id-code>
+kida backup run --name <name>
+```
+
+Exactly one selector must be provided. When KIDA Core accepts the execution,
+KIDA CLI prints its execution ID:
+
+```text
+Backup queued (Execution ID: 4f79f9e1-1628-4e86-88bb-e96f5507aa1f).
+```
 
 ## Output and errors
 
