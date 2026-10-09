@@ -7,6 +7,7 @@ mod system;
 
 use comm::transport::{http::HttpServer, unix::UnixSocketServer};
 use conf::{ConfigManager, DEFAULT_CONFIG_PATH};
+use exec::{executor, worker};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,10 +16,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_manager = ConfigManager::load_or_create(DEFAULT_CONFIG_PATH)?;
     let config = config_manager.get();
 
+    // Inicializar FIFO global
+    let receiver = executor::init_queue()
+        .map_err(std::io::Error::other)?;
+
+    // Iniciar worker único
+    tokio::spawn(worker::run(receiver));
+
+    // Inicializar transportes sin dependencias de la FIFO
     let unix_server = UnixSocketServer::new(&config.unix.socket_path);
     let http_server = HttpServer::new(&config.http.host, config.http.port);
 
-    tokio::try_join!(unix_server.start(), http_server.start(),)?;
+    tokio::try_join!(
+        unix_server.start(),
+        http_server.start(),
+    )?;
 
     Ok(())
 }
