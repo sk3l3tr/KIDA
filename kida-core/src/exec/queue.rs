@@ -44,4 +44,3 @@ impl CommandQueue {
         Ok(execution_id)
     }
 }
-

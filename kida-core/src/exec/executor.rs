@@ -5,17 +5,16 @@ use tokio::sync::mpsc;
 use crate::{
     comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
     exec::{
-        queue::{CommandQueue, QueuedCommand, QueueError},
         commands::{
             self,
             backup::config::{backup_create, backup_delete, backup_list},
             docker::{
-                docker_container_delete, docker_container_restart,
-                docker_container_start, docker_container_stop,
-                docker_containers_list,
+                docker_container_delete, docker_container_restart, docker_container_start,
+                docker_container_stop, docker_containers_list,
             },
             sys::{system_health, system_info, system_reboot, system_shutdown},
         },
+        queue::{CommandQueue, QueueError, QueuedCommand},
     },
 };
 

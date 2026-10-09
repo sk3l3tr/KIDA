@@ -3,20 +3,14 @@ use tokio::sync::mpsc;
 
 use crate::{
     comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
-    exec::{
-        commands::backup::backup_run,
-        queue::QueuedCommand,
-    },
+    exec::{commands::backup::backup_run, queue::QueuedCommand},
 };
 
 pub async fn run(receiver: mpsc::Receiver<QueuedCommand>) {
     run_with_handler(receiver, backup_run::exec).await;
 }
 
-async fn run_with_handler<F, Fut>(
-    mut receiver: mpsc::Receiver<QueuedCommand>,
-    handler: F,
-)
+async fn run_with_handler<F, Fut>(mut receiver: mpsc::Receiver<QueuedCommand>, handler: F)
 where
     F: Fn(CommandRequest) -> Fut,
     Fut: Future<Output = CommandResponse> + Send + 'static,
@@ -60,10 +54,7 @@ where
             },
 
             Err(error) if error.is_panic() => {
-                eprintln!(
-                    "[QUEUE] Execution panicked: {} - {}",
-                    execution_id, error
-                );
+                eprintln!("[QUEUE] Execution panicked: {} - {}", execution_id, error);
             }
 
             Err(error) => {
@@ -77,4 +68,3 @@ where
 
     println!("[QUEUE] Worker stopped: channel closed");
 }
-

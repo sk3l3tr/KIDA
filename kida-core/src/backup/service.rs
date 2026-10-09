@@ -102,8 +102,20 @@ impl BackupService {
         let temp_path =
             std::env::temp_dir().join(format!("kida-{}-{artifact_name}", Uuid::new_v4()));
 
-        // 4. Crear artefacto.
-        let artifact_result = create_artifact(&job.sources, &temp_path);
+        // 4. Crear artefacto en un hilo bloqueante.
+        let sources = job.sources.clone();
+        let artifact_path = temp_path.clone();
+
+        let artifact_result: Result<(), BackupError> =
+            match tokio::task::spawn_blocking(move || create_artifact(&sources, &artifact_path))
+                .await
+            {
+                Ok(result) => result,
+                Err(error) => Err(std::io::Error::other(format!(
+                    "Backup artifact task failed: {error}"
+                ))
+                .into()),
+            };
 
         // 5/6/7. Dejamos de acceder a sources y restauramos servicios SIEMPRE.
         let post_result = run_lifecycle(&job.lifecycle.post_backup).await;
@@ -115,79 +127,94 @@ impl BackupService {
         post_result?;
 
         // 8. checksum
-        let checksum = sha256(&temp_path)?;
-        let size = fs::metadata(&temp_path)?.len();
+        // 8-11. Finalizar backup fuera del runtime asíncrono.
+        let result =
+            tokio::task::spawn_blocking(move || -> Result<BackupRunResult, BackupError> {
+                let checksum = sha256(&temp_path)?;
+                let size = fs::metadata(&temp_path)?.len();
 
-        // 9. Replicar + verificar
-        let mut target_results = Vec::new();
+                // 9. Replicar + verificar
+                let mut target_results = Vec::new();
 
-        for target in &job.targets {
-            if !target.path.is_dir() {
-                target_results.push(BackupTargetResult {
-                    path: target.path.clone(),
-                    status: BackupTargetStatus::Unavailable,
-                    error: Some("target unavailable".to_string()),
-                });
+                for target in &job.targets {
+                    if !target.path.is_dir() {
+                        target_results.push(BackupTargetResult {
+                            path: target.path.clone(),
+                            status: BackupTargetStatus::Unavailable,
+                            error: Some("target unavailable".to_string()),
+                        });
 
-                continue;
-            }
+                        continue;
+                    }
 
-            let destination = target.path.join(&artifact_name);
+                    let destination = target.path.join(&artifact_name);
 
-            let result = (|| -> Result<(), BackupError> {
-                fs::copy(&temp_path, &destination)?;
+                    let result = (|| -> Result<(), BackupError> {
+                        fs::copy(&temp_path, &destination)?;
 
-                let destination_checksum = sha256(&destination)?;
+                        let destination_checksum = sha256(&destination)?;
 
-                if destination_checksum != checksum {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("checksum mismatch for {}", destination.display()),
+                        if destination_checksum != checksum {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                format!("checksum mismatch for {}", destination.display()),
+                            )
+                            .into());
+                        }
+
+                        Ok(())
+                    })();
+
+                    match result {
+                        Ok(()) => target_results.push(BackupTargetResult {
+                            path: target.path.clone(),
+                            status: BackupTargetStatus::Ok,
+                            error: None,
+                        }),
+
+                        Err(error) => target_results.push(BackupTargetResult {
+                            path: target.path.clone(),
+                            status: BackupTargetStatus::Failed,
+                            error: Some(error.to_string()),
+                        }),
+                    }
+                }
+
+                // 10. Comprobar destinos required
+                let required_failed =
+                    job.targets
+                        .iter()
+                        .zip(&target_results)
+                        .any(|(target, result)| {
+                            target.required && !matches!(result.status, BackupTargetStatus::Ok)
+                        });
+
+                // 11. Eliminar temporal
+                let _ = fs::remove_file(&temp_path);
+
+                if required_failed {
+                    return Err(std::io::Error::other(
+                        "one or more required backup targets failed",
                     )
                     .into());
                 }
 
-                Ok(())
-            })();
+                Ok(BackupRunResult {
+                    job_id: job.id,
+                    artifact_name,
+                    checksum,
+                    size,
+                    targets: target_results,
+                })
+            })
+            .await
+            .map_err(|error| {
+                BackupError::from(std::io::Error::other(format!(
+                    "Backup finalization task failed: {error}"
+                )))
+            })?;
 
-            match result {
-                Ok(()) => target_results.push(BackupTargetResult {
-                    path: target.path.clone(),
-                    status: BackupTargetStatus::Ok,
-                    error: None,
-                }),
-
-                Err(error) => target_results.push(BackupTargetResult {
-                    path: target.path.clone(),
-                    status: BackupTargetStatus::Failed,
-                    error: Some(error.to_string()),
-                }),
-            }
-        }
-
-        // 10. Comprobar destinos required
-        let required_failed = job
-            .targets
-            .iter()
-            .zip(&target_results)
-            .any(|(target, result)| {
-                target.required && !matches!(result.status, BackupTargetStatus::Ok)
-            });
-
-        // 11. Eliminar temporal
-        let _ = fs::remove_file(&temp_path);
-
-        if required_failed {
-            return Err(std::io::Error::other("one or more required backup targets failed").into());
-        }
-
-        Ok(BackupRunResult {
-            job_id: job.id,
-            artifact_name,
-            checksum,
-            size,
-            targets: target_results,
-        })
+        result
     }
 }
 
