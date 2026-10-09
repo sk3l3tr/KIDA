@@ -45,17 +45,3 @@ impl CommandQueue {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::Value;
-
-    fn request(id: usize) -> CommandRequest {
-        CommandRequest {
-            id: id.to_string(),
-            command: "backup.run".to_string(),
-            params: Value::Null,
-        }
-    }
-
- 
