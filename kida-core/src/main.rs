@@ -3,6 +3,7 @@ mod comm;
 mod conf;
 mod docker;
 mod exec;
+mod storage;
 mod system;
 
 use comm::transport::{http::HttpServer, unix::UnixSocketServer};
