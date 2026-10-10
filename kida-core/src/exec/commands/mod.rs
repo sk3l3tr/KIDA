@@ -1,5 +1,6 @@
 pub mod backup;
 pub mod docker;
+pub mod scheduler;
 pub mod sys;
 
 use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};

@@ -30,7 +30,41 @@ pub fn init_queue() -> Result<mpsc::Receiver<QueuedCommand>, &'static str> {
     Ok(receiver)
 }
 
+pub fn command_queue() -> Result<CommandQueue, &'static str> {
+    QUEUE.get().cloned().ok_or("Command queue not initialized")
+}
+
+pub fn is_registered(command: &str) -> bool {
+    matches!(
+        command,
+        "health"
+            | "system.info"
+            | "system.health"
+            | "system.shutdown"
+            | "system.reboot"
+            | "docker.containers.list"
+            | "docker.container.stop"
+            | "docker.container.start"
+            | "docker.container.restart"
+            | "docker.container.delete"
+            | "backup.config.list"
+            | "backup.config.create"
+            | "backup.config.delete"
+            | "backup.run"
+            | "scheduler.add"
+            | "scheduler.list"
+            | "scheduler.delete"
+    )
+}
+
 pub async fn execute(request: CommandRequest) -> CommandResponse {
+    match request.command.as_str() {
+        "backup.run" => enqueue(request),
+        _ => execute_now(request).await,
+    }
+}
+
+pub async fn execute_now(request: CommandRequest) -> CommandResponse {
     match request.command.as_str() {
         "health" => commands::health(request).await,
 
@@ -48,9 +82,29 @@ pub async fn execute(request: CommandRequest) -> CommandResponse {
         "backup.config.list" => backup_list::exec(request).await,
         "backup.config.create" => backup_create::exec(request).await,
         "backup.config.delete" => backup_delete::exec(request).await,
+        "backup.run" => commands::backup::backup_run::exec(request).await,
 
-        // Comandos encolados
-        "backup.run" => enqueue(request),
+        "scheduler.add" | "scheduler.list" | "scheduler.delete" => {
+            let manager = match crate::scheduler::runtime::manager() {
+                Ok(manager) => manager,
+                Err(error) => {
+                    return CommandResponse {
+                        id: request.id,
+                        status: CommandStatus::Error,
+                        data: None,
+                        error: Some(error),
+                    };
+                }
+            };
+
+            match request.command.as_str() {
+                "scheduler.add" => commands::scheduler::scheduler_add::exec(request, manager).await,
+                "scheduler.list" => {
+                    commands::scheduler::scheduler_list::exec(request, manager).await
+                }
+                _ => commands::scheduler::scheduler_delete::exec(request, manager).await,
+            }
+        }
 
         _ => CommandResponse {
             id: request.id,

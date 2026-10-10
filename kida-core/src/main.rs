@@ -3,6 +3,7 @@ mod comm;
 mod conf;
 mod docker;
 mod exec;
+mod scheduler;
 mod storage;
 mod system;
 
@@ -19,6 +20,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Inicializar FIFO global
     let receiver = executor::init_queue().map_err(std::io::Error::other)?;
+    scheduler::runtime::init(
+        scheduler::repository::DEFAULT_SCHEDULER_PATH,
+        executor::command_queue().map_err(std::io::Error::other)?,
+    )
+    .map_err(std::io::Error::other)?;
 
     // Iniciar worker único
     tokio::spawn(worker::run(receiver));
@@ -27,7 +33,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let unix_server = UnixSocketServer::new(&config.unix.socket_path);
     let http_server = HttpServer::new(&config.http.host, config.http.port);
 
-    tokio::try_join!(unix_server.start(), http_server.start(),)?;
+    tokio::try_join!(
+        unix_server.start(),
+        http_server.start(),
+        scheduler::timer::run(),
+    )?;
 
     Ok(())
 }

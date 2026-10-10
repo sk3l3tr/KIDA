@@ -44,3 +44,66 @@ impl CommandQueue {
         Ok(execution_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn shared_queue_preserves_capacity_fifo_and_arbitrary_commands() {
+        assert_eq!(QUEUE_CAPACITY, 16);
+
+        let (queue, mut receiver) = CommandQueue::new();
+        let shared = queue.clone();
+        let commands = ["health", "backup.run", "scheduler.list"];
+        let mut execution_ids = Vec::new();
+
+        for index in 0..QUEUE_CAPACITY {
+            let sender = if index % 2 == 0 { &queue } else { &shared };
+            let execution_id = sender
+                .enqueue(CommandRequest {
+                    id: index.to_string(),
+                    command: commands[index % commands.len()].to_string(),
+                    params: json!({"position": index, "resource": null}),
+                })
+                .unwrap();
+
+            execution_ids.push(execution_id);
+        }
+
+        assert!(matches!(
+            shared.enqueue(CommandRequest {
+                id: "discarded".to_string(),
+                command: "health".to_string(),
+                params: json!(null),
+            }),
+            Err(QueueError::Full)
+        ));
+
+        for (index, execution_id) in execution_ids.iter().enumerate() {
+            let queued = receiver.try_recv().unwrap();
+
+            assert_eq!(&queued.execution_id, execution_id);
+            assert_eq!(queued.request.id, index.to_string());
+            assert_eq!(queued.request.command, commands[index % commands.len()]);
+            assert_eq!(
+                queued.request.params,
+                json!({"position": index, "resource": null})
+            );
+        }
+
+        assert!(receiver.try_recv().is_err());
+
+        drop(receiver);
+
+        assert!(matches!(
+            queue.enqueue(CommandRequest {
+                id: "closed".to_string(),
+                command: "health".to_string(),
+                params: json!(null),
+            }),
+            Err(QueueError::Closed)
+        ));
+    }
+}
