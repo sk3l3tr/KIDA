@@ -1,29 +1,31 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
+
+use crate::storage::{Storage, StorageError, TomlStorage};
 
 use super::model::KidaConfig;
 
 pub struct ConfigManager {
-    path: PathBuf,
+    storage: TomlStorage<KidaConfig>,
     config: KidaConfig,
 }
 
 impl ConfigManager {
     pub fn load_or_create(path: impl Into<PathBuf>) -> Result<Self, Box<dyn std::error::Error>> {
-        let path = path.into();
+        let storage = TomlStorage::new(path);
 
-        let config = if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            toml::from_str(&content)?
-        } else {
-            let config = KidaConfig::default();
-            save_config(&path, &config)?;
-            config
+        let config = match storage.load() {
+            Ok(config) => config,
+
+            Err(StorageError::NotFound { .. }) => {
+                let config = KidaConfig::default();
+                storage.save(&config)?;
+                config
+            }
+
+            Err(error) => return Err(error.into()),
         };
 
-        Ok(Self { path, config })
+        Ok(Self { storage, config })
     }
 
     pub fn get(&self) -> &KidaConfig {
@@ -31,24 +33,9 @@ impl ConfigManager {
     }
 
     pub fn update(&mut self, config: KidaConfig) -> Result<(), Box<dyn std::error::Error>> {
-        save_config(&self.path, &config)?;
+        self.storage.save(&config)?;
         self.config = config;
 
         Ok(())
     }
-}
-
-fn save_config(path: &Path, config: &KidaConfig) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let content = toml::to_string_pretty(config)?;
-
-    let tmp_path = path.with_extension("toml.tmp");
-
-    fs::write(&tmp_path, content)?;
-    fs::rename(tmp_path, path)?;
-
-    Ok(())
 }

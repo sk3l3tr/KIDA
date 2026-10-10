@@ -2,13 +2,15 @@ use std::{io, path::PathBuf};
 
 use thiserror::Error;
 
+use crate::storage::StorageError;
+
 #[derive(Debug, Error)]
 pub enum BackupError {
-    #[error("backup configuration I/O error: {0}")]
+    #[error("backup I/O error: {0}")]
     Io(#[from] io::Error),
 
-    #[error("failed to serialize backup configuration: {0}")]
-    SerializeConfig(#[from] toml::ser::Error),
+    #[error(transparent)]
+    Storage(#[from] StorageError),
 
     #[error("invalid backup configuration '{path}': {source}")]
     InvalidConfig {
