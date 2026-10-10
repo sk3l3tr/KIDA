@@ -189,6 +189,21 @@ KIDA CLI prints its execution ID:
 Backup queued (Execution ID: 4f79f9e1-1628-4e86-88bb-e96f5507aa1f).
 ```
 
+## Scheduled commands
+
+KIDA Core can schedule commands with one-time dates, fixed intervals, or CRON
+expressions with time zones. This version of KIDA CLI does not provide scheduler
+subcommands: `kida scheduler` is not available.
+
+To create, list, or delete schedules, use KIDA Core's HTTP or Unix socket API.
+See the [SCHEDULER usage guide](../kida-core/README.md#programar-comandos-con-scheduler)
+for complete examples and the behavior on restarts or a full execution queue.
+
+The schedule displayed in a backup job's configuration does not automatically
+schedule that backup. Create a separate schedule in KIDA Core to run it
+automatically. Deleting a schedule prevents future queue submissions but does
+not cancel requests already queued or running.
+
 ## Output and errors
 
 Command results are printed directly in the terminal in a compact,
