@@ -4,6 +4,7 @@ pub mod backup;
 pub mod error;
 pub mod file;
 pub mod indexed;
+pub mod scheduler;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
@@ -40,6 +41,7 @@ mod tests {
 pub mod fields;
 
 pub enum PreparedCommand {
+    Schedule(scheduler::NewSchedule),
     Create(Box<backup::NewBackupJob>),
     Other(crate::cli::Command),
 }
@@ -52,6 +54,30 @@ pub fn prepare(
 ) -> Result<PreparedCommand, InputError> {
     use crate::cli::{BackupCommand, BackupConfigCommand, Command, CreateParameters};
     match command {
+        Command::Scheduler {
+            command: crate::cli::SchedulerCommand::Add(args),
+        } => {
+            let mode = resolve_mode(
+                args.file.is_some(),
+                args.parameters != crate::cli::AddParameters::default(),
+            )?;
+            let schedule = match mode {
+                InputMode::File => {
+                    file::read_toml::<scheduler::FileSchedule>(&args.file.unwrap())?.prepare()?
+                }
+                InputMode::Parameters => scheduler::from_parameters(args.parameters)?,
+                InputMode::Wizard => {
+                    if !interactive {
+                        return Err(InputError::new(
+                            "wizard",
+                            "an interactive terminal is required",
+                        ));
+                    }
+                    scheduler::wizard(reader, writer)?
+                }
+            };
+            Ok(PreparedCommand::Schedule(schedule))
+        }
         Command::Backup {
             command:
                 BackupCommand::Config {

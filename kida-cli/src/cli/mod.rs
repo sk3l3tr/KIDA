@@ -1,11 +1,13 @@
 mod backup;
 mod docker;
+mod scheduler;
 mod system;
 
 use clap::{Parser, Subcommand};
 
 pub use backup::{BackupCommand, BackupConfigCommand, CreateParameters};
 pub use docker::{ContainerCommand, ContainersCommand, DockerCommand};
+pub use scheduler::{AddParameters, SchedulerCommand};
 pub use system::SystemCommand;
 
 #[derive(Debug, Parser, PartialEq, Eq)]
@@ -17,6 +19,10 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum Command {
+    Scheduler {
+        #[command(subcommand)]
+        command: SchedulerCommand,
+    },
     System {
         #[command(subcommand)]
         command: SystemCommand,

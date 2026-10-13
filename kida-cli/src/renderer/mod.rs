@@ -1,5 +1,6 @@
 mod backup;
 mod docker;
+mod scheduler;
 mod system;
 
 mod error;
@@ -14,6 +15,9 @@ use error::RenderError;
 type Renderer = fn(&CommandResponse) -> Result<String, RenderError>;
 
 const RENDERERS: &[(&str, Renderer)] = &[
+    ("scheduler.add", scheduler::add),
+    ("scheduler.list", scheduler::list),
+    ("scheduler.delete", scheduler::delete),
     ("system.info", system::info),
     ("system.health", system::health),
     ("system.shutdown", system::shutdown),

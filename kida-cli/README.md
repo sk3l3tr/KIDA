@@ -240,16 +240,56 @@ Backup queued (Execution ID: 4f79f9e1-1628-4e86-88bb-e96f5507aa1f).
 
 ## Scheduled commands
 
-KIDA Core can schedule commands with one-time dates, fixed intervals, or CRON
-expressions with time zones. This version of KIDA CLI does not provide scheduler
-subcommands: `kida scheduler` is not available.
+Choose a local TOML file, flags, or the interactive assistant:
 
-To create, list, or delete schedules, use KIDA Core's HTTP or Unix socket API.
-See the [SCHEDULER usage guide](../kida-core/README.md#programar-comandos-con-scheduler)
-for complete examples and the behavior on restarts or a full execution queue.
+```bash
+kida scheduler add -f ./schedule.toml
+kida scheduler add --command backup.run --params '{"name":"daily"}' --at '2030-01-01T12:00:00Z'
+kida scheduler add --command backup.run --params '{"name":"daily"}' --seconds 3600
+kida scheduler add --command backup.run --params '{"name":"daily"}' --cron '30 2 * * *' --timezone Europe/Madrid
+kida scheduler add
+```
+
+`-f` and `--file` are aliases. The file is read locally; only its interpreted
+definition is sent to CORE. For example:
+
+```toml
+command = "backup.run"
+params = '{"name":"daily"}'
+
+[schedule]
+type = "cron"
+expression = "30 2 * * *"
+timezone = "Europe/Madrid"
+```
+
+For `once`, use `type = "once"` and `at = "2030-01-01T12:00:00Z"` in
+`[schedule]`. For `interval`, use `type = "interval"` and `seconds = 3600`.
+`params` is required JSON text; use `'null'` when no parameters are needed.
+Unknown fields and fields belonging to another rule are rejected.
+
+File and flag modes are exclusive. Flags require `--command`, `--params`, and
+exactly one of `--at`, `--seconds`, or `--cron`. `--timezone` is valid only with
+`--cron` and defaults to `UTC`, as it does in files and the assistant. Incomplete
+flags, invalid JSON, and file errors fail locally without contacting CORE or
+opening the assistant. The assistant requires an interactive terminal, asks
+one question at a time, and cancels on EOF or interruption.
+
+CORE validates registered commands, future RFC3339 dates, positive intervals,
+five-field cron expressions, and IANA timezones. Command parameters retain their
+JSON values and are interpreted by the scheduled command when it executes.
+
+```bash
+kida scheduler list
+kida scheduler delete --id 8e1dba64-36c2-4eac-937c-d23a283256ec
+```
+
+The list shows each ID, command, JSON parameters, rule, and next enqueue attempt
+in the order returned by CORE. An empty list prints `No schedules found.`.
+CORE validates the deletion ID and whether it exists.
 
 The schedule displayed in a backup job's configuration does not automatically
-schedule that backup. Create a separate schedule in KIDA Core to run it
+schedule that backup. Use `kida scheduler add` with `backup.run` to run it
 automatically. Deleting a schedule prevents future queue submissions but does
 not cancel requests already queued or running.
 
