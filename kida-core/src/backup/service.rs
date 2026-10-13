@@ -17,6 +17,7 @@ use crate::{
         repository::BackupRepository,
     },
     comm::protocol::{CommandRequest, CommandStatus},
+    conf,
     exec::executor,
 };
 
@@ -24,12 +25,23 @@ pub struct BackupService;
 
 impl BackupService {
     pub fn list() -> Result<Vec<BackupJob>, BackupError> {
-        let repository = BackupRepository::new("/etc/kida/backups.d");
+        let repository = BackupRepository::new(
+            &conf::get()
+                .map_err(std::io::Error::other)?
+                .backup
+                .backup_dir,
+        );
 
         repository.list()
     }
 
     pub fn create(path: &Path) -> Result<BackupJob, BackupError> {
+        let repository = BackupRepository::new(
+            &conf::get()
+                .map_err(std::io::Error::other)?
+                .backup
+                .backup_dir,
+        );
         let content = fs::read_to_string(path)?;
 
         let input: NewBackupJob =
@@ -49,20 +61,29 @@ impl BackupService {
             retention: input.retention,
         };
 
-        let repository = BackupRepository::new("/etc/kida/backups.d");
         repository.create(&job)?;
 
         Ok(job)
     }
 
     pub fn delete(identifier: &str) -> Result<BackupJob, BackupError> {
-        let repository = BackupRepository::new("/etc/kida/backups.d");
+        let repository = BackupRepository::new(
+            &conf::get()
+                .map_err(std::io::Error::other)?
+                .backup
+                .backup_dir,
+        );
 
         repository.delete(identifier)
     }
 
     pub async fn run(identifier: &str) -> Result<BackupRunResult, BackupError> {
-        let repository = BackupRepository::new("/etc/kida/backups.d");
+        let repository = BackupRepository::new(
+            &conf::get()
+                .map_err(std::io::Error::other)?
+                .backup
+                .backup_dir,
+        );
         let job = repository.get(identifier)?;
 
         // 1. Validar sources

@@ -8,15 +8,15 @@ mod storage;
 mod system;
 
 use comm::transport::{http::HttpServer, unix::UnixSocketServer};
-use conf::{ConfigManager, DEFAULT_CONFIG_PATH};
+use conf::DEFAULT_CONFIG_PATH;
 use exec::{executor, worker};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     print_banner();
 
-    let config_manager = ConfigManager::load_or_create(DEFAULT_CONFIG_PATH)?;
-    let config = config_manager.get();
+    conf::init(DEFAULT_CONFIG_PATH)?;
+    let config = conf::get().map_err(std::io::Error::other)?;
 
     // Inicializar FIFO global
     let receiver = executor::init_queue().map_err(std::io::Error::other)?;
