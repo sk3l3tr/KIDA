@@ -4,10 +4,13 @@ use std::{
     process::Command,
 };
 
+use super::model::*;
 use serde_json::{Value, json};
 use sysinfo::{Disks, System};
 
-use super::model::*;
+const SYS_DMI_PRODUCT_NAME_PATH: &str = "/sys/devices/virtual/dmi/id/product_name";
+const SYS_DMI_VENDOR_PATH: &str = "/sys/devices/virtual/dmi/id/sys_vendor";
+const SYS_HWMON_PATH: &str = "/sys/class/hwmon";
 
 pub struct SystemCollector;
 
@@ -48,8 +51,8 @@ impl SystemCollector {
             architecture: System::cpu_arch(),
 
             hardware: HardwareInfo {
-                model: read_trimmed("/sys/devices/virtual/dmi/id/product_name"),
-                vendor: read_trimmed("/sys/devices/virtual/dmi/id/sys_vendor"),
+                model: read_trimmed(SYS_DMI_PRODUCT_NAME_PATH),
+                vendor: read_trimmed(SYS_DMI_VENDOR_PATH),
             },
 
             cpu: CpuInfo {
@@ -72,7 +75,7 @@ impl SystemCollector {
     }
 
     pub fn collect_hwmon() -> Result<Vec<Value>, String> {
-        let root = Path::new("/sys/class/hwmon");
+        let root = Path::new(SYS_HWMON_PATH);
 
         if !root.exists() {
             return Ok(Vec::new());
