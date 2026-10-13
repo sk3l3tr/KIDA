@@ -1,8 +1,8 @@
 use serde::Deserialize;
 
 use crate::{
-    comm::protocol::{CommandRequest, CommandResponse},
-    scheduler::manager::SchedulerManager,
+    features::scheduler::manager::SchedulerManager,
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse},
 };
 
 #[derive(Deserialize)]

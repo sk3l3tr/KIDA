@@ -2,8 +2,8 @@ use std::future::Future;
 use tokio::sync::mpsc;
 
 use crate::{
-    comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
     exec::{executor, queue::QueuedCommand},
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
 };
 
 pub async fn run(receiver: mpsc::Receiver<QueuedCommand>) {
@@ -67,7 +67,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::scheduler::{runtime, timer};
+    use crate::features::scheduler::{runtime, timer};
 
     #[tokio::test]
     async fn scheduled_commands_use_worker_and_backup_is_not_requeued() {
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(listed.as_array().unwrap().len(), 1);
         assert_eq!(listed[0]["id"], created["id"]);
         assert_ne!(listed[0]["id"].as_str().unwrap(), outer_id);
-        let persisted = crate::scheduler::repository::ScheduleRepository::new(path)
+        let persisted = crate::features::scheduler::repository::ScheduleRepository::new(path)
             .load()
             .unwrap();
         assert_eq!(persisted.len(), 1);

@@ -53,7 +53,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::scheduler::{model::ScheduleRule, time::parse_once};
+    use crate::features::scheduler::{model::ScheduleRule, time::parse_once};
 
     #[test]
     fn concurrent_delete_and_due_allow_only_pre_delete_enqueue() {

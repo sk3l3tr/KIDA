@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::backup::service::BackupService;
-use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
+use crate::features::backup::service::BackupService;
+use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
     let id = request.params.get("id").and_then(|value| value.as_str());

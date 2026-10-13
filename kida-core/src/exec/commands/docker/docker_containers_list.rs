@@ -1,8 +1,8 @@
 use serde_json::to_value;
 
-use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
+use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
-use crate::docker::DockerService;
+use crate::features::docker::DockerService;
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
     match DockerService::list() {

@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
-use crate::system::SystemCollector;
+use crate::features::system::SystemCollector;
+use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
     match SystemCollector::collect_hwmon() {

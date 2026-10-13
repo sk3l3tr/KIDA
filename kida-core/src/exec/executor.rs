@@ -3,7 +3,6 @@ use std::sync::OnceLock;
 use tokio::sync::mpsc;
 
 use crate::{
-    comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
     exec::{
         commands::{
             self,
@@ -16,6 +15,7 @@ use crate::{
         },
         queue::{CommandQueue, QueueError, QueuedCommand},
     },
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
 };
 
 static QUEUE: OnceLock<CommandQueue> = OnceLock::new();
@@ -85,7 +85,7 @@ pub async fn execute_now(request: CommandRequest) -> CommandResponse {
         "backup.run" => commands::backup::backup_run::exec(request).await,
 
         "scheduler.add" | "scheduler.list" | "scheduler.delete" => {
-            let manager = match crate::scheduler::runtime::manager() {
+            let manager = match crate::features::scheduler::runtime::manager() {
                 Ok(manager) => manager,
                 Err(error) => {
                     return CommandResponse {

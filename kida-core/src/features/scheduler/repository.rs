@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::storage::{Storage, StorageError, TomlStorage};
+use crate::infrastructure::storage::{Storage, StorageError, TomlStorage};
 
 use super::model::ScheduleRule;
 

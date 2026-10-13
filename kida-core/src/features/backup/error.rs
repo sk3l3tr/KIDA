@@ -2,7 +2,7 @@ use std::{io, path::PathBuf};
 
 use thiserror::Error;
 
-use crate::storage::StorageError;
+use crate::infrastructure::storage::StorageError;
 
 #[derive(Debug, Error)]
 pub enum BackupError {

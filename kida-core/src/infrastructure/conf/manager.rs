@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::storage::{Storage, StorageError, TomlStorage};
+use crate::infrastructure::storage::{Storage, StorageError, TomlStorage};
 
 use super::model::KidaConfig;
 

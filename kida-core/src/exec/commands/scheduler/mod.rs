@@ -4,7 +4,7 @@ pub mod scheduler_list;
 
 use serde_json::Value;
 
-use crate::comm::protocol::{CommandResponse, CommandStatus};
+use crate::infrastructure::comm::protocol::{CommandResponse, CommandStatus};
 
 fn response(id: String, result: Result<Value, String>) -> CommandResponse {
     match result {
@@ -31,9 +31,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        comm::protocol::CommandRequest,
         exec::queue::CommandQueue,
-        scheduler::{manager::SchedulerManager, service::ScheduleService},
+        features::scheduler::{manager::SchedulerManager, service::ScheduleService},
+        infrastructure::comm::protocol::CommandRequest,
     };
 
     fn request(command: &str, params: Value) -> CommandRequest {

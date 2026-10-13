@@ -2,8 +2,8 @@ use std::{fs, path::PathBuf};
 
 use super::*;
 use crate::{
-    backup::{error::BackupError, model::BackupTargetStatus, service::BackupService},
-    storage::StorageError,
+    features::backup::{error::BackupError, model::BackupTargetStatus, service::BackupService},
+    infrastructure::storage::StorageError,
 };
 
 pub(crate) fn init_test_config() -> &'static KidaConfig {

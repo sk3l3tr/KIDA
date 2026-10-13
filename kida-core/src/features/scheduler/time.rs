@@ -109,7 +109,7 @@ pub fn next_enqueue_at(
 #[cfg(test)]
 mod rule_tests {
     use super::*;
-    use crate::scheduler::model::ScheduleRule;
+    use crate::features::scheduler::model::ScheduleRule;
 
     #[test]
     fn next_date_distinguishes_expired_once_from_recurrences() {

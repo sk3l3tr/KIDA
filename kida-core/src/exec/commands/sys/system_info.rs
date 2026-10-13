@@ -1,7 +1,7 @@
 use serde_json::to_value;
 
-use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
-use crate::system::SystemCollector;
+use crate::features::system::SystemCollector;
+use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
     let info = SystemCollector::info();

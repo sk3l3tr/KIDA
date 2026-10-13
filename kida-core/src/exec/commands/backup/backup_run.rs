@@ -1,8 +1,8 @@
 use serde_json::json;
 
 use crate::{
-    backup::service::BackupService,
-    comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
+    features::backup::service::BackupService,
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
 };
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {

@@ -7,18 +7,19 @@ use std::{
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::{
-    backup::{
-        error::BackupError,
-        model::{
-            BackupJob, BackupRunResult, BackupTargetResult, BackupTargetStatus, LifecycleCommand,
-            NewBackupJob,
-        },
-        repository::BackupRepository,
+use super::{
+    error::BackupError,
+    model::{
+        BackupJob, BackupRunResult, BackupTargetResult, BackupTargetStatus, LifecycleCommand,
+        NewBackupJob,
     },
-    comm::protocol::{CommandRequest, CommandStatus},
+    repository::BackupRepository,
+};
+
+use crate::{
     conf,
     exec::executor,
+    infrastructure::comm::protocol::{CommandRequest, CommandStatus},
 };
 
 pub struct BackupService;

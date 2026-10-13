@@ -3,8 +3,8 @@ use axum::{Router, extract::Json, routing::post};
 use tokio::net::TcpListener;
 
 use crate::{
-    comm::protocol::{CommandRequest, CommandResponse},
     exec::executor,
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse},
 };
 
 pub struct HttpServer {

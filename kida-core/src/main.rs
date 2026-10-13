@@ -1,15 +1,12 @@
-mod backup;
-mod comm;
-mod conf;
-mod docker;
 mod exec;
-mod scheduler;
-mod storage;
-mod system;
+mod features;
+mod infrastructure;
 
-use comm::transport::{http::HttpServer, unix::UnixSocketServer};
-use conf::DEFAULT_CONFIG_PATH;
 use exec::{executor, worker};
+use infrastructure::{
+    comm::transport::{http::HttpServer, unix::UnixSocketServer},
+    conf::{self, DEFAULT_CONFIG_PATH},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Inicializar FIFO global
     let receiver = executor::init_queue().map_err(std::io::Error::other)?;
-    scheduler::runtime::init(executor::command_queue().map_err(std::io::Error::other)?)
+    features::scheduler::runtime::init(executor::command_queue().map_err(std::io::Error::other)?)
         .map_err(std::io::Error::other)?;
 
     // Iniciar worker único
@@ -33,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::try_join!(
         unix_server.start(),
         http_server.start(),
-        scheduler::timer::run(),
+        features::scheduler::timer::run(),
     )?;
 
     Ok(())

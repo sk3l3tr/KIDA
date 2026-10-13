@@ -1,6 +1,6 @@
 use crate::{
-    comm::protocol::{CommandRequest, CommandResponse},
-    scheduler::{manager::SchedulerManager, model::NewSchedule},
+    features::scheduler::{manager::SchedulerManager, model::NewSchedule},
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse},
 };
 
 pub async fn exec(request: CommandRequest, manager: &SchedulerManager) -> CommandResponse {

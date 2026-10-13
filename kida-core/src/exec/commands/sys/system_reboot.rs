@@ -1,8 +1,7 @@
 use serde_json::json;
 
-use crate::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
-
-use crate::system::SystemPower;
+use crate::features::system::SystemPower;
+use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
     let when = request

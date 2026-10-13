@@ -1,8 +1,8 @@
 use tokio::sync::mpsc::{self, error::TrySendError};
 use uuid::Uuid;
 
-use crate::comm::protocol::CommandRequest;
 use crate::conf;
+use crate::infrastructure::comm::protocol::CommandRequest;
 
 pub struct QueuedCommand {
     pub execution_id: String,

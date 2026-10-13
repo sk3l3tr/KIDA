@@ -5,11 +5,11 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{
-    comm::protocol::CommandRequest,
     exec::{
         executor,
         queue::{CommandQueue, QueueError},
     },
+    infrastructure::comm::protocol::CommandRequest,
 };
 
 use super::{
@@ -249,7 +249,7 @@ impl ScheduleService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduler::model::ScheduleRule;
+    use crate::features::scheduler::model::ScheduleRule;
 
     #[test]
     fn startup_removes_expired_once_and_preserves_interval_anchor() {

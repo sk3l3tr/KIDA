@@ -4,10 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    backup::{error::BackupError, model::BackupJob},
-    storage::{Storage, TomlStorage},
-};
+use super::{error::BackupError, model::BackupJob};
+use crate::infrastructure::storage::{Storage, TomlStorage};
 
 pub struct BackupRepository {
     directory: PathBuf,

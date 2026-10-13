@@ -3,7 +3,7 @@ use tokio::{
     net::{UnixListener, UnixStream},
 };
 
-use crate::{comm::protocol::CommandRequest, exec::executor};
+use crate::{exec::executor, infrastructure::comm::protocol::CommandRequest};
 
 pub struct UnixSocketServer {
     path: String,
