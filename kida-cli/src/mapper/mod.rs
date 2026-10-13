@@ -37,3 +37,15 @@ fn generate_request_id() -> String {
         .as_nanos()
         .to_string()
 }
+
+impl From<crate::input::PreparedCommand> for CommandRequest {
+    fn from(command: crate::input::PreparedCommand) -> Self {
+        match command {
+            crate::input::PreparedCommand::Create(job) => request(
+                "backup.config.create",
+                serde_json::to_value(job).expect("backup DTO is JSON serializable"),
+            ),
+            crate::input::PreparedCommand::Other(command) => command.into(),
+        }
+    }
+}

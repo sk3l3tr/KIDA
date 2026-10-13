@@ -20,8 +20,8 @@ impl From<BackupConfigCommand> for CommandRequest {
     fn from(command: BackupConfigCommand) -> Self {
         match command {
             BackupConfigCommand::List => request("backup.config.list", empty_params()),
-            BackupConfigCommand::Create { file } => {
-                request("backup.config.create", json!({ "file": file }))
+            BackupConfigCommand::Create(_) => {
+                unreachable!("creation must be prepared before mapping")
             }
             BackupConfigCommand::Delete { id, name } => selected("backup.config.delete", id, name),
         }

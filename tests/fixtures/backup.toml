@@ -1,0 +1,23 @@
+name = " daily "
+sources = ["./etc/../hosts", " source with spaces "]
+compression = "tar_zstd"
+[[targets]]
+path = "../main"
+filesystem_uuid = " volume-id "
+[[targets]]
+path = "./secondary"
+required = false
+[[lifecycle.pre_backup]]
+command = " first "
+[[lifecycle.pre_backup]]
+command = "second"
+params = {text = "a=b", items = [true, 3]}
+[[lifecycle.post_backup]]
+command = "last"
+params = "null"
+[schedule]
+custom = [1]
+[retention]
+max_age = "7d"
+keep_last = 0
+protected_restore_points = ["point-a", "point-b"]

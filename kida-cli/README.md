@@ -149,15 +149,64 @@ Retention:
 
 ### Create a backup job
 
-Create a backup job from a TOML configuration file:
+Choose one of three input modes:
 
 ```bash
-kida backup config create -f /path/to/backup-job.toml
+# Read a local TOML file (-f and --file are aliases).
+kida backup config create --file ./backup-job.toml
+
+# Supply configuration fields directly.
+kida backup config create --name daily --source /etc/hosts --target ../backups
+
+# Start the interactive assistant.
+kida backup config create
 ```
 
-Relative paths are resolved against KIDA CLI's current working directory before
-being sent to KIDA Core. Absolute paths are passed unchanged. KIDA CLI does not
-read or validate the file, which must be accessible from KIDA Core's filesystem.
+The CLI reads and validates the TOML locally, relative to its current working
+directory. It sends the configuration to CORE; the input-file path is never sent.
+Source and target paths retain their literal values and are interpreted by CORE
+when the backup runs. Creation does not check whether these paths exist.
+
+File and parameter modes are exclusive. Any configuration flag selects parameter
+mode, which requires `--name`, at least one `--source`, and at least one `--target`.
+Incomplete or invalid parameters fail locally with exit code 1, without opening
+the assistant or contacting CORE. The assistant requires an interactive terminal,
+writes prompts to stderr, shows defaults, retries invalid values, asks list counts
+before their elements, and confirms optional blocks. EOF or Ctrl+C cancels it.
+
+Repeat `--source`, `--target`, `--pre-backup`, `--post-backup`, and
+`--retention-protected-restore-point` to add ordered elements. Indexed modifiers
+use zero-based `INDEX=VALUE` assignments and may appear before or after the elements:
+
+```bash
+kida backup config create --name daily \
+  --source /etc/hosts --target ./primary --target ../secondary \
+  --target-required '1=false' --target-filesystem-uuid '0=volume-id' \
+  --pre-backup system.health --pre-backup-params '0={}' \
+  --post-backup system.health --post-backup-params '0=null' \
+  --schedule '{"custom":[null,1]}' \
+  --retention-max-age 7d --retention-keep-last 7 \
+  --retention-protected-restore-point point-a
+```
+
+Duplicate or out-of-range modifiers fail locally. `--compression` accepts
+`tar_zstd` (the default). Targets default to `required = true`; lifecycle command
+parameters default to JSON `null`. `--schedule` and lifecycle parameters accept
+arbitrary JSON; `--retention-keep-last` accepts an unsigned 32-bit integer.
+
+A minimal TOML file is:
+
+```toml
+name = "daily"
+sources = ["/etc/hosts"]
+[[targets]]
+path = "../backups"
+```
+
+`schedule` is optional metadata and does not create a scheduled execution. Create
+a separate CORE schedule to run the backup automatically. See the
+[CORE JSON contract](../kida-core/README.md#crear-configuraciones-de-backup)
+for the configuration fields used by all three modes.
 
 ### Delete a backup job
 

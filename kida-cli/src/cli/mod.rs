@@ -4,7 +4,7 @@ mod system;
 
 use clap::{Parser, Subcommand};
 
-pub use backup::{BackupCommand, BackupConfigCommand};
+pub use backup::{BackupCommand, BackupConfigCommand, CreateParameters};
 pub use docker::{ContainerCommand, ContainersCommand, DockerCommand};
 pub use system::SystemCommand;
 

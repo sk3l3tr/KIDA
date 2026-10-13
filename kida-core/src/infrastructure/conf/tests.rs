@@ -151,7 +151,13 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
     assert_eq!(get().unwrap_err(), "configuration not initialized");
     for error in [
         BackupService::list().unwrap_err(),
-        BackupService::create(&temp.0.join("missing-job.toml")).unwrap_err(),
+        BackupService::create(
+            serde_json::from_value(
+                serde_json::json!({"name":"unused", "sources":[], "targets":[]}),
+            )
+            .unwrap(),
+        )
+        .unwrap_err(),
         BackupService::delete("missing").unwrap_err(),
         BackupService::run("missing").await.unwrap_err(),
     ] {
@@ -229,7 +235,9 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
         ),
     )
     .unwrap();
-    let job = BackupService::create(&job_path).unwrap();
+    let job =
+        BackupService::create(toml::from_str(&fs::read_to_string(&job_path).unwrap()).unwrap())
+            .unwrap();
     let stored_job = backups.join(format!("{}.toml", job.id));
     assert!(stored_job.is_file());
     assert!(!temp.0.join("other-jobs").exists());

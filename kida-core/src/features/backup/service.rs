@@ -36,21 +36,20 @@ impl BackupService {
         repository.list()
     }
 
-    pub fn create(path: &Path) -> Result<BackupJob, BackupError> {
+    pub fn create(input: NewBackupJob) -> Result<BackupJob, BackupError> {
         let repository = BackupRepository::new(
             &conf::get()
                 .map_err(std::io::Error::other)?
                 .backup
                 .backup_dir,
         );
-        let content = fs::read_to_string(path)?;
+        Self::create_in(input, &repository)
+    }
 
-        let input: NewBackupJob =
-            toml::from_str(&content).map_err(|source| BackupError::InvalidConfig {
-                path: path.to_path_buf(),
-                source,
-            })?;
-
+    pub(crate) fn create_in(
+        input: NewBackupJob,
+        repository: &BackupRepository,
+    ) -> Result<BackupJob, BackupError> {
         let job = BackupJob {
             id: Uuid::new_v4().to_string(),
             name: input.name,

@@ -1,0 +1,15 @@
+{
+  "name": " daily ",
+  "sources": ["./etc/../hosts", " source with spaces "],
+  "targets": [
+    {"path": "../main", "required": true, "filesystem_uuid": " volume-id "},
+    {"path": "./secondary", "required": false}
+  ],
+  "compression": "tar_zstd",
+  "lifecycle": {
+    "pre_backup": [{"command": " first ", "params": null}, {"command": "second", "params": {"text":"a=b", "items":[true,3]}}],
+    "post_backup": [{"command": "last", "params": "null"}]
+  },
+  "schedule": {"custom":[1]},
+  "retention": {"max_age":"7d", "keep_last":0, "protected_restore_points":["point-a","point-b"]}
+}

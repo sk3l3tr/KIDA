@@ -36,6 +36,68 @@ capacity = 16
 
 El valor predeterminado es 16 si se omite la sección o el campo. La capacidad debe ser mayor que cero; con cero, CORE devuelve un error al arrancar. Reinicia CORE para aplicar los cambios. La ejecución sigue a cargo de un único worker.
 
+## Crear configuraciones de backup
+
+`backup.config.create` recibe la configuración directamente en `params`.
+CORE es independiente del modo de entrada: CLI puede leer un TOML local,
+componer parámetros o usar su asistente, y envía el mismo contrato JSON.
+El payload antiguo `{"file":"ruta.toml"}` se rechaza.
+
+```bash
+curl -sS http://127.0.0.1:8989/command \
+  -H 'Content-Type: application/json' \
+  --data '{
+    "id": "create-backup",
+    "command": "backup.config.create",
+    "params": {
+      "name": "daily",
+      "sources": ["/etc/hosts"],
+      "targets": [
+        {"path": "../primary", "filesystem_uuid": "volume-id"},
+        {"path": "./secondary", "required": false}
+      ],
+      "compression": "tar_zstd",
+      "lifecycle": {
+        "pre_backup": [{"command": "system.health", "params": null}],
+        "post_backup": []
+      },
+      "schedule": {"custom": [null, 1]},
+      "retention": {
+        "max_age": "7d",
+        "keep_last": 7,
+        "protected_restore_points": ["point-a"]
+      }
+    }
+  }'
+```
+
+`name`, `sources` y `targets` son obligatorios. Cada target exige `path`;
+`required` tiene default `true` y `filesystem_uuid` es opcional. La compresión
+actual es `tar_zstd` y se aplica si se omite. `lifecycle` es opcional y sus listas
+`pre_backup` y `post_backup` tienen default vacío. Cada comando exige `command`;
+`params` acepta JSON arbitrario y tiene default `null`.
+
+`schedule` y `retention` son opcionales. En retention, `max_age` es una cadena
+opcional, `keep_last` es un entero opcional de 0 a 4294967295 y
+`protected_restore_points` es una lista de cadenas con default vacío. Los valores
+JSON libres se guardan como cadenas JSON en la representación TOML persistida;
+los jobs TOML antiguos siguen siendo legibles. Los tipos JSON de la API se conservan.
+
+Una respuesta `OK` devuelve el job completo en `data`, con un UUID nuevo en
+`data.id`. Las rutas de sources y targets se conservan literalmente; su existencia
+se comprueba al ejecutar el backup. `schedule` solo guarda metadata: no crea una
+programación. Usa `scheduler.add` para programar `backup.run` con el ID o nombre del job.
+
+Los tres modos de CLI son:
+
+```bash
+kida backup config create -f ./backup-job.toml
+kida backup config create --name daily --source /etc/hosts --target ../backups
+kida backup config create
+```
+
+Consulta las [opciones y defaults de CLI](../kida-cli/README.md#create-a-backup-job).
+
 ## Programar comandos con SCHEDULER
 
 SCHEDULER permite programar cualquier comando registrado en KIDA CORE, incluidos `scheduler.add`, `scheduler.list` y `scheduler.delete`. Los ejemplos usan HTTP; los mismos mensajes JSON se pueden enviar por Unix socket.
