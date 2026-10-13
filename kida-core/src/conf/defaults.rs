@@ -1,5 +1,6 @@
-pub const DEFAULT_CONFIG_PATH: &str = "/tmp/kida/kida.toml";
+pub const DEFAULT_CONFIG_PATH: &str = "/etc/kida/kida.toml";
 pub const DEFAULT_BACKUP_DIRECTORY: &str = "/etc/kida/backups.d";
+pub const DEFAULT_SCHEDULER_PATH: &str = "/etc/kida/scheduler.toml";
 
 pub const DEFAULT_UNIX_SOCKET_PATH: &str = "/tmp/kida.sock";
 

@@ -8,6 +8,7 @@ pub struct KidaConfig {
     pub unix: UnixConfig,
     pub http: HttpConfig,
     pub backup: BackupConfig,
+    pub scheduler: SchedulerConfig,
     pub queue: QueueConfig,
 }
 
@@ -32,6 +33,12 @@ pub struct BackupConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+pub struct SchedulerConfig {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct QueueConfig {
     pub capacity: usize,
 }
@@ -42,6 +49,7 @@ impl Default for KidaConfig {
             unix: UnixConfig::default(),
             http: HttpConfig::default(),
             backup: BackupConfig::default(),
+            scheduler: SchedulerConfig::default(),
             queue: QueueConfig::default(),
         }
     }
@@ -76,6 +84,14 @@ impl Default for QueueConfig {
     fn default() -> Self {
         Self {
             capacity: DEFAULT_QUEUE_CAPACITY,
+        }
+    }
+}
+
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            path: DEFAULT_SCHEDULER_PATH.to_string(),
         }
     }
 }

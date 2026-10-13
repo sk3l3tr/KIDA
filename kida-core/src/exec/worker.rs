@@ -65,19 +65,17 @@ mod tests {
 
     use chrono::{TimeDelta, Utc};
     use serde_json::json;
-    use uuid::Uuid;
 
     use super::*;
     use crate::scheduler::{runtime, timer};
 
     #[tokio::test]
     async fn scheduled_commands_use_worker_and_backup_is_not_requeued() {
-        let path =
-            std::env::temp_dir().join(format!("kida-scheduler-worker-{}.toml", Uuid::new_v4()));
-        crate::conf::tests::init_test_config();
+        let config = crate::conf::tests::init_test_config();
+        let path = &config.scheduler.path;
         let receiver = executor::init_queue().unwrap();
 
-        runtime::init(&path, executor::command_queue().unwrap()).unwrap();
+        runtime::init(executor::command_queue().unwrap()).unwrap();
 
         let (responses, mut received) = mpsc::unbounded_channel::<CommandResponse>();
 
@@ -165,6 +163,13 @@ mod tests {
         assert_eq!(listed.as_array().unwrap().len(), 1);
         assert_eq!(listed[0]["id"], created["id"]);
         assert_ne!(listed[0]["id"].as_str().unwrap(), outer_id);
+        let persisted = crate::scheduler::repository::ScheduleRepository::new(path)
+            .load()
+            .unwrap();
+        assert_eq!(persisted.len(), 1);
+        assert_eq!(persisted[0].id, created["id"].as_str().unwrap());
+        assert_eq!(persisted[0].command, "health");
+        assert_eq!(persisted[0].params, json!(null));
         assert!(received.try_recv().is_err());
 
         timer_task.abort();
@@ -178,6 +183,6 @@ mod tests {
         worker_task.abort();
         let _ = worker_task.await;
 
-        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
     }
 }

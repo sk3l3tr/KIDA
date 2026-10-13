@@ -27,7 +27,7 @@ echo '{"id": "1", "command": "system.health", "params": {}}' | socat - UNIX-CONN
 
 ## Configurar la capacidad de la cola
 
-En `/tmp/kida/kida.toml`, puedes ajustar cuántos comandos pendientes admite la cola compartida por los backups manuales y SCHEDULER:
+En `/etc/kida/kida.toml`, puedes ajustar cuántos comandos pendientes admite la cola compartida por los backups manuales y SCHEDULER:
 
 ```toml
 [queue]
@@ -40,7 +40,14 @@ El valor predeterminado es 16 si se omite la sección o el campo. La capacidad d
 
 SCHEDULER permite programar cualquier comando registrado en KIDA CORE, incluidos `scheduler.add`, `scheduler.list` y `scheduler.delete`. Los ejemplos usan HTTP; los mismos mensajes JSON se pueden enviar por Unix socket.
 
-Las programaciones se guardan en `/etc/kida/scheduler.toml`. CORE necesita permisos para escribir en ese directorio. Si el archivo no existe, empieza sin programaciones; si está corrupto, CORE no arranca y no lo sobrescribe.
+La ruta del archivo de programaciones se configura en `/etc/kida/kida.toml`:
+
+```toml
+[scheduler]
+path = "/etc/kida/scheduler.toml"
+```
+
+Si omites la sección o el campo, se usa `/etc/kida/scheduler.toml`. Reinicia CORE para aplicar los cambios de ruta. CORE necesita permisos para escribir en el directorio configurado. Si el archivo no existe, empieza sin programaciones; si está corrupto, CORE no arranca y no lo sobrescribe.
 
 ### Crear una programación
 

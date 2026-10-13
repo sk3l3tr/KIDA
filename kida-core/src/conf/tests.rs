@@ -10,6 +10,11 @@ pub(crate) fn init_test_config() -> &'static KidaConfig {
     CONFIG.get_or_init(|| {
         let mut config = KidaConfig::default();
         config.queue.capacity = 3;
+        config.scheduler.path = std::env::temp_dir()
+            .join(format!("kida-scheduler-test-{}.toml", uuid::Uuid::new_v4()))
+            .to_str()
+            .unwrap()
+            .into();
         config
     })
 }
@@ -35,19 +40,23 @@ fn assert_defaults(config: &KidaConfig) {
     assert_eq!(config.http.host, DEFAULT_HTTP_HOST);
     assert_eq!(config.http.port, DEFAULT_HTTP_PORT);
     assert_eq!(config.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
+    assert_eq!(config.scheduler.path, DEFAULT_SCHEDULER_PATH);
     assert_eq!(config.queue.capacity, DEFAULT_QUEUE_CAPACITY);
 }
 
 #[test]
 fn toml_defaults_and_custom_values() {
     assert_defaults(&toml::from_str::<KidaConfig>("").unwrap());
-    assert_defaults(&toml::from_str::<KidaConfig>("[unix]\n[http]\n[backup]\n[queue]\n").unwrap());
+    assert_defaults(
+        &toml::from_str::<KidaConfig>("[unix]\n[http]\n[backup]\n[scheduler]\n[queue]\n").unwrap(),
+    );
 
     let partial: KidaConfig = toml::from_str("[http]\nport = 9000\n").unwrap();
     assert_eq!(partial.http.port, 9000);
     assert_eq!(partial.http.host, DEFAULT_HTTP_HOST);
     assert_eq!(partial.unix.socket_path, DEFAULT_UNIX_SOCKET_PATH);
     assert_eq!(partial.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
+    assert_eq!(partial.scheduler.path, DEFAULT_SCHEDULER_PATH);
     assert_eq!(partial.queue.capacity, DEFAULT_QUEUE_CAPACITY);
 
     let old: KidaConfig = toml::from_str(
@@ -58,16 +67,18 @@ fn toml_defaults_and_custom_values() {
     assert_eq!(old.http.host, "0.0.0.0");
     assert_eq!(old.http.port, 9001);
     assert_eq!(old.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
+    assert_eq!(old.scheduler.path, DEFAULT_SCHEDULER_PATH);
     assert_eq!(old.queue.capacity, DEFAULT_QUEUE_CAPACITY);
 
     let custom: KidaConfig = toml::from_str(
-        "[unix]\nsocket_path = '/tmp/custom.sock'\n[http]\nhost = '::1'\nport = 9002\n[backup]\nbackup_dir = '/tmp/custom-backups'\n[queue]\ncapacity = 3\n",
+        "[unix]\nsocket_path = '/tmp/custom.sock'\n[http]\nhost = '::1'\nport = 9002\n[backup]\nbackup_dir = '/tmp/custom-backups'\n[scheduler]\npath = '/tmp/custom-scheduler.toml'\n[queue]\ncapacity = 3\n",
     )
     .unwrap();
     assert_eq!(custom.unix.socket_path, "/tmp/custom.sock");
     assert_eq!(custom.http.host, "::1");
     assert_eq!(custom.http.port, 9002);
     assert_eq!(custom.backup.backup_dir, "/tmp/custom-backups");
+    assert_eq!(custom.scheduler.path, "/tmp/custom-scheduler.toml");
     assert_eq!(custom.queue.capacity, 3);
 }
 
@@ -81,9 +92,11 @@ fn manager_creates_missing_file_and_preserves_update_api() {
 
     let mut updated = manager.get().clone();
     updated.backup.backup_dir = "/tmp/updated-backups".into();
+    updated.scheduler.path = "/tmp/updated-scheduler.toml".into();
     updated.queue.capacity = 3;
     manager.update(updated).unwrap();
     assert_eq!(manager.get().backup.backup_dir, "/tmp/updated-backups");
+    assert_eq!(manager.get().scheduler.path, "/tmp/updated-scheduler.toml");
     assert_eq!(manager.get().queue.capacity, 3);
     assert_eq!(
         ConfigManager::load_or_create(&path)
@@ -100,6 +113,14 @@ fn manager_creates_missing_file_and_preserves_update_api() {
             .backup
             .backup_dir,
         "/tmp/updated-backups"
+    );
+    assert_eq!(
+        ConfigManager::load_or_create(&path)
+            .unwrap()
+            .get()
+            .scheduler
+            .path,
+        "/tmp/updated-scheduler.toml"
     );
 }
 

@@ -7,8 +7,6 @@ use crate::storage::{Storage, StorageError, TomlStorage};
 
 use super::model::ScheduleRule;
 
-pub const DEFAULT_SCHEDULER_PATH: &str = "/etc/kida/scheduler.toml";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoredSchedule {

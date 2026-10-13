@@ -20,11 +20,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Inicializar FIFO global
     let receiver = executor::init_queue().map_err(std::io::Error::other)?;
-    scheduler::runtime::init(
-        scheduler::repository::DEFAULT_SCHEDULER_PATH,
-        executor::command_queue().map_err(std::io::Error::other)?,
-    )
-    .map_err(std::io::Error::other)?;
+    scheduler::runtime::init(executor::command_queue().map_err(std::io::Error::other)?)
+        .map_err(std::io::Error::other)?;
 
     // Iniciar worker único
     tokio::spawn(worker::run(receiver));
