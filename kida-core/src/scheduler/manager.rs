@@ -74,6 +74,7 @@ mod tests {
             .unwrap();
 
         let id = definition["id"].as_str().unwrap().to_string();
+        crate::conf::tests::init_test_config();
         let (queue, mut receiver) = CommandQueue::new();
         let manager = Arc::new(SchedulerManager::new(service, queue));
         let barrier = Arc::new(Barrier::new(3));

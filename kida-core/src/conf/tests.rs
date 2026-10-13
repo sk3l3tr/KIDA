@@ -6,6 +6,14 @@ use crate::{
     storage::StorageError,
 };
 
+pub(crate) fn init_test_config() -> &'static KidaConfig {
+    CONFIG.get_or_init(|| {
+        let mut config = KidaConfig::default();
+        config.queue.capacity = 3;
+        config
+    })
+}
+
 struct TempDir(PathBuf);
 
 impl TempDir {
@@ -27,18 +35,20 @@ fn assert_defaults(config: &KidaConfig) {
     assert_eq!(config.http.host, DEFAULT_HTTP_HOST);
     assert_eq!(config.http.port, DEFAULT_HTTP_PORT);
     assert_eq!(config.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
+    assert_eq!(config.queue.capacity, DEFAULT_QUEUE_CAPACITY);
 }
 
 #[test]
 fn toml_defaults_and_custom_values() {
     assert_defaults(&toml::from_str::<KidaConfig>("").unwrap());
-    assert_defaults(&toml::from_str::<KidaConfig>("[unix]\n[http]\n[backup]\n").unwrap());
+    assert_defaults(&toml::from_str::<KidaConfig>("[unix]\n[http]\n[backup]\n[queue]\n").unwrap());
 
     let partial: KidaConfig = toml::from_str("[http]\nport = 9000\n").unwrap();
     assert_eq!(partial.http.port, 9000);
     assert_eq!(partial.http.host, DEFAULT_HTTP_HOST);
     assert_eq!(partial.unix.socket_path, DEFAULT_UNIX_SOCKET_PATH);
     assert_eq!(partial.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
+    assert_eq!(partial.queue.capacity, DEFAULT_QUEUE_CAPACITY);
 
     let old: KidaConfig = toml::from_str(
         "[unix]\nsocket_path = '/tmp/old.sock'\n[http]\nhost = '0.0.0.0'\nport = 9001\n",
@@ -48,15 +58,17 @@ fn toml_defaults_and_custom_values() {
     assert_eq!(old.http.host, "0.0.0.0");
     assert_eq!(old.http.port, 9001);
     assert_eq!(old.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
+    assert_eq!(old.queue.capacity, DEFAULT_QUEUE_CAPACITY);
 
     let custom: KidaConfig = toml::from_str(
-        "[unix]\nsocket_path = '/tmp/custom.sock'\n[http]\nhost = '::1'\nport = 9002\n[backup]\nbackup_dir = '/tmp/custom-backups'\n",
+        "[unix]\nsocket_path = '/tmp/custom.sock'\n[http]\nhost = '::1'\nport = 9002\n[backup]\nbackup_dir = '/tmp/custom-backups'\n[queue]\ncapacity = 3\n",
     )
     .unwrap();
     assert_eq!(custom.unix.socket_path, "/tmp/custom.sock");
     assert_eq!(custom.http.host, "::1");
     assert_eq!(custom.http.port, 9002);
     assert_eq!(custom.backup.backup_dir, "/tmp/custom-backups");
+    assert_eq!(custom.queue.capacity, 3);
 }
 
 #[test]
@@ -69,8 +81,18 @@ fn manager_creates_missing_file_and_preserves_update_api() {
 
     let mut updated = manager.get().clone();
     updated.backup.backup_dir = "/tmp/updated-backups".into();
+    updated.queue.capacity = 3;
     manager.update(updated).unwrap();
     assert_eq!(manager.get().backup.backup_dir, "/tmp/updated-backups");
+    assert_eq!(manager.get().queue.capacity, 3);
+    assert_eq!(
+        ConfigManager::load_or_create(&path)
+            .unwrap()
+            .get()
+            .queue
+            .capacity,
+        3
+    );
     assert_eq!(
         ConfigManager::load_or_create(&path)
             .unwrap()
@@ -81,9 +103,29 @@ fn manager_creates_missing_file_and_preserves_update_api() {
     );
 }
 
-// All accesses to the process-wide singleton stay in this one test.
+// A separate process preserves the uninitialized singleton checks.
 #[tokio::test]
 async fn singleton_and_backup_service_use_the_published_snapshot() {
+    const CHILD_ENV: &str = "KIDA_CONF_SINGLETON_TEST";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "conf::tests::singleton_and_backup_service_use_the_published_snapshot",
+                "--nocapture",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
     let temp = TempDir::new();
     assert_eq!(get().unwrap_err(), "configuration not initialized");
     for error in [

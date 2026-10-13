@@ -25,6 +25,17 @@ curl -X POST http://127.0.0.1:8989/command -H 'Content-Type: application/json' -
 echo '{"id": "1", "command": "system.health", "params": {}}' | socat - UNIX-CONNECT:/tmp/kida.sock
 ```
 
+## Configurar la capacidad de la cola
+
+En `/tmp/kida/kida.toml`, puedes ajustar cuántos comandos pendientes admite la cola compartida por los backups manuales y SCHEDULER:
+
+```toml
+[queue]
+capacity = 16
+```
+
+El valor predeterminado es 16 si se omite la sección o el campo. La capacidad debe ser mayor que cero; con cero, CORE devuelve un error al arrancar. Reinicia CORE para aplicar los cambios. La ejecución sigue a cargo de un único worker.
+
 ## Programar comandos con SCHEDULER
 
 SCHEDULER permite programar cualquier comando registrado en KIDA CORE, incluidos `scheduler.add`, `scheduler.list` y `scheduler.delete`. Los ejemplos usan HTTP; los mismos mensajes JSON se pueden enviar por Unix socket.

@@ -8,6 +8,7 @@ pub struct KidaConfig {
     pub unix: UnixConfig,
     pub http: HttpConfig,
     pub backup: BackupConfig,
+    pub queue: QueueConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,12 +30,19 @@ pub struct BackupConfig {
     pub backup_dir: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QueueConfig {
+    pub capacity: usize,
+}
+
 impl Default for KidaConfig {
     fn default() -> Self {
         Self {
             unix: UnixConfig::default(),
             http: HttpConfig::default(),
             backup: BackupConfig::default(),
+            queue: QueueConfig::default(),
         }
     }
 }
@@ -60,6 +68,14 @@ impl Default for BackupConfig {
     fn default() -> Self {
         Self {
             backup_dir: DEFAULT_BACKUP_DIRECTORY.to_string(),
+        }
+    }
+}
+
+impl Default for QueueConfig {
+    fn default() -> Self {
+        Self {
+            capacity: DEFAULT_QUEUE_CAPACITY,
         }
     }
 }

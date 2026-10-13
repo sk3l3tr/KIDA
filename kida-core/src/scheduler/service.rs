@@ -455,6 +455,7 @@ mod tests {
         let path = std::env::temp_dir().join(format!("kida-scheduler-due-{}.toml", Uuid::new_v4()));
         let now = parse_once("2026-10-10T12:00:00Z").unwrap();
         let mut service = ScheduleService::load(&path, now).unwrap();
+        crate::conf::tests::init_test_config();
         let (queue, mut receiver) = CommandQueue::new();
 
         service
@@ -481,7 +482,7 @@ mod tests {
             )
             .unwrap();
 
-        for index in 0..16 {
+        for index in 0..crate::conf::get().unwrap().queue.capacity {
             queue
                 .enqueue(CommandRequest {
                     id: format!("filler-{index}"),
@@ -503,7 +504,7 @@ mod tests {
         assert_eq!(persisted.len(), 1);
         assert_eq!(persisted[0].id, interval["id"].as_str().unwrap());
 
-        for index in 0..16 {
+        for index in 0..crate::conf::get().unwrap().queue.capacity {
             assert_eq!(
                 receiver.try_recv().unwrap().request.id,
                 format!("filler-{index}")
@@ -586,6 +587,7 @@ mod tests {
             )
             .unwrap();
 
+        crate::conf::tests::init_test_config();
         let (queue, receiver) = CommandQueue::new();
 
         service
@@ -614,6 +616,7 @@ mod tests {
             assert_eq!(definition.anchor_at, anchor.to_rfc3339());
         }
 
+        crate::conf::tests::init_test_config();
         let (new_queue, mut new_receiver) = CommandQueue::new();
         restarted.enqueue_due(restarted_at, &new_queue).unwrap();
 
@@ -659,6 +662,7 @@ mod tests {
         let corrupt_content = "invalid = [";
         std::fs::write(&path, corrupt_content).unwrap();
 
+        crate::conf::tests::init_test_config();
         let (queue, mut receiver) = CommandQueue::new();
 
         assert!(service.enqueue_due(due, &queue).is_err());

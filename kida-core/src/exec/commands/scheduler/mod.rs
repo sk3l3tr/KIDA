@@ -49,6 +49,7 @@ mod tests {
         let path =
             std::env::temp_dir().join(format!("kida-scheduler-handlers-{}.toml", Uuid::new_v4()));
         let service = ScheduleService::load(&path, Utc::now()).unwrap();
+        crate::conf::tests::init_test_config();
         let (queue, _receiver) = CommandQueue::new();
         let manager = SchedulerManager::new(service, queue);
 

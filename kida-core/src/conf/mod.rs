@@ -29,4 +29,4 @@ pub fn get() -> Result<&'static KidaConfig, &'static str> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

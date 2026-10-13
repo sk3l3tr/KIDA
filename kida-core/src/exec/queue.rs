@@ -2,8 +2,7 @@ use tokio::sync::mpsc::{self, error::TrySendError};
 use uuid::Uuid;
 
 use crate::comm::protocol::CommandRequest;
-
-const QUEUE_CAPACITY: usize = 16;
+use crate::conf;
 
 pub struct QueuedCommand {
     pub execution_id: String,
@@ -23,7 +22,10 @@ pub enum QueueError {
 
 impl CommandQueue {
     pub fn new() -> (Self, mpsc::Receiver<QueuedCommand>) {
-        let (sender, receiver) = mpsc::channel(QUEUE_CAPACITY);
+        let global_conf = conf::get().expect("configuration not initialized");
+        let capacity = global_conf.queue.capacity;
+
+        let (sender, receiver) = mpsc::channel(capacity);
 
         (Self { sender }, receiver)
     }
@@ -52,14 +54,13 @@ mod tests {
 
     #[test]
     fn shared_queue_preserves_capacity_fifo_and_arbitrary_commands() {
-        assert_eq!(QUEUE_CAPACITY, 16);
-
+        let capacity = conf::tests::init_test_config().queue.capacity;
         let (queue, mut receiver) = CommandQueue::new();
         let shared = queue.clone();
         let commands = ["health", "backup.run", "scheduler.list"];
         let mut execution_ids = Vec::new();
 
-        for index in 0..QUEUE_CAPACITY {
+        for index in 0..capacity {
             let sender = if index % 2 == 0 { &queue } else { &shared };
             let execution_id = sender
                 .enqueue(CommandRequest {

@@ -74,6 +74,7 @@ mod tests {
     async fn scheduled_commands_use_worker_and_backup_is_not_requeued() {
         let path =
             std::env::temp_dir().join(format!("kida-scheduler-worker-{}.toml", Uuid::new_v4()));
+        crate::conf::tests::init_test_config();
         let receiver = executor::init_queue().unwrap();
 
         runtime::init(&path, executor::command_queue().unwrap()).unwrap();
