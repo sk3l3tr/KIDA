@@ -11,7 +11,10 @@ use crate::{
                 docker_container_delete, docker_container_restart, docker_container_start,
                 docker_container_stop, docker_containers_list,
             },
-            sys::{system_health, system_info, system_reboot, system_shutdown},
+            sys::{
+                system_health, system_info, system_power_cycle, system_reboot, system_shutdown,
+                system_wake_capabilities,
+            },
         },
         queue::{CommandQueue, QueueError, QueuedCommand},
     },
@@ -42,6 +45,8 @@ pub fn is_registered(command: &str) -> bool {
             | "system.health"
             | "system.shutdown"
             | "system.reboot"
+            | "system.wake_capabilities"
+            | "system.power_cycle"
             | "docker.containers.list"
             | "docker.container.stop"
             | "docker.container.start"
@@ -70,6 +75,8 @@ pub async fn execute_now(request: CommandRequest) -> CommandResponse {
         "system.health" => system_health::exec(request).await,
         "system.shutdown" => system_shutdown::exec(request).await,
         "system.reboot" => system_reboot::exec(request).await,
+        "system.wake_capabilities" => system_wake_capabilities::exec(request).await,
+        "system.power_cycle" => system_power_cycle::exec(request).await,
 
         "docker.containers.list" => docker_containers_list::exec(request).await,
         "docker.container.stop" => docker_container_stop::exec(request).await,
