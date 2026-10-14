@@ -43,6 +43,10 @@ fn generate_request_id() -> String {
 impl From<crate::input::PreparedCommand> for CommandRequest {
     fn from(command: crate::input::PreparedCommand) -> Self {
         match command {
+            crate::input::PreparedCommand::PowerCycle(params) => request(
+                "system.power_cycle",
+                serde_json::to_value(params).expect("power cycle input is JSON serializable"),
+            ),
             crate::input::PreparedCommand::Schedule(schedule) => request(
                 "scheduler.add",
                 serde_json::to_value(schedule).expect("scheduler DTO is JSON serializable"),

@@ -1,6 +1,275 @@
 // Must implement module tests here! Do not implement tests inside source files!
 
 #[cfg(test)]
+mod power_tests {
+    use crate::{
+        cli::Cli,
+        client::KidaClient,
+        handle_response, input,
+        protocol::{CommandRequest, CommandResponse, CommandStatus},
+        send_command,
+    };
+    use clap::Parser;
+    use serde_json::{Value, json};
+    use std::{
+        io::{BufRead, BufReader, Write},
+        os::unix::net::UnixListener,
+        process::ExitCode,
+    };
+
+    fn command(args: &[&str]) -> crate::cli::Command {
+        Cli::try_parse_from(["kida", "system"].into_iter().chain(args.iter().copied()))
+            .unwrap()
+            .command
+    }
+
+    fn response(data: Value) -> CommandResponse {
+        CommandResponse {
+            id: "test".into(),
+            status: CommandStatus::Ok,
+            data: Some(data),
+            error: None,
+        }
+    }
+
+    #[test]
+    fn flags_and_wizard_send_identical_payloads_and_render_over_socket() {
+        for (index, args, script, expected, data, rendered) in [
+            (
+                0,
+                vec!["powercicle", "--wake-time", "06:00"],
+                "",
+                json!({"wake_time":"06:00"}),
+                json!({"wake_at":"2030-01-01T06:00:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "RTC wake scheduled for 2030-01-01T06:00:00+02:00.",
+            ),
+            (
+                1,
+                vec!["powercicle"],
+                "time\n06:00\n",
+                json!({"wake_time":"06:00"}),
+                json!({"wake_at":"2030-01-01T06:00:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "Wake from S5 is unverified",
+            ),
+            (
+                2,
+                vec!["powercicle", "--wake-after-seconds", "120"],
+                "",
+                json!({"wake_after_seconds":120}),
+                json!({"wake_at":"2030-01-01T06:00:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "Shutdown scheduled in one minute.",
+            ),
+            (
+                3,
+                vec!["powercicle"],
+                "after\n120\n",
+                json!({"wake_after_seconds":120}),
+                json!({"wake_at":"2030-01-01T06:00:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "physical power-on is not guaranteed",
+            ),
+            (
+                4,
+                vec!["wake-capabilities"],
+                "",
+                json!({}),
+                json!({"rtc_device":null,"rtcwake_available":null,"rtc_alarm_available":false,"s5_wake_status":"unverified","warnings":["first","second"]}),
+                "RTC device: Unknown\nrtcwake available: Unknown\nRTC alarm available: No\nWake from S5: Unverified\nWarning: first\nWarning: second",
+            ),
+        ] {
+            let path = std::env::temp_dir()
+                .join(format!("kida-power-{}-{index}.sock", std::process::id()));
+            let listener = UnixListener::bind(&path).unwrap();
+            let server = std::thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream);
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let request: CommandRequest = serde_json::from_str(&line).unwrap();
+                writeln!(
+                    reader.get_mut(),
+                    "{}",
+                    json!({"id":request.id,"status":"OK","data":data})
+                )
+                .unwrap();
+                request
+            });
+            let mut prompts = Vec::new();
+            let (id, response) = send_command(
+                command(&args),
+                !script.is_empty(),
+                &mut script.as_bytes(),
+                &mut prompts,
+                &KidaClient::new(&path),
+            )
+            .unwrap();
+            let result = handle_response(&id, &response);
+            assert_eq!(result.exit_code, ExitCode::SUCCESS);
+            assert!(result.stdout.unwrap().contains(rendered));
+            let request = server.join().unwrap();
+            assert_eq!(
+                request.command,
+                if index == 4 {
+                    "system.wake_capabilities"
+                } else {
+                    "system.power_cycle"
+                }
+            );
+            assert_eq!(request.params, expected);
+            if script.is_empty() {
+                assert!(prompts.is_empty());
+            }
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn invalid_input_does_not_prompt_or_contact_core() {
+        for args in [
+            vec!["powercicle"],
+            vec!["powercicle", "--wake-time", "24:00"],
+            vec!["powercicle", "--wake-time", "06:60"],
+            vec!["powercicle", "--wake-time", "6:00"],
+            vec!["powercicle", "--wake-time", "é:00"],
+            vec!["powercicle", "--wake-after-seconds", "119"],
+            vec!["powercicle", "--wake-after-seconds", "0"],
+        ] {
+            let mut prompts = Vec::new();
+            let error = send_command(
+                command(&args),
+                false,
+                &mut &b""[..],
+                &mut prompts,
+                &KidaClient::new("/nonexistent/kida-power.sock"),
+            )
+            .unwrap_err();
+            assert!(matches!(error, crate::RunError::Input(_)));
+            assert!(prompts.is_empty());
+        }
+        for args in [
+            vec!["--wake-time", "06:00", "--wake-after-seconds", "120"],
+            vec!["--wake-after-seconds", "-1"],
+            vec!["--wake-after-seconds", "18446744073709551616"],
+            vec!["--wake-time"],
+        ] {
+            assert!(
+                Cli::try_parse_from(["kida", "system", "powercicle"].into_iter().chain(args))
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn wizard_retries_and_cancels_without_sending() {
+        for (script, expected) in [
+            (
+                "invalid\ntime\n24:00\n06:60\n06:00\n",
+                json!({"wake_time":"06:00"}),
+            ),
+            ("after\n-1\n119\n120\n", json!({"wake_after_seconds":120})),
+        ] {
+            let mut prompts = Vec::new();
+            let prepared = input::prepare(
+                command(&["powercicle"]),
+                true,
+                &mut script.as_bytes(),
+                &mut prompts,
+            )
+            .unwrap();
+            assert_eq!(CommandRequest::from(prepared).params, expected);
+            assert!(String::from_utf8(prompts).unwrap().contains("try again"));
+        }
+        for script in [
+            "",
+            "time\n",
+            "after\n",
+            "time\n24:00\n",
+            "\u{3}\n",
+            "after\n\u{3}\n",
+        ] {
+            assert!(matches!(
+                send_command(
+                    command(&["powercicle"]),
+                    true,
+                    &mut script.as_bytes(),
+                    &mut Vec::new(),
+                    &KidaClient::new("/nonexistent/kida-power.sock")
+                ),
+                Err(crate::RunError::Input(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn renderers_reject_incompatible_responses_and_preserve_core_errors() {
+        for (id, valid) in [
+            (
+                "system.power_cycle",
+                json!({"wake_at":"2030-01-01T06:00:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+            ),
+            (
+                "system.wake_capabilities",
+                json!({"rtc_device":"rtc0","rtcwake_available":true,"rtc_alarm_available":true,"s5_wake_status":"unverified","warnings":[]}),
+            ),
+        ] {
+            assert_eq!(
+                handle_response(id, &response(valid.clone())).exit_code,
+                ExitCode::SUCCESS
+            );
+            for key in valid.as_object().unwrap().keys() {
+                for replacement in [None, Some(json!(42))] {
+                    let mut malformed = valid.clone();
+                    match replacement {
+                        None => {
+                            malformed.as_object_mut().unwrap().remove(key);
+                        }
+                        Some(value) => {
+                            malformed[key] = value;
+                        }
+                    }
+                    let result = handle_response(id, &response(malformed));
+                    assert_eq!(result.exit_code, ExitCode::from(3), "{key}");
+                    assert!(result.stdout.is_none());
+                }
+            }
+            let mut unknown = valid.clone();
+            unknown["s5_wake_status"] = json!("verified");
+            assert_eq!(
+                handle_response(id, &response(unknown)).exit_code,
+                ExitCode::from(3)
+            );
+            let error = CommandResponse {
+                id: "test".into(),
+                status: CommandStatus::Error,
+                data: None,
+                error: Some("Shutdown failed; RTC alarm may remain active".into()),
+            };
+            let result = handle_response(id, &error);
+            assert_eq!(result.stderr, error.error);
+            assert_eq!(result.exit_code, ExitCode::from(1));
+            assert!(result.stdout.is_none());
+        }
+        for (id, data) in [
+            (
+                "system.power_cycle",
+                json!({"wake_at":"future","shutdown_scheduled":false,"s5_wake_status":"unverified"}),
+            ),
+            (
+                "system.wake_capabilities",
+                json!({"rtc_device":null,"rtcwake_available":false,"rtc_alarm_available":null,"s5_wake_status":"unverified","warnings":[42]}),
+            ),
+        ] {
+            assert_eq!(
+                handle_response(id, &response(data)).exit_code,
+                ExitCode::from(3)
+            );
+        }
+    }
+}
+
+#[cfg(test)]
 mod acceptance_tests {
     use std::{
         io::{self, BufRead, BufReader, Write},

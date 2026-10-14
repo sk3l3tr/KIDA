@@ -80,6 +80,40 @@ kida system shutdown 23:30
 > **Warning:** This command powers off the server. Check the time carefully
 > before running it.
 
+### Shut down and schedule RTC wake
+
+```bash
+kida system powercicle --wake-time 06:00
+kida system powercicle --wake-after-seconds 28800
+kida system powercicle
+```
+
+Choose exactly one flag. `--wake-time` uses the next occurrence of a 24-hour
+`HH:MM` time in the server's local timezone. `--wake-after-seconds` counts from
+execution and requires at least 120 seconds. CORE also checks that the calculated
+wake time is at least 120 seconds away.
+
+Without flags, the interactive assistant asks for the wake mode and its value.
+An interactive terminal is required only in this case. With a flag, no questions
+are asked.
+
+This command programs the RTC alarm and requests shutdown in one minute. The
+response shows the resulting wake time and timezone. Success does not guarantee
+physical power-on from S5; that requires a test on the target hardware.
+
+Check RTC availability without changing alarms:
+
+```bash
+kida system wake-capabilities
+```
+
+The output includes unknown values and diagnostic warnings. RTC availability
+does not establish S5 compatibility or permission to program an alarm.
+
+Existing scheduler commands can invoke `system.power_cycle` with the same wake
+parameters. A later alarm can replace an earlier one; deleting a schedule does
+not clear an RTC alarm already programmed.
+
 ## Docker commands
 
 ### List containers

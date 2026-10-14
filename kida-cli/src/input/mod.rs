@@ -6,6 +6,7 @@ pub mod fields;
 pub mod file;
 pub mod indexed;
 pub mod scheduler;
+pub mod system;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
@@ -27,6 +28,7 @@ pub fn resolve_mode(has_file: bool, has_parameters: bool) -> Result<InputMode, I
 }
 
 pub enum PreparedCommand {
+    PowerCycle(system::PowerCycle),
     Schedule(scheduler::NewSchedule),
     Create(Box<backup::NewBackupJob>),
     Other(crate::cli::Command),
@@ -40,6 +42,19 @@ pub fn prepare(
 ) -> Result<PreparedCommand, InputError> {
     use crate::cli::{BackupCommand, BackupConfigCommand, Command, CreateParameters};
     match command {
+        Command::System {
+            command:
+                crate::cli::SystemCommand::PowerCycle {
+                    wake_time,
+                    wake_after_seconds,
+                },
+        } => Ok(PreparedCommand::PowerCycle(system::prepare(
+            wake_time,
+            wake_after_seconds,
+            interactive,
+            reader,
+            writer,
+        )?)),
         Command::Scheduler {
             command: crate::cli::SchedulerCommand::Add(args),
         } => {

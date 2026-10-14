@@ -15,6 +15,8 @@ use error::RenderError;
 type Renderer = fn(&CommandResponse) -> Result<String, RenderError>;
 
 const RENDERERS: &[(&str, Renderer)] = &[
+    ("system.power_cycle", system::power_cycle),
+    ("system.wake_capabilities", system::wake_capabilities),
     ("scheduler.add", scheduler::add),
     ("scheduler.list", scheduler::list),
     ("scheduler.delete", scheduler::delete),

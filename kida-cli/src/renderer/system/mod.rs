@@ -1,5 +1,8 @@
 mod health;
 mod info;
+mod power;
+
+pub(super) use power::{power_cycle, wake_capabilities};
 
 use crate::{
     protocol::CommandResponse,
