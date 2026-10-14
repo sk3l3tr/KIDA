@@ -33,3 +33,6 @@ fn schedule(response: &CommandResponse, action: &str) -> Result<String, RenderEr
     let when = string(data, "when", "data.when")?;
     Ok(format!("{action} scheduled for {when}."))
 }
+
+#[cfg(test)]
+pub(crate) mod tests;

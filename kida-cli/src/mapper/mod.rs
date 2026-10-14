@@ -55,3 +55,6 @@ impl From<crate::input::PreparedCommand> for CommandRequest {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests;

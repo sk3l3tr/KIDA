@@ -2,6 +2,7 @@ use error::InputError;
 
 pub mod backup;
 pub mod error;
+pub mod fields;
 pub mod file;
 pub mod indexed;
 pub mod scheduler;
@@ -24,21 +25,6 @@ pub fn resolve_mode(has_file: bool, has_parameters: bool) -> Result<InputMode, I
         (false, false) => Ok(InputMode::Wizard),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{InputMode, resolve_mode};
-
-    #[test]
-    fn resolves_exclusive_modes() {
-        assert_eq!(resolve_mode(true, false).unwrap(), InputMode::File);
-        assert_eq!(resolve_mode(false, true).unwrap(), InputMode::Parameters);
-        assert_eq!(resolve_mode(false, false).unwrap(), InputMode::Wizard);
-        assert!(resolve_mode(true, true).is_err());
-    }
-}
-
-pub mod fields;
 
 pub enum PreparedCommand {
     Schedule(scheduler::NewSchedule),
@@ -106,3 +92,6 @@ pub fn prepare(
         other => Ok(PreparedCommand::Other(other)),
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests;

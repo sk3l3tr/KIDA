@@ -22,8 +22,8 @@ pub struct StoredSchedule {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ScheduleDocument {
-    schedules: Vec<StoredSchedule>,
+pub struct ScheduleDocument {
+    pub(crate) schedules: Vec<StoredSchedule>,
 }
 
 pub struct ScheduleRepository {
@@ -72,39 +72,5 @@ mod json_params {
         let encoded = String::deserialize(deserializer)?;
 
         serde_json::from_str(&encoded).map_err(serde::de::Error::custom)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn toml_preserves_json_params() {
-        let values = [
-            Value::Null,
-            serde_json::json!({
-                "nested": [null, true, {"text": "línea\n\"texto\""}],
-                "integer": 18446744073709551615_u64,
-                "decimal": 1.25
-            }),
-        ];
-
-        for params in values {
-            let document = ScheduleDocument {
-                schedules: vec![StoredSchedule {
-                    id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
-                    command: "health".to_string(),
-                    params: params.clone(),
-                    schedule: ScheduleRule::Interval { seconds: 60 },
-                    anchor_at: "2026-10-10T12:00:00Z".to_string(),
-                }],
-            };
-
-            let encoded = toml::to_string_pretty(&document).unwrap();
-            let decoded: ScheduleDocument = toml::from_str(&encoded).unwrap();
-
-            assert_eq!(decoded.schedules[0].params, params);
-        }
     }
 }

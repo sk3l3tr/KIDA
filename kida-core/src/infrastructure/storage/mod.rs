@@ -18,3 +18,6 @@ where
     fn load(&self) -> Result<T, StorageError>;
     fn save(&self, data: &T) -> Result<(), StorageError>;
 }
+
+#[cfg(test)]
+pub(crate) mod tests;

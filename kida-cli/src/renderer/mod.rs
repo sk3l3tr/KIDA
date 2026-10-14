@@ -56,3 +56,6 @@ fn renderer_for(command: &str) -> Option<Renderer> {
         .find(|(id, _)| *id == command)
         .map(|(_, renderer)| *renderer)
 }
+
+#[cfg(test)]
+pub(crate) mod tests;

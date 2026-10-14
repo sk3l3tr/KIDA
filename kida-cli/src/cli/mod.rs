@@ -36,3 +36,6 @@ pub enum Command {
         command: BackupCommand,
     },
 }
+
+#[cfg(test)]
+pub(crate) mod tests;
