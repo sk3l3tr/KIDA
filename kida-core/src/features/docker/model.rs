@@ -1,6 +1,24 @@
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
+pub struct ComposeVersion {
+    pub version: String,
+}
+
+/// An observed project in the current Docker daemon, not a KIDA ownership claim.
+#[derive(Debug, Serialize)]
+pub struct ComposeProject {
+    pub name: String,
+    pub services: Vec<ComposeService>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ComposeService {
+    pub name: Option<String>,
+    pub containers: Vec<DockerContainer>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct DockerContainers {
     pub total: usize,
     pub running: usize,

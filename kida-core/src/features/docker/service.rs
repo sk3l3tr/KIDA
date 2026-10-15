@@ -1,12 +1,59 @@
-use std::process::Command;
+use std::{collections::BTreeMap, process::Command};
 
 use serde_json::Value;
 
-use super::model::{DockerContainer, DockerContainers, DockerNetwork, DockerPort};
+use super::{
+    ComposeProject, ComposeService, ComposeVersion, DockerContainer, DockerContainers,
+    DockerNetwork, DockerPort,
+};
 
 pub struct DockerService;
 
 impl DockerService {
+    pub fn compose_version() -> Result<ComposeVersion, String> {
+        let output = Command::new("docker")
+            .args(["compose", "version", "--short"])
+            .output()
+            .map_err(|e| format!("Cannot execute docker compose version: {e}"))?;
+
+        if !output.status.success() {
+            return Err(command_error(
+                "docker compose version failed",
+                &output.stderr,
+            ));
+        }
+
+        let version = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Invalid docker compose version output: {e}"))?
+            .trim()
+            .to_string();
+
+        if version.is_empty() {
+            return Err("Docker Compose returned an empty version".to_string());
+        }
+
+        Ok(ComposeVersion { version })
+    }
+
+    pub fn compose_projects() -> Result<Vec<ComposeProject>, String> {
+        let ids = get_container_ids(&["--filter", "label=com.docker.compose.project"])?;
+        Ok(map_compose_projects(&inspect_containers(&ids)?))
+    }
+
+    pub fn compose_project(name: &str) -> Result<ComposeProject, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Compose project cannot be empty".to_string());
+        }
+
+        let filter = format!("label=com.docker.compose.project={name}");
+        let ids = get_container_ids(&["--filter", &filter])?;
+        map_compose_projects(&inspect_containers(&ids)?)
+            .into_iter()
+            .find(|project| project.name == name)
+            .ok_or_else(|| format!("Compose project '{name}' not found"))
+    }
+
     pub fn start(container: &str) -> Result<(), String> {
         run_container_action("start", container)
     }
@@ -24,29 +71,8 @@ impl DockerService {
     }
 
     pub fn list() -> Result<DockerContainers, String> {
-        let ids = get_container_ids()?;
-
-        if ids.is_empty() {
-            return Ok(DockerContainers {
-                total: 0,
-                running: 0,
-                containers: Vec::new(),
-            });
-        }
-
-        let output = Command::new("docker")
-            .arg("inspect")
-            .args(&ids)
-            .output()
-            .map_err(|e| format!("Cannot execute docker inspect: {e}"))?;
-
-        if !output.status.success() {
-            return Err(command_error("docker inspect failed", &output.stderr));
-        }
-
-        let inspected: Vec<Value> = serde_json::from_slice(&output.stdout)
-            .map_err(|e| format!("Cannot parse docker inspect output: {e}"))?;
-
+        let ids = get_container_ids(&[])?;
+        let inspected = inspect_containers(&ids)?;
         let containers: Vec<DockerContainer> = inspected.iter().map(map_container).collect();
 
         let running = containers
@@ -84,9 +110,10 @@ fn run_container_action(action: &str, container: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn get_container_ids() -> Result<Vec<String>, String> {
+fn get_container_ids(filters: &[&str]) -> Result<Vec<String>, String> {
     let output = Command::new("docker")
         .args(["ps", "-aq"])
+        .args(filters)
         .output()
         .map_err(|e| format!("Cannot execute docker ps: {e}"))?;
 
@@ -100,6 +127,65 @@ fn get_container_ids() -> Result<Vec<String>, String> {
         .filter(|id| !id.is_empty())
         .map(ToOwned::to_owned)
         .collect())
+}
+
+fn inspect_containers(ids: &[String]) -> Result<Vec<Value>, String> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let output = Command::new("docker")
+        .arg("inspect")
+        .args(ids)
+        .output()
+        .map_err(|e| format!("Cannot execute docker inspect: {e}"))?;
+
+    if !output.status.success() {
+        return Err(command_error("docker inspect failed", &output.stderr));
+    }
+
+    serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("Cannot parse docker inspect output: {e}"))
+}
+
+pub(super) fn map_compose_projects(inspected: &[Value]) -> Vec<ComposeProject> {
+    let mut projects: BTreeMap<String, BTreeMap<Option<String>, Vec<DockerContainer>>> =
+        BTreeMap::new();
+
+    for container in inspected {
+        let labels = &container["Config"]["Labels"];
+        let Some(project) = labels["com.docker.compose.project"]
+            .as_str()
+            .filter(|name| !name.trim().is_empty())
+        else {
+            continue;
+        };
+        let service = labels["com.docker.compose.service"]
+            .as_str()
+            .filter(|name| !name.trim().is_empty())
+            .map(ToOwned::to_owned);
+
+        projects
+            .entry(project.to_string())
+            .or_default()
+            .entry(service)
+            .or_default()
+            .push(map_container(container));
+    }
+
+    projects
+        .into_iter()
+        .map(|(name, services)| ComposeProject {
+            name,
+            services: services
+                .into_iter()
+                .map(|(name, mut containers)| {
+                    containers.sort_by(|a, b| a.id.cmp(&b.id));
+                    ComposeService { name, containers }
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 fn map_container(container: &Value) -> DockerContainer {

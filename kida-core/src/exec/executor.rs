@@ -8,8 +8,9 @@ use crate::{
             self,
             backup::config::{backup_create, backup_delete, backup_list},
             docker::{
-                docker_container_delete, docker_container_restart, docker_container_start,
-                docker_container_stop, docker_containers_list,
+                docker_compose_project_inspect, docker_compose_projects_list,
+                docker_compose_version, docker_container_delete, docker_container_restart,
+                docker_container_start, docker_container_stop, docker_containers_list,
             },
             sys::{
                 system_health, system_info, system_power_cycle, system_reboot, system_shutdown,
@@ -47,6 +48,9 @@ pub fn is_registered(command: &str) -> bool {
             | "system.reboot"
             | "system.wake_capabilities"
             | "system.power_cycle"
+            | "docker.compose.version"
+            | "docker.compose.projects.list"
+            | "docker.compose.project.inspect"
             | "docker.containers.list"
             | "docker.container.stop"
             | "docker.container.start"
@@ -77,6 +81,10 @@ pub async fn execute_now(request: CommandRequest) -> CommandResponse {
         "system.reboot" => system_reboot::exec(request).await,
         "system.wake_capabilities" => system_wake_capabilities::exec(request).await,
         "system.power_cycle" => system_power_cycle::exec(request).await,
+
+        "docker.compose.version" => docker_compose_version::exec(request).await,
+        "docker.compose.projects.list" => docker_compose_projects_list::exec(request).await,
+        "docker.compose.project.inspect" => docker_compose_project_inspect::exec(request).await,
 
         "docker.containers.list" => docker_containers_list::exec(request).await,
         "docker.container.stop" => docker_container_stop::exec(request).await,

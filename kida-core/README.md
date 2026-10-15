@@ -99,6 +99,55 @@ kida backup config create
 
 Consulta las [opciones y defaults de CLI](../kida-cli/README.md#create-a-backup-job).
 
+## Consultar Docker Compose
+
+CORE ofrece tres comandos de solo lectura, mediante HTTP o Unix socket:
+
+```json
+{"id":"compose-version","command":"docker.compose.version","params":{}}
+{"id":"compose-list","command":"docker.compose.projects.list","params":{}}
+{"id":"compose-inspect","command":"docker.compose.project.inspect","params":{"project":"my-project"}}
+```
+
+`docker.compose.version` ejecuta `docker compose version --short`. Devuelve
+`data: {"version":"2.40.0"}` si el plugin puede ejecutarse, o `ERROR` con el
+diagnóstico. Esto no comprueba la disponibilidad del daemon. Se utiliza el plugin
+`docker compose`, sin fallback al ejecutable antiguo `docker-compose`.
+
+Las consultas de inventario solo necesitan acceso al daemon mediante `docker`;
+funcionan aunque el plugin Compose no esté instalado. Descubren los contenedores
+mediante `com.docker.compose.project`, incluidos los detenidos, y los inspeccionan.
+No leen archivos Compose: un proyecto sin contenedores presentes y los servicios
+sin contenedores no aparecen.
+
+`docker.compose.projects.list` devuelve en `data` un array (vacío si no hay
+proyectos). `docker.compose.project.inspect` devuelve un único proyecto:
+
+```json
+{
+  "name": "my-project",
+  "services": [
+    {"name": "web", "containers": []}
+  ]
+}
+```
+
+El esquema anterior abrevia la lista de contenedores: cada entrada real conserva
+los campos de `docker.containers.list`, incluidos `id`, `name`, `image`, `online`,
+`status`, `health`, fechas, código de salida, reinicios, puertos y redes. Las
+réplicas se agrupan por servicio; los contenedores sin etiqueta de servicio se
+agrupan bajo `name: null`. Proyectos y servicios se ordenan por nombre, y los
+contenedores por ID. No se sintetiza un estado agregado del proyecto.
+
+`params.project` debe ser una cadena no vacía; se recortan espacios exteriores.
+Un proyecto inexistente o un fallo de Docker devuelve `ERROR`, sin resultado
+parcial. El nombre identifica el proyecto únicamente dentro del daemon/contexto
+Docker consultado: no es un identificador global ni acredita propiedad de KIDA.
+Los modelos `ComposeVersion`, `ComposeProject` y `ComposeService` se exportan desde
+`features::docker`, junto con los modelos existentes de contenedores, para su
+reutilización interna. No se añaden operaciones de creación, arranque, parada ni
+borrado de proyectos Compose.
+
 ## Programar comandos con SCHEDULER
 
 SCHEDULER permite programar cualquier comando registrado en KIDA CORE, incluidos `scheduler.add`, `scheduler.list` y `scheduler.delete`. Los ejemplos usan HTTP; los mismos mensajes JSON se pueden enviar por Unix socket.
