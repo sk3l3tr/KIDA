@@ -5,7 +5,10 @@ use serde_json::Value;
 
 use crate::exec::queue::CommandQueue;
 
-use super::{model::NewSchedule, service::ScheduleService};
+use super::{
+    model::{NewSchedule, ScheduleOriginFilter},
+    service::ScheduleService,
+};
 
 pub struct SchedulerManager {
     service: Mutex<ScheduleService>,
@@ -27,6 +30,22 @@ impl SchedulerManager {
 
     pub fn list(&self) -> Result<Value, String> {
         Ok(self.lock()?.list())
+    }
+
+    pub fn list_by_origin(&self, origin: ScheduleOriginFilter) -> Result<Value, String> {
+        Ok(self.lock()?.list_by_origin(origin))
+    }
+
+    pub(crate) fn add_internal(&self, input: NewSchedule) -> Result<Value, String> {
+        self.lock()?.add_internal(input, Utc::now())
+    }
+
+    pub(crate) fn replace_internal(&self, id: &str, input: NewSchedule) -> Result<Value, String> {
+        self.lock()?.replace_internal(id, input, Utc::now())
+    }
+
+    pub(crate) fn delete_internal(&self, id: &str) -> Result<Value, String> {
+        self.lock()?.delete_internal(id)
     }
 
     pub fn delete(&self, id: &str) -> Result<Value, String> {

@@ -317,17 +317,52 @@ JSON values and are interpreted by the scheduled command when it executes.
 
 ```bash
 kida scheduler list
+kida scheduler list --origin user
+kida scheduler list --origin internal
+kida scheduler list --origin all
 kida scheduler delete --id 8e1dba64-36c2-4eac-937c-d23a283256ec
 ```
 
-The list shows each ID, command, JSON parameters, rule, and next enqueue attempt
-in the order returned by CORE. An empty list prints `No schedules found.`.
-CORE validates the deletion ID and whether it exists.
+The list defaults to `--origin user`. Use `internal` for schedules managed by
+CORE or `all` for both origins. CLI values are lowercase; the JSON protocol uses
+`USER`, `INTERNAL`, and `ALL`. The list shows each ID, origin, command, JSON
+parameters, rule, and pending enqueue time in the order returned by CORE.
+An empty list prints `No schedules found.`. A pending time may be in the past
+while the queue is full; it does not guarantee an execution start time.
+
+Adding a schedule always creates a `USER` entry. Public deletion only accepts
+`USER` entries; invalid, missing, or `INTERNAL` IDs fail. The public add and
+delete commands cannot override the origin.
+
+CORE admits the oldest pending occurrence first, across both origins, and
+keeps stored order for ties. When the queue is full, the occurrence stays
+pending and admission is retried after a one-second monotonic delay, subject
+to timer polling. New recurring occurrences do not overtake older pending ones.
+A recurring schedule keeps one pending occurrence and advances to a future
+time after admission, preserving its rule and anchor without replaying every
+missed repetition. A `once` entry is removed after admission; expired `once`
+entries still pending at restart are discarded without execution.
+
+Scheduled commands share the FIFO and worker with manual backups. The worker
+uses `queue.max_concurrent_jobs` (default 2) for execution concurrency and runs
+`backup.run` commands one at a time. Admission order does not guarantee start
+or completion order. Queued requests and interrupted executions are not
+recovered after restart; admission does not guarantee execution or exactly-once
+delivery. Persistence failures while processing due schedules or a closed queue
+terminate CORE with an error.
 
 The schedule displayed in a backup job's configuration does not automatically
 schedule that backup. Use `kida scheduler add` with `backup.run` to run it
 automatically. Deleting a schedule prevents future queue submissions but does
 not cancel requests already queued or running.
+
+Update CORE before CLI. This CLI requires `origin` in scheduler responses and
+rejects older CORE responses without it, even when an add or delete succeeded.
+Check existing schedules before repeating an add after a rendering error.
+CORE accepts older scheduler files without `origin` as `USER`, but saving writes
+the field and makes the file incompatible with the previous CORE version.
+Keep a backup before upgrading if rollback is required; removing the field
+from `INTERNAL` entries would lose their origin protection.
 
 ## Output and errors
 

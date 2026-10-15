@@ -17,7 +17,7 @@ mod scheduler_tests {
     }
 
     fn entry(id: &str, schedule: Value) -> Value {
-        json!({"id":id,"command":"backup.run","params":null,"schedule":schedule,"next_enqueue_at":"2030-01-01T12:00:00Z"})
+        json!({"id":id,"origin":"USER","command":"backup.run","params":null,"schedule":schedule,"next_enqueue_at":"2030-01-01T12:00:00Z"})
     }
 
     #[test]
@@ -32,11 +32,14 @@ mod scheduler_tests {
             "third",
             json!({"type":"cron","expression":"30 2 * * *","timezone":"Europe/Madrid"}),
         );
+        cron["origin"] = json!("INTERNAL");
         cron["params"] = json!({"name":"daily","items":[null,true,3]});
         let output = list(&response(json!([once, interval, cron]))).unwrap();
         assert!(output.find("ID: first").unwrap() < output.find("ID: second").unwrap());
         assert!(output.find("ID: second").unwrap() < output.find("ID: third").unwrap());
         for text in [
+            "Origin: USER",
+            "Origin: INTERNAL",
             "Command: backup.run",
             "Parameters: null",
             "once at 2030",
@@ -63,13 +66,22 @@ mod scheduler_tests {
             assert!(super::super::render("scheduler.list", &response(value)).is_err());
         }
         let base = entry("id", json!({"type":"interval","seconds":60}));
-        for key in ["id", "command", "params", "schedule", "next_enqueue_at"] {
+        for key in [
+            "id",
+            "origin",
+            "command",
+            "params",
+            "schedule",
+            "next_enqueue_at",
+        ] {
             let mut value = base.clone();
             value.as_object_mut().unwrap().remove(key);
             assert!(list(&response(json!([value]))).is_err(), "{key}");
         }
         for (key, bad) in [
             ("id", json!(1)),
+            ("origin", json!("ALL")),
+            ("origin", Value::Null),
             ("command", json!([])),
             ("next_enqueue_at", Value::Null),
             ("schedule", json!({"type":"interval","seconds":-1})),

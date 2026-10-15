@@ -100,4 +100,132 @@ mod mod_tests {
 
         std::fs::remove_file(&path).unwrap();
     }
+    #[tokio::test]
+    async fn origins_filters_spoofing_and_scheduled_requests_use_public_permissions() {
+        use crate::features::scheduler::model::{NewSchedule, ScheduleOriginFilter, ScheduleRule};
+        let path =
+            std::env::temp_dir().join(format!("kida-handler-origins-{}.toml", Uuid::new_v4()));
+        let now = Utc::now();
+        let mut service = ScheduleService::load(&path, now).unwrap();
+        let internal = service
+            .add_internal(
+                NewSchedule {
+                    command: "health".into(),
+                    params: Value::Null,
+                    schedule: ScheduleRule::Interval { seconds: 3600 },
+                },
+                now,
+            )
+            .unwrap();
+        let id = internal["id"].as_str().unwrap();
+        // Even an INTERNAL scheduled command invokes the public delete handler.
+        let anchor = now - chrono::TimeDelta::seconds(120);
+        service
+            .add_internal(
+                NewSchedule {
+                    command: "scheduler.delete".into(),
+                    params: json!({"id":id}),
+                    schedule: ScheduleRule::Once {
+                        at: (anchor + chrono::TimeDelta::seconds(60)).to_rfc3339(),
+                    },
+                },
+                anchor,
+            )
+            .unwrap();
+        crate::conf::tests::init_test_config();
+        let (queue, mut receiver) = CommandQueue::new();
+        let manager = SchedulerManager::new(service, queue);
+        manager.enqueue_due().unwrap();
+        let queued = receiver.try_recv().unwrap().request;
+        assert_eq!(queued.command, "scheduler.delete");
+        assert!(matches!(
+            scheduler_delete::exec(queued, &manager).await.status,
+            CommandStatus::Error
+        ));
+        assert!(receiver.try_recv().is_err());
+
+        let user = manager
+            .add(NewSchedule {
+                command: "health".into(),
+                params: json!({"origin":"INTERNAL","permissions":"internal"}),
+                schedule: ScheduleRule::Interval { seconds: 3600 },
+            })
+            .unwrap();
+        assert_eq!(user["origin"], "USER");
+        let before = manager.list_by_origin(ScheduleOriginFilter::All).unwrap();
+        let original = std::fs::read_to_string(&path).unwrap();
+        for params in [json!({}), Value::Null, json!({"origin":"USER"})] {
+            let response = scheduler_list::exec(request("scheduler.list", params), &manager).await;
+            assert!(matches!(response.status, CommandStatus::Ok));
+            assert_eq!(response.data.unwrap()[0]["id"], user["id"]);
+        }
+        for (origin, count) in [("INTERNAL", 1), ("ALL", 2)] {
+            let response = scheduler_list::exec(
+                request("scheduler.list", json!({"origin":origin})),
+                &manager,
+            )
+            .await;
+            assert_eq!(response.data.unwrap().as_array().unwrap().len(), count);
+        }
+        for params in [
+            json!({"origin":"user"}),
+            json!({"origin":null}),
+            json!({"origin":1}),
+            json!({"origin":"OTHER"}),
+            json!({"internal":true}),
+            json!([]),
+            json!("ALL"),
+        ] {
+            assert!(matches!(
+                scheduler_list::exec(request("scheduler.list", params), &manager)
+                    .await
+                    .status,
+                CommandStatus::Error
+            ));
+        }
+        for key in ["origin", "internal", "permissions"] {
+            let mut params = json!({"command":"health","params":null,"schedule":{"type":"interval","seconds":60}});
+            params[key] = json!("INTERNAL");
+            assert!(matches!(
+                scheduler_add::exec(request("scheduler.add", params), &manager)
+                    .await
+                    .status,
+                CommandStatus::Error
+            ));
+            let mut params = json!({"id":id});
+            params[key] = json!("INTERNAL");
+            assert!(matches!(
+                scheduler_delete::exec(request("scheduler.delete", params), &manager)
+                    .await
+                    .status,
+                CommandStatus::Error
+            ));
+        }
+        assert!(matches!(
+            scheduler_delete::exec(request("scheduler.delete", json!({"id":id})), &manager)
+                .await
+                .status,
+            CommandStatus::Error
+        ));
+        assert_eq!(
+            manager.list_by_origin(ScheduleOriginFilter::All).unwrap(),
+            before
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        let replaced = manager
+            .replace_internal(
+                id,
+                NewSchedule {
+                    command: "health".into(),
+                    params: json!([null, true]),
+                    schedule: ScheduleRule::Interval { seconds: 3600 },
+                },
+            )
+            .unwrap();
+        assert_ne!(replaced["id"], internal["id"]);
+        manager
+            .delete_internal(replaced["id"].as_str().unwrap())
+            .unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
 }

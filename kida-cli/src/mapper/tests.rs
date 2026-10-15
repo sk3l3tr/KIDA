@@ -54,7 +54,11 @@ mod scheduler_tests {
     #[test]
     fn list_and_delete_map_exactly_and_defer_uuid_validation() {
         for (args, command, params) in [
-            (vec!["list"], "scheduler.list", serde_json::json!({})),
+            (
+                vec!["list"],
+                "scheduler.list",
+                serde_json::json!({"origin":"USER"}),
+            ),
             (
                 vec!["delete", "--id", "invalid-uuid"],
                 "scheduler.delete",
@@ -71,11 +75,26 @@ mod scheduler_tests {
     }
 
     #[test]
+    fn list_maps_each_origin() {
+        for (flag, expected) in [("user", "USER"), ("internal", "INTERNAL"), ("all", "ALL")] {
+            let cli = Cli::try_parse_from(["kida", "scheduler", "list", "--origin", flag]).unwrap();
+            let request = CommandRequest::from(
+                crate::input::prepare(cli.command, false, &mut &b""[..], &mut Vec::new()).unwrap(),
+            );
+            assert_eq!(request.command, "scheduler.list");
+            assert_eq!(request.params, serde_json::json!({"origin":expected}));
+        }
+    }
+
+    #[test]
     fn parser_rejects_missing_ids_unknown_flags_and_invalid_u64() {
         for args in [
             vec!["delete"],
             vec!["delete", "--name", "x"],
             vec!["list", "--id", "x"],
+            vec!["list", "--origin", "USER"],
+            vec!["list", "--origin", "invalid"],
+            vec!["add", "--origin", "internal"],
             vec!["add", "--seconds", "-1"],
             vec!["add", "--seconds", "18446744073709551616"],
             vec!["add", "--seconds", "1.5"],

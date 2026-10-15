@@ -4,7 +4,10 @@ use clap::{Args, Subcommand};
 pub enum SchedulerCommand {
     /// Add from a local TOML file, flags, or an interactive assistant.
     Add(AddArgs),
-    List,
+    List {
+        #[arg(long, value_enum, default_value = "user")]
+        origin: ScheduleOrigin,
+    },
     Delete {
         #[arg(long)]
         id: String,
@@ -37,4 +40,21 @@ pub struct AddParameters {
     /// IANA timezone for cron (default: UTC).
     #[arg(long, value_name = "IANA")]
     pub timezone: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum, PartialEq, Eq)]
+pub enum ScheduleOrigin {
+    User,
+    Internal,
+    All,
+}
+
+impl ScheduleOrigin {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "USER",
+            Self::Internal => "INTERNAL",
+            Self::All => "ALL",
+        }
+    }
 }

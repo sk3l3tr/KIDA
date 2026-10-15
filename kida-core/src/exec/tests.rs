@@ -185,6 +185,8 @@ mod worker_tests {
         timer_task.abort();
         let _ = timer_task.await;
 
+        crate::infrastructure::comm::tests::scheduler_protection_through_transports().await;
+
         runtime::manager()
             .unwrap()
             .delete(created["id"].as_str().unwrap())

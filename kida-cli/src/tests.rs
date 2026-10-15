@@ -375,6 +375,7 @@ mod acceptance_tests {
                     let request: CommandRequest = serde_json::from_str(&payload).unwrap();
                     let mut data = request.params.clone();
                     data["id"] = json!("schedule-id");
+                    data["origin"] = json!("USER");
                     writeln!(
                         reader.get_mut(),
                         "{}",

@@ -5,12 +5,14 @@ use serde_json::Value;
 
 use crate::infrastructure::storage::{Storage, StorageError, TomlStorage};
 
-use super::model::ScheduleRule;
+use super::model::{ScheduleOrigin, ScheduleRule};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoredSchedule {
     pub id: String,
+    #[serde(default)]
+    pub origin: ScheduleOrigin,
     pub command: String,
 
     #[serde(with = "json_params")]

@@ -39,3 +39,30 @@ where
 fn default_timezone() -> String {
     "UTC".to_string()
 }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum ScheduleOrigin {
+    #[default]
+    User,
+    Internal,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum ScheduleOriginFilter {
+    #[default]
+    User,
+    Internal,
+    All,
+}
+
+impl ScheduleOriginFilter {
+    pub fn matches(self, origin: ScheduleOrigin) -> bool {
+        match self {
+            Self::User => origin == ScheduleOrigin::User,
+            Self::Internal => origin == ScheduleOrigin::Internal,
+            Self::All => true,
+        }
+    }
+}

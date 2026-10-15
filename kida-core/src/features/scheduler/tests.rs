@@ -55,7 +55,10 @@ mod rule_tests {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Barrier};
+    use std::{
+        sync::{Arc, Barrier},
+        time::{Duration, Instant},
+    };
 
     use chrono::{DateTime, Utc};
     use serde_json::{Value, json};
@@ -65,7 +68,7 @@ mod tests {
         exec::queue::CommandQueue,
         features::scheduler::{
             manager::SchedulerManager,
-            model::{NewSchedule, ScheduleRule},
+            model::{NewSchedule, ScheduleOrigin, ScheduleOriginFilter, ScheduleRule},
             repository::{ScheduleDocument, ScheduleRepository, StoredSchedule},
             service::ScheduleService,
             time::{next_interval, parse_once},
@@ -158,6 +161,7 @@ mod tests {
         for params in values {
             let document = ScheduleDocument {
                 schedules: vec![StoredSchedule {
+                    origin: ScheduleOrigin::User,
                     id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
                     command: "health".to_string(),
                     params: params.clone(),
@@ -191,6 +195,7 @@ mod tests {
         repository
             .save(&[
                 StoredSchedule {
+                    origin: ScheduleOrigin::User,
                     id: expired_id,
                     command: "health".to_string(),
                     params: Value::Null,
@@ -200,6 +205,7 @@ mod tests {
                     anchor_at: "2026-10-10T12:00:00Z".to_string(),
                 },
                 StoredSchedule {
+                    origin: ScheduleOrigin::User,
                     id: interval_id.clone(),
                     command: "health".to_string(),
                     params: json!({"nested": null}),
@@ -375,96 +381,348 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
     }
 
-    #[test]
-    fn due_drops_full_queue_skips_backlog_and_preserves_queued_requests() {
-        let path = std::env::temp_dir().join(format!("kida-scheduler-due-{}.toml", Uuid::new_v4()));
-        let now = parse_once("2026-10-10T12:00:00Z").unwrap();
-        let mut service = ScheduleService::load(&path, now).unwrap();
-        crate::conf::tests::init_test_config();
-        let (queue, mut receiver) = CommandQueue::new();
-
-        service
-            .add(
-                NewSchedule {
-                    command: "health".to_string(),
-                    params: Value::Null,
-                    schedule: ScheduleRule::Once {
-                        at: "2026-10-10T12:01:00Z".to_string(),
-                    },
-                },
-                now,
-            )
-            .unwrap();
-
-        let interval = service
-            .add(
-                NewSchedule {
-                    command: "backup.run".to_string(),
-                    params: json!({"id": "resolved-at-execution"}),
-                    schedule: ScheduleRule::Interval { seconds: 60 },
-                },
-                now,
-            )
-            .unwrap();
-
-        for index in 0..crate::conf::get().unwrap().queue.capacity {
+    fn fill_queue(queue: &CommandQueue, count: usize) {
+        for index in 0..count {
             queue
                 .enqueue(CommandRequest {
                     id: format!("filler-{index}"),
-                    command: "health".to_string(),
+                    command: "health".into(),
                     params: Value::Null,
                 })
                 .unwrap();
         }
+    }
 
-        let late = parse_once("2026-10-10T12:07:35Z").unwrap();
-        service.enqueue_due(late, &queue).unwrap();
+    fn due_rules() -> [ScheduleRule; 3] {
+        [
+            ScheduleRule::Once {
+                at: "2026-10-10T12:01:00Z".into(),
+            },
+            ScheduleRule::Interval { seconds: 60 },
+            ScheduleRule::Cron {
+                expression: "*/5 * * * *".into(),
+                timezone: "UTC".into(),
+            },
+        ]
+    }
 
+    #[test]
+    fn full_queue_preserves_each_rule_and_retries_without_backlog_or_duplicates() {
+        for (index, schedule) in due_rules().into_iter().enumerate() {
+            let path =
+                std::env::temp_dir().join(format!("kida-scheduler-full-{}.toml", Uuid::new_v4()));
+            let anchor = parse_once("2026-10-10T12:00:00Z").unwrap();
+            let due = parse_once("2026-10-10T12:07:35Z").unwrap();
+            let late = parse_once("2026-10-10T12:37:35Z").unwrap();
+            let mut service = ScheduleService::load(&path, anchor).unwrap();
+            let input = NewSchedule {
+                command: "health".into(),
+                params: json!({"rule": index}),
+                schedule,
+            };
+            // Both origins share admission and retry behavior.
+            if index == 2 {
+                service.add_internal(input, anchor).unwrap();
+            } else {
+                service.add(input, anchor).unwrap();
+            }
+            let before = service.list_by_origin(ScheduleOriginFilter::All);
+            let original_file = std::fs::read_to_string(&path).unwrap();
+            crate::conf::tests::init_test_config();
+            let (queue, mut receiver) = CommandQueue::new();
+            fill_queue(&queue, crate::conf::get().unwrap().queue.capacity);
+            let tick = Instant::now();
+            service.enqueue_due_at(due, &queue, tick).unwrap();
+            // Repeated saturation retains the same pending occurrence despite elapsed cadences.
+            service
+                .enqueue_due_at(late, &queue, tick + Duration::from_secs(1))
+                .unwrap();
+            service
+                .enqueue_due_at(late, &queue, tick + Duration::from_secs(20))
+                .unwrap();
+            assert_eq!(service.list_by_origin(ScheduleOriginFilter::All), before);
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), original_file);
+            for index in 0..crate::conf::get().unwrap().queue.capacity {
+                assert_eq!(
+                    receiver.try_recv().unwrap().request.id,
+                    format!("filler-{index}")
+                );
+            }
+            // Even a large wall-clock advance cannot bypass the monotonic deadline.
+            service
+                .enqueue_due_at(late, &queue, tick + Duration::from_millis(20_999))
+                .unwrap();
+            assert!(receiver.try_recv().is_err());
+            service
+                .enqueue_due_at(late, &queue, tick + Duration::from_secs(21))
+                .unwrap();
+            assert_eq!(
+                receiver.try_recv().unwrap().request.params,
+                json!({"rule": index})
+            );
+            service
+                .enqueue_due_at(late, &queue, tick + Duration::from_secs(21))
+                .unwrap();
+            assert!(receiver.try_recv().is_err());
+            let listed = service.list_by_origin(ScheduleOriginFilter::All);
+            if index == 0 {
+                assert_eq!(listed, json!([]));
+                assert!(ScheduleRepository::new(&path).load().unwrap().is_empty());
+            } else {
+                let expected = if index == 1 {
+                    "2026-10-10T12:38:00+00:00"
+                } else {
+                    "2026-10-10T12:40:00+00:00"
+                };
+                assert_eq!(listed[0]["next_enqueue_at"], expected);
+                assert_eq!(std::fs::read_to_string(&path).unwrap(), original_file);
+                let next = parse_once(expected).unwrap();
+                service
+                    .enqueue_due_at(next, &queue, tick + Duration::from_secs(22))
+                    .unwrap();
+                service
+                    .enqueue_due_at(next, &queue, tick + Duration::from_secs(22))
+                    .unwrap();
+                assert_eq!(
+                    receiver.try_recv().unwrap().request.params,
+                    json!({"rule": index})
+                );
+                assert!(receiver.try_recv().is_err());
+            }
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn pending_once_precedes_new_recurrences_under_sustained_saturation() {
+        for origin in [ScheduleOrigin::User, ScheduleOrigin::Internal] {
+            let path = std::env::temp_dir()
+                .join(format!("kida-scheduler-fairness-{}.toml", Uuid::new_v4()));
+            let anchor = parse_once("2026-10-10T12:00:00Z").unwrap();
+            let mut service = ScheduleService::load(&path, anchor).unwrap();
+            crate::conf::tests::init_test_config();
+            let capacity = crate::conf::get().unwrap().queue.capacity;
+            for _ in 0..capacity {
+                service
+                    .add(
+                        NewSchedule {
+                            command: "health".into(),
+                            params: json!("recurring"),
+                            schedule: ScheduleRule::Interval { seconds: 1 },
+                        },
+                        anchor,
+                    )
+                    .unwrap();
+            }
+            let input = NewSchedule {
+                command: "health".into(),
+                params: json!("pending-once"),
+                schedule: ScheduleRule::Once {
+                    at: (anchor + chrono::TimeDelta::seconds(1)).to_rfc3339(),
+                },
+            };
+            match origin {
+                ScheduleOrigin::User => service.add(input, anchor),
+                ScheduleOrigin::Internal => service.add_internal(input, anchor),
+            }
+            .unwrap();
+            let (queue, mut receiver) = CommandQueue::new();
+            let tick = Instant::now();
+            let mut once_admissions = 0;
+            for seconds in 1..=20 {
+                service
+                    .enqueue_due_at(
+                        anchor + chrono::TimeDelta::seconds(seconds),
+                        &queue,
+                        tick + Duration::from_secs(seconds as u64),
+                    )
+                    .unwrap();
+                for _ in 0..capacity {
+                    let request = receiver.try_recv().unwrap().request;
+                    if request.params == json!("pending-once") {
+                        once_admissions += 1;
+                        assert_eq!(seconds, 2);
+                    } else {
+                        assert_eq!(request.params, json!("recurring"));
+                    }
+                }
+                assert!(receiver.try_recv().is_err());
+                assert_eq!(once_admissions, usize::from(seconds >= 2));
+            }
+            let listed = service.list_by_origin(ScheduleOriginFilter::All);
+            assert_eq!(listed.as_array().unwrap().len(), capacity);
+            let stored = ScheduleRepository::new(&path).load().unwrap();
+            assert_eq!(stored.len(), capacity);
+            assert!(
+                stored
+                    .iter()
+                    .all(|entry| entry.params == json!("recurring"))
+            );
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+
+    #[test]
+    fn admission_orders_oldest_first_with_stable_ties_without_reordering_storage() {
+        let path =
+            std::env::temp_dir().join(format!("kida-scheduler-order-{}.toml", Uuid::new_v4()));
+        let anchor = parse_once("2026-10-10T12:00:00Z").unwrap();
+        let now = anchor + chrono::TimeDelta::seconds(180);
+        let mut service = ScheduleService::load(&path, anchor).unwrap();
+        for (index, seconds) in [180, 60, 60, 120, 240].into_iter().enumerate() {
+            let input = NewSchedule {
+                command: "health".into(),
+                params: json!(index),
+                schedule: ScheduleRule::Interval { seconds },
+            };
+            if index % 2 == 0 {
+                service.add_internal(input, anchor).unwrap();
+            } else {
+                service.add(input, anchor).unwrap();
+            }
+        }
+        let before = service.list_by_origin(ScheduleOriginFilter::All);
+        let original_file = std::fs::read_to_string(&path).unwrap();
+        crate::conf::tests::init_test_config();
+        let (queue, mut receiver) = CommandQueue::new();
+        let capacity = crate::conf::get().unwrap().queue.capacity;
+        assert!(capacity >= 3);
+        fill_queue(&queue, capacity - 3);
+        let tick = Instant::now();
+        service.enqueue_due_at(now, &queue, tick).unwrap();
+        for _ in 0..capacity - 3 {
+            receiver.try_recv().unwrap();
+        }
+        for index in [1, 2, 3] {
+            assert_eq!(receiver.try_recv().unwrap().request.params, json!(index));
+        }
+        assert!(receiver.try_recv().is_err());
+        let listed = service.list_by_origin(ScheduleOriginFilter::All);
+        assert_eq!(listed[0], before[0]);
+        assert_eq!(listed[4], before[4]);
+        for (index, entry) in listed.as_array().unwrap().iter().enumerate() {
+            assert_eq!(entry["id"], before[index]["id"]);
+        }
+        service
+            .enqueue_due_at(now, &queue, tick + Duration::from_secs(1))
+            .unwrap();
+        assert_eq!(receiver.try_recv().unwrap().request.params, json!(0));
+        assert!(receiver.try_recv().is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original_file);
+        let stored = ScheduleRepository::new(&path).load().unwrap();
+        for (index, entry) in stored.iter().enumerate() {
+            assert_eq!(entry.id, before[index]["id"]);
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn partial_admission_advances_only_accepted_schedules_and_persists_once_removal() {
+        let path =
+            std::env::temp_dir().join(format!("kida-scheduler-partial-{}.toml", Uuid::new_v4()));
+        let anchor = parse_once("2026-10-10T12:00:00Z").unwrap();
+        let due = parse_once("2026-10-10T12:07:35Z").unwrap();
+        let mut service = ScheduleService::load(&path, anchor).unwrap();
+        for (index, schedule) in due_rules().into_iter().enumerate() {
+            service
+                .add(
+                    NewSchedule {
+                        command: "health".into(),
+                        params: json!(index),
+                        schedule,
+                    },
+                    anchor,
+                )
+                .unwrap();
+        }
+        service
+            .add(
+                NewSchedule {
+                    command: "health".into(),
+                    params: json!(3),
+                    schedule: ScheduleRule::Once {
+                        at: "2026-10-10T12:02:00Z".into(),
+                    },
+                },
+                anchor,
+            )
+            .unwrap();
+        let before = service.list();
+        crate::conf::tests::init_test_config();
+        let (queue, mut receiver) = CommandQueue::new();
+        let capacity = crate::conf::get().unwrap().queue.capacity;
+        assert!(capacity >= 2);
+        fill_queue(&queue, capacity - 2);
+        let tick = Instant::now();
+        service.enqueue_due_at(due, &queue, tick).unwrap();
         let listed = service.list();
-        assert_eq!(listed.as_array().unwrap().len(), 1);
-        assert_eq!(listed[0]["id"], interval["id"]);
+        assert_eq!(listed.as_array().unwrap().len(), 3);
         assert_eq!(listed[0]["next_enqueue_at"], "2026-10-10T12:08:00+00:00");
-
-        let persisted = ScheduleRepository::new(&path).load().unwrap();
-        assert_eq!(persisted.len(), 1);
-        assert_eq!(persisted[0].id, interval["id"].as_str().unwrap());
-
-        for index in 0..crate::conf::get().unwrap().queue.capacity {
-            assert_eq!(
-                receiver.try_recv().unwrap().request.id,
-                format!("filler-{index}")
-            );
+        assert_eq!(listed[1], before[2]);
+        assert_eq!(listed[2], before[3]);
+        let stored = ScheduleRepository::new(&path).load().unwrap();
+        assert_eq!(stored.len(), 3);
+        assert_eq!(stored[0].id, before[1]["id"].as_str().unwrap());
+        assert_eq!(stored[1].id, before[2]["id"].as_str().unwrap());
+        assert_eq!(stored[2].id, before[3]["id"].as_str().unwrap());
+        for _ in 0..capacity - 2 {
+            receiver.try_recv().unwrap();
         }
-        assert!(receiver.try_recv().is_err());
-
-        service.enqueue_due(late, &queue).unwrap();
-        assert!(receiver.try_recv().is_err());
-
-        service
-            .enqueue_due(parse_once("2026-10-10T12:08:00Z").unwrap(), &queue)
-            .unwrap();
-        service
-            .enqueue_due(parse_once("2026-10-10T12:09:00Z").unwrap(), &queue)
-            .unwrap();
-
-        service.delete(interval["id"].as_str().unwrap()).unwrap();
-        service
-            .enqueue_due(parse_once("2026-10-10T12:10:00Z").unwrap(), &queue)
-            .unwrap();
-
-        for _ in 0..2 {
-            let queued = receiver.try_recv().unwrap();
-            assert_eq!(queued.request.command, "backup.run");
-            assert_eq!(
-                queued.request.params,
-                json!({"id": "resolved-at-execution"})
-            );
+        for index in 0..2 {
+            assert_eq!(receiver.try_recv().unwrap().request.params, json!(index));
         }
-
+        service
+            .enqueue_due_at(due, &queue, tick + Duration::from_millis(999))
+            .unwrap();
         assert!(receiver.try_recv().is_err());
-        assert_eq!(service.list(), json!([]));
+        service
+            .enqueue_due_at(due, &queue, tick + Duration::from_secs(1))
+            .unwrap();
+        assert_eq!(receiver.try_recv().unwrap().request.params, json!(3));
+        assert_eq!(receiver.try_recv().unwrap().request.params, json!(2));
+        service
+            .enqueue_due_at(due, &queue, tick + Duration::from_secs(1))
+            .unwrap();
+        assert!(receiver.try_recv().is_err());
+        assert_eq!(
+            service.list()[1]["next_enqueue_at"],
+            "2026-10-10T12:10:00+00:00"
+        );
+        assert_eq!(service.list().as_array().unwrap().len(), 2);
+        assert_eq!(ScheduleRepository::new(&path).load().unwrap().len(), 2);
+        std::fs::remove_file(path).unwrap();
+    }
 
-        std::fs::remove_file(&path).unwrap();
+    #[test]
+    fn closed_queue_preserves_pending_schedules_and_propagates_error() {
+        let path =
+            std::env::temp_dir().join(format!("kida-scheduler-closed-{}.toml", Uuid::new_v4()));
+        let anchor = parse_once("2026-10-10T12:00:00Z").unwrap();
+        let mut service = ScheduleService::load(&path, anchor).unwrap();
+        for schedule in due_rules() {
+            service
+                .add(
+                    NewSchedule {
+                        command: "health".into(),
+                        params: Value::Null,
+                        schedule,
+                    },
+                    anchor,
+                )
+                .unwrap();
+        }
+        let before = service.list();
+        let original_file = std::fs::read_to_string(&path).unwrap();
+        crate::conf::tests::init_test_config();
+        let (queue, receiver) = CommandQueue::new();
+        drop(receiver);
+        let error = service
+            .enqueue_due(parse_once("2026-10-10T12:07:35Z").unwrap(), &queue)
+            .unwrap_err();
+        assert_eq!(error, "Execution queue is closed");
+        assert_eq!(service.list(), before);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original_file);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
@@ -552,7 +810,7 @@ mod tests {
     }
 
     #[test]
-    fn due_persistence_failure_preserves_state_and_does_not_enqueue() {
+    fn due_persistence_failure_preserves_confirmed_admissions_without_duplicates() {
         let path =
             std::env::temp_dir().join(format!("kida-scheduler-save-error-{}.toml", Uuid::new_v4()));
         let anchor = parse_once("2026-10-10T12:00:00Z").unwrap();
@@ -583,7 +841,6 @@ mod tests {
             )
             .unwrap();
 
-        let before = service.list();
         let corrupt_content = "invalid = [";
         std::fs::write(&path, corrupt_content).unwrap();
 
@@ -591,7 +848,15 @@ mod tests {
         let (queue, mut receiver) = CommandQueue::new();
 
         assert!(service.enqueue_due(due, &queue).is_err());
-        assert_eq!(service.list(), before);
+        let listed = service.list();
+        assert_eq!(listed.as_array().unwrap().len(), 1);
+        assert_eq!(listed[0]["next_enqueue_at"], "2026-10-10T12:02:00+00:00");
+        assert_eq!(receiver.try_recv().unwrap().request.params, Value::Null);
+        assert_eq!(
+            receiver.try_recv().unwrap().request.params,
+            json!({"source": "interval"})
+        );
+        service.enqueue_due(due, &queue).unwrap();
         assert!(receiver.try_recv().is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), corrupt_content);
 
@@ -701,5 +966,150 @@ mod cron_tests {
             .unwrap(),
             parse_once("2026-10-25T02:00:00Z").unwrap()
         );
+    }
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use crate::features::scheduler::{
+        model::{NewSchedule, ScheduleOrigin, ScheduleOriginFilter, ScheduleRule},
+        repository::{ScheduleDocument, ScheduleRepository},
+        service::ScheduleService,
+        time::parse_once,
+    };
+    use serde_json::{Value, json};
+
+    fn input(params: Value) -> NewSchedule {
+        NewSchedule {
+            command: "health".into(),
+            params,
+            schedule: ScheduleRule::Interval { seconds: 60 },
+        }
+    }
+
+    #[test]
+    fn internal_permissions_replace_and_failures_preserve_state() {
+        let path = std::env::temp_dir().join(format!("kida-origins-{}.toml", uuid::Uuid::new_v4()));
+        let now = parse_once("2026-10-10T12:00:00Z").unwrap();
+        let later = parse_once("2026-10-10T12:00:30Z").unwrap();
+        let mut service = ScheduleService::load(&path, now).unwrap();
+        let user = service
+            .add(input(json!({"origin":"INTERNAL","internal":true})), now)
+            .unwrap();
+        assert_eq!(user["origin"], "USER");
+        let internal = service.add_internal(input(Value::Null), now).unwrap();
+        assert_eq!(internal["origin"], "INTERNAL");
+        let id = internal["id"].as_str().unwrap();
+        let user_id = user["id"].as_str().unwrap();
+        let before = service.list_by_origin(ScheduleOriginFilter::All);
+        let original = std::fs::read_to_string(&path).unwrap();
+        assert!(service.delete(id).is_err());
+        assert!(service.delete_internal(user_id).is_err());
+        assert!(
+            service
+                .replace_internal(user_id, input(Value::Null), later)
+                .is_err()
+        );
+        let mut invalid = input(Value::Null);
+        invalid.schedule = ScheduleRule::Interval { seconds: 0 };
+        assert!(service.replace_internal(id, invalid, later).is_err());
+        let mut invalid = input(Value::Null);
+        invalid.command = "unknown.command".into();
+        assert!(service.replace_internal(id, invalid, later).is_err());
+        assert_eq!(service.list_by_origin(ScheduleOriginFilter::All), before);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+
+        // A valid destination that cannot be replaced exercises the actual I/O failure path.
+        let saved = path.with_extension("saved");
+        std::fs::rename(&path, &saved).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(
+            service
+                .replace_internal(id, input(json!([null, true, 3])), later)
+                .is_err()
+        );
+        assert!(service.delete_internal(id).is_err());
+        assert!(service.add_internal(input(Value::Null), later).is_err());
+        assert_eq!(service.list_by_origin(ScheduleOriginFilter::All), before);
+        assert_eq!(std::fs::read_to_string(&saved).unwrap(), original);
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::rename(&saved, &path).unwrap();
+
+        let replacement = service
+            .replace_internal(id, input(json!([null,true,{"x":null}])), later)
+            .unwrap();
+        assert_ne!(replacement["id"], internal["id"]);
+        assert_eq!(replacement["origin"], "INTERNAL");
+        assert!(service.delete_internal(id).is_err());
+        let stored = ScheduleRepository::new(&path).load().unwrap();
+        assert_eq!(stored.len(), 2);
+        assert_eq!(stored[1].id, replacement["id"]);
+        assert_eq!(stored[1].anchor_at, later.to_rfc3339());
+        assert_eq!(stored[1].params, replacement["params"]);
+        let mut reloaded = ScheduleService::load(&path, later).unwrap();
+        assert_eq!(reloaded.list(), service.list());
+        assert_eq!(
+            reloaded.list_by_origin(ScheduleOriginFilter::All),
+            service.list_by_origin(ScheduleOriginFilter::All)
+        );
+        assert_eq!(
+            reloaded.list_by_origin(ScheduleOriginFilter::Internal)[0]["next_enqueue_at"],
+            "2026-10-10T12:01:30+00:00"
+        );
+        assert_eq!(
+            reloaded
+                .delete_internal(replacement["id"].as_str().unwrap())
+                .unwrap(),
+            replacement
+        );
+        assert_eq!(reloaded.delete(user_id).unwrap(), user);
+        assert_eq!(ScheduleRepository::new(&path).load().unwrap().len(), 0);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn legacy_defaults_and_both_origins_preserve_json_and_restart_execution() {
+        let path = std::env::temp_dir().join(format!("kida-legacy-{}.toml", uuid::Uuid::new_v4()));
+        let now = parse_once("2026-10-10T12:00:00Z").unwrap();
+        let mut service = ScheduleService::load(&path, now).unwrap();
+        service
+            .add(
+                input(json!({"nested":[null,true,18446744073709551615_u64]})),
+                now,
+            )
+            .unwrap();
+        let legacy = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace("origin = \"USER\"\n", "");
+        assert!(!legacy.contains("origin"));
+        std::fs::write(&path, &legacy).unwrap();
+        let doc: ScheduleDocument = toml::from_str(&legacy).unwrap();
+        assert_eq!(doc.schedules[0].origin, ScheduleOrigin::User);
+        let mut service = ScheduleService::load(&path, now).unwrap();
+        service.add_internal(input(Value::Null), now).unwrap();
+        let mut once = input(json!({"once":true}));
+        once.schedule = ScheduleRule::Once {
+            at: "2026-10-10T12:01:00Z".into(),
+        };
+        service.add_internal(once, now).unwrap();
+        let restart = parse_once("2026-10-10T12:07:35Z").unwrap();
+        let mut service = ScheduleService::load(&path, restart).unwrap();
+        let listed = service.list_by_origin(ScheduleOriginFilter::All);
+        assert_eq!(listed.as_array().unwrap().len(), 2);
+        for entry in listed.as_array().unwrap() {
+            assert_eq!(entry["next_enqueue_at"], "2026-10-10T12:08:00+00:00");
+        }
+        crate::conf::tests::init_test_config();
+        let (queue, mut receiver) = crate::exec::queue::CommandQueue::new();
+        service
+            .enqueue_due(parse_once("2026-10-10T12:08:00Z").unwrap(), &queue)
+            .unwrap();
+        for entry in listed.as_array().unwrap() {
+            let request = receiver.try_recv().unwrap().request;
+            assert_eq!(request.command, "health");
+            assert_eq!(request.params, entry["params"]);
+        }
+        assert!(receiver.try_recv().is_err());
+        std::fs::remove_file(path).unwrap();
     }
 }

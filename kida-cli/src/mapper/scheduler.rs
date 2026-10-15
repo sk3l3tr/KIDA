@@ -1,11 +1,14 @@
-use super::{empty_params, request};
+use super::request;
 use crate::{cli::SchedulerCommand, protocol::CommandRequest};
 
 pub(super) fn map(
     command: SchedulerCommand,
 ) -> Result<CommandRequest, crate::input::error::InputError> {
     match command {
-        SchedulerCommand::List => Ok(request("scheduler.list", empty_params())),
+        SchedulerCommand::List { origin } => Ok(request(
+            "scheduler.list",
+            serde_json::json!({"origin": origin.as_str()}),
+        )),
         SchedulerCommand::Delete { id } => {
             Ok(request("scheduler.delete", serde_json::json!({"id":id})))
         }

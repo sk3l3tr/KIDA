@@ -126,7 +126,17 @@ curl -sS http://127.0.0.1:8989/command \
   --data '{"id":"list-schedules","command":"scheduler.list","params":{}}'
 ```
 
-Una respuesta `OK` contiene en `data` un array con `id`, `command`, `params`, `schedule` y `next_enqueue_at` para cada programación. Si no hay ninguna, devuelve `[]`. `next_enqueue_at` está en UTC e indica el próximo intento de encolado, no un inicio de ejecución garantizado.
+Sin filtro, `scheduler.list` devuelve solo programaciones `USER`. También acepta `params: null` con ese mismo resultado. Para consultar las internas o todas, envía `{"origin":"INTERNAL"}` o `{"origin":"ALL"}` en `params`; los valores del protocolo son `USER`, `INTERNAL` y `ALL`, en mayúsculas.
+
+```bash
+curl -sS http://127.0.0.1:8989/command \
+  -H 'Content-Type: application/json' \
+  --data '{"id":"list-all-schedules","command":"scheduler.list","params":{"origin":"ALL"}}'
+```
+
+Una respuesta `OK` contiene en `data` un array con `id`, `origin`, `command`, `params`, `schedule` y `next_enqueue_at` para cada programación, en su orden almacenado. Si no hay coincidencias, devuelve `[]`. El origen de una entrada es `USER` o `INTERNAL`; `ALL` solo es un filtro. `next_enqueue_at` está en UTC e indica el vencimiento pendiente de admisión, no un inicio de ejecución garantizado. Si la cola está llena, esa fecha puede quedar en el pasado mientras se espera un reintento.
+
+`scheduler.add` crea siempre entradas `USER`. Las entradas `INTERNAL` las gestiona CORE mediante su API interna. Los comandos públicos de alta y borrado no aceptan un campo de origen para cambiar sus permisos.
 
 Para eliminar una programación, sustituye `UUID_DEVUELTO` por su UUID:
 
@@ -140,16 +150,23 @@ curl -sS http://127.0.0.1:8989/command \
   }'
 ```
 
-La respuesta `OK` devuelve la definición eliminada y garantiza que esa programación no producirá nuevos encolados. No elimina peticiones ya encoladas ni interrumpe ejecuciones. Un UUID inválido o inexistente devuelve `ERROR`. No existe `scheduler.modify`: para sustituir una programación, elimínala y crea otra mediante operaciones independientes.
+La respuesta `OK` devuelve la definición eliminada y garantiza que esa programación no producirá nuevos encolados. No elimina peticiones ya encoladas ni interrumpe ejecuciones. Un UUID inválido, inexistente o perteneciente a una entrada `INTERNAL` devuelve `ERROR`. El borrado público solo permite eliminar entradas `USER`. No existe `scheduler.modify`: para sustituir una programación, elimínala y crea otra mediante operaciones independientes.
 
 ### Qué ocurre al vencer o reiniciar
 
-- Los comandos programados comparten la cola FIFO y el worker único con los backups manuales. Se pueden encolar nuevos vencimientos aunque una ejecución anterior siga pendiente o ejecutándose; esto no crea workers adicionales.
-- Si la cola está llena, se descarta ese vencimiento sin reintentos. Las recurrencias futuras se conservan.
-- Una `once` se elimina tras su único intento, incluso si la cola está llena. Si vence mientras CORE está parado, se elimina al arrancar sin ejecutarse.
-- No se recuperan vencimientos perdidos, peticiones encoladas ni ejecuciones interrumpidas. Si el temporizador se retrasa, intenta una vez el vencimiento pendiente y avanza directamente a una fecha futura, sin ráfagas de recuperación.
+- Los comandos programados comparten la cola FIFO y el worker con los backups manuales. El worker limita las ejecuciones simultáneas mediante `queue.max_concurrent_jobs` (2 por defecto); los `backup.run` se ejecutan de uno en uno. Se pueden encolar nuevos vencimientos aunque una ejecución anterior siga pendiente o ejecutándose. El orden de admisión no garantiza el orden de inicio o finalización.
+- Se intenta admitir primero el vencimiento más antiguo, tanto para entradas `USER` como `INTERNAL`. En caso de empate se conserva el orden almacenado. Así, las recurrencias recién vencidas no adelantan a entradas que llevan más tiempo pendientes.
+- Si la cola está llena, se conserva el vencimiento pendiente y se vuelve a intentar su admisión al cabo de un segundo, medido con reloj monotónico. El temporizador comprueba periódicamente el plazo; no se garantiza un instante exacto de admisión.
+- Una `once` se elimina después de admitirse en la cola. Si aún está pendiente cuando CORE se detiene y su fecha ya pasó al reiniciar, se elimina al arrancar sin ejecutarse.
+- Las recurrencias conservan un único vencimiento pendiente durante la saturación. Tras admitirlo, avanzan directamente a una fecha futura manteniendo su regla y anclaje, sin ráfagas para recuperar cada repetición omitida. No se recuperan peticiones encoladas ni ejecuciones interrumpidas tras reiniciar. Admitir una petición no garantiza su ejecución ni ofrece ejecución exactamente una vez.
 - Al encolar se conserva únicamente el comando y sus parámetros. Los recursos referenciados se resuelven al ejecutar; borrar una programación no cambia las peticiones ya encoladas.
 - Un fallo de persistencia durante el procesamiento de vencimientos o una cola cerrada termina CORE con error; no se reintenta automáticamente desde SCHEDULER.
 - SCHEDULER no ofrece historial, consulta de ejecuciones ni cancelación. El campo `schedule` de una configuración de backup no activa automáticamente una programación.
+
+### Compatibilidad al actualizar
+
+Actualiza CORE antes que CLI. La CLI actual exige `origin` en las respuestas del scheduler y rechaza las respuestas del CORE anterior que no lo incluyen, incluso si el alta o borrado se completó. No repitas automáticamente un alta por un error de presentación: consulta primero las programaciones existentes.
+
+CORE lee archivos anteriores sin `origin` y trata esas entradas como `USER`. Al guardar, escribe el campo en cada entrada. El CORE anterior rechaza ese formato: conserva un respaldo antes de actualizar si necesitas poder volver a esa versión. No elimines el campo de entradas `INTERNAL` para forzar compatibilidad, porque perderían su protección de origen.
 
 # License and trademarks
