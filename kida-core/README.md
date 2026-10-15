@@ -145,8 +145,192 @@ parcial. El nombre identifica el proyecto únicamente dentro del daemon/contexto
 Docker consultado: no es un identificador global ni acredita propiedad de KIDA.
 Los modelos `ComposeVersion`, `ComposeProject` y `ComposeService` se exportan desde
 `features::docker`, junto con los modelos existentes de contenedores, para su
-reutilización interna. No se añaden operaciones de creación, arranque, parada ni
-borrado de proyectos Compose.
+reutilización interna. El protocolo y la CLI mantienen únicamente estas consultas
+Compose; el lifecycle siguiente es interno.
+
+### Lifecycle Compose interno
+
+`features::docker` exporta `ComposeOptions` y estos métodos de `DockerService`:
+
+```rust
+let mut options = ComposeOptions::new("my-project", "/srv/my-project/compose.yaml");
+options.variables.insert("APP_TAG".into(), "stable".into());
+// options.timeout = std::time::Duration::from_secs(300); // valor predeterminado
+DockerService::compose_create(&options).await?; // Result<(), String>
+DockerService::compose_start(&options).await?;
+let project = DockerService::compose_project(&options.project)?; // inspección existente
+DockerService::compose_stop(&options).await?;
+```
+
+`ComposeOptions` contiene `project: String`, `file: PathBuf`,
+`variables: BTreeMap<String, String>` y `timeout: Duration`. El proyecto explícito
+cumple `[a-z0-9][a-z0-9_-]*`, sin normalización. Se canonicaliza un único archivo
+local regular; su directorio se pasa como `--project-directory`. Las rutas deben
+ser UTF-8 y no contener comas, porque la etiqueta nativa de archivos usa comas
+sin escape. Las variables deben tener nombres de entorno portables y valores sin
+NUL. Se rechazan `DOCKER_*`, `COMPOSE_*`, `PATH`, `HOME`, `XDG_CONFIG_HOME`,
+`LD_*` y `DYLD_*` antes de ejecutar Docker.
+
+Todos los argumentos se pasan separados, sin shell. Las variables se inyectan
+solo en los hijos; se conserva el destino/contexto Docker heredado. Se fuerzan
+los perfiles predeterminados (`COMPOSE_PROFILES` vacío) y se desactiva la
+eliminación automática de huérfanos del entorno. No se ofrecen selección de
+servicios ni perfiles. La única combinación adicional es el archivo de propiedad generado por KIDA. Compose resuelve y valida el
+documento con `compose config --format json`, incluidas su interpolación y rutas;
+CORE solo lee el modelo JSON resultante para Create y Start. Stop comprueba la
+procedencia y ejecuta directamente `compose stop`, sin resolver `env_file` ni
+comprobar la existencia de redes o volúmenes externos. El archivo Compose
+principal debe seguir existiendo y ser válido para el comando nativo.
+
+Create rechaza contenedores, redes o volúmenes etiquetados con el proyecto,
+nombres explícitos de contenedores ocupados y nombres resueltos de redes y
+volúmenes no externos ya existentes. Ejecuta
+[`compose create --no-recreate`](https://docs.docker.com/reference/cli/docker/compose/create/)
+sin arrancar contenedores ni cambiar las políticas nativas de build/pull.
+Para Create y Start, los recursos `external: true` deben existir y los gestiona
+Compose.
+
+Start y Stop requieren contenedores presentes. En cada uno se exige coincidencia
+exacta de las etiquetas nativas `com.docker.compose.project`,
+`com.docker.compose.project.config_files` (archivo canonicalizado y, si está gestionado, archivo adicional de propiedad) y
+`com.docker.compose.project.working_dir`. Se rechaza procedencia ausente, mixta,
+ambigua o con archivos distintos de los registrados. Se admiten proyectos creados fuera de KIDA con un único archivo coincidente; Start/Stop no los incorporan al registro. Se usan las
+[etiquetas oficiales de Compose](https://github.com/docker/compose/blob/main/pkg/api/labels.go).
+[`compose start`](https://docs.docker.com/reference/cli/docker/compose/start/)
+no espera salud; [`compose stop`](https://docs.docker.com/reference/cli/docker/compose/stop/)
+conserva IDs, contenedores, redes y volúmenes. Ambos actúan sobre todos los
+servicios habilitados por defecto, sin selección explícita.
+
+Las operaciones del mismo proyecto se serializan dentro del proceso KIDA.
+El timeout cubre la espera de ese bloqueo, las comprobaciones y el comando final,
+con captura concurrente mediante `tokio::process`. Las consultas admiten hasta
+8 MiB de stdout; superar ese límite termina el proceso y devuelve un error sin
+analizar datos truncados. Create, Start y Stop descartan stdout. De stderr se
+conservan los primeros 64 KiB y se drena el resto; los errores indican si el
+diagnóstico fue truncado. Al vencer el timeout se mata y recoge el proceso; en
+Unix también se termina su grupo, incluido el
+plugin. Los errores distinguen entrada, conflicto, Docker/plugin ausente, daemon
+inaccesible, salida inválida, fallo del comando y timeout. Un fallo puede dejar
+recursos parciales: no hay rollback ni limpieza automática. No se garantiza
+exclusión frente a clientes Docker externos ni cambios del archivo durante una
+operación. No se usan `down` ni operaciones globales.
+
+### Propiedad y eliminación selectiva de Docker
+
+La configuración global admite una sección opcional, compatible con configuraciones anteriores:
+
+```toml
+[docker]
+ownership_dir = "/etc/kida/docker.d"
+```
+
+El registro se abre al invocar el lifecycle, nunca durante el arranque. CORE requiere
+permisos de escritura para Create y Remove. Cada creación reserva un UUID y un JSON
+versionado mediante `JsonStorage` antes de ejecutar Create. Registra daemon, proyecto,
+procedencia, hashes de archivos, recursos externos e identidades verificadas. Los
+contenedores y redes usan IDs completos; los volúmenes se identifican por nombre,
+fecha de creación, driver, ámbito, opciones, punto de montaje y etiquetas.
+
+KIDA conserva el Compose original y genera un archivo adicional persistente con
+`io.kida.owner=<uuid>` en servicios, redes y volúmenes no externos. Compose combina
+ambos según sus [reglas de merge](https://docs.docker.com/reference/compose-file/merge/).
+Create rechaza etiquetas de usuario `io.kida.*`, colisiones y proyectos con registro
+activo o pendiente. Start/Stop reutilizan ambos archivos y exigen que sus hashes,
+procedencia, daemon, identidades y etiquetas concuerden. Los proyectos ajenos conservan
+su contrato anterior y nunca se adoptan por nombre ni por etiquetas.
+
+Contratos internos, sin comandos CLI ni cambios de protocolo:
+
+```rust
+let reference = DockerService::compose_managed_project("my-project").await?;
+let report = DockerService::compose_remove(&reference, Duration::from_secs(60)).await?;
+// reference: ManagedProject { owner, project }
+// report: removed, absent, preserved, failed; cada entrada incluye kind, identity, reason
+// report.errors: errores generales de persistencia o timeout; comprobar failed y errors.
+```
+
+La referencia corresponde a una creación concreta. Los registros completados se
+conservan para reconocer repeticiones; una referencia antigua no puede borrar una
+creación posterior con el mismo proyecto. Remove no lee el Compose ni necesita su
+plugin. Antes de cualquier mutación exige inventario válido, daemon e identidades
+concordantes y todos los contenedores gestionados detenidos. Recursos adicionales
+con etiquetas coincidentes son ambiguos: bloquean la operación sin adopción.
+
+Remove elimina individualmente contenedores por ID, redes por ID y finalmente
+volúmenes verificados. Reinspecciona antes de borrar, sin `--force`, `rm -v`,
+`compose down`, desconexiones ajenas ni limpieza global. Examina todos los
+contenedores, incluidos los detenidos, y las conexiones de red. Conserva redes y
+volúmenes que sigan en uso; continúa con los exclusivos. Conserva recursos externos,
+bind mounts y volúmenes anónimos sin propiedad acreditada. Solo elimina volúmenes
+con driver `local`, ámbito `local` y opciones nulas o vacías; los demás aparecen
+como conservados con un motivo explícito.
+
+Cada identidad se persiste en cuanto se verifica tras Create; un fallo conserva el
+registro pendiente, sin rollback. Tras un reinicio solo se recuperan identidades ya
+persistidas: no se descubre propiedad a partir de etiquetas. Un registro pendiente
+bloquea Create/Start/Stop; Remove puede retirar sus recursos acreditados si el inventario
+no contiene ambigüedades. La pérdida del registro impide autorizar la eliminación.
+Un registro corrupto bloquea las operaciones y no se sobrescribe. Los avances de
+Remove se guardan tras cada recurso y los registros parciales permiten reintentos.
+Solo una consulta válida confirma ausencia; un error Docker se informa como fallo.
+Los errores previos se devuelven sin mutaciones; los posteriores quedan en el informe,
+con los recursos no intentados señalados como conservados.
+
+Se presupone un único proceso KIDA escritor por directorio y un registro confiable.
+No existe exclusión frente a clientes Docker externos. Las reinspecciones reducen la
+ventana de carrera; Docker rechaza eliminar redes conectadas y volúmenes utilizados.
+La protección evita adopciones accidentales y copias simples de etiquetas, pero no
+protege frente a un administrador que controle Docker y el registro. No hay limpieza
+al arrancar ni integración con Backup Health, Worker o Scheduler.
+
+El lifecycle mantiene exclusión por proyecto, incluida la consulta de referencia y la
+persistencia; proyectos distintos pueden avanzar simultáneamente. El registro
+presupone un único proceso escritor y sustitución atómica de cada JSON mediante
+`JsonStorage`; se sigue leyendo y validando el registro completo.
+
+El timeout es un presupuesto para iniciar y continuar trabajo. La E/S de disco ya
+iniciada se espera hasta terminar, incluso si vence el plazo; no se garantiza un
+límite estricto de respuesta con disco bloqueado. Una cancelación conserva el
+bloqueo del proyecto hasta terminar esa E/S. Tras vencer el plazo no se inician
+nuevos comandos ni guardados. Durante la eliminación, los fallos de persistencia
+y timeout se devuelven en `RemovalReport.errors`, conservando los resultados
+confirmados y preservando los recursos restantes por interrupción. El consumidor
+debe comprobar tanto `failed` como `errors`. Los errores anteriores al recorrido
+siguen siendo `Err(String)`.
+
+Verificación simulada (sin daemon; el Docker simulado en Unix usa Python 3):
+
+```sh
+cargo test -p kida-core features::docker
+```
+
+Aceptación real optativa (requiere daemon, plugin Compose e imagen descargable):
+
+```sh
+KIDA_COMPOSE_REAL=1 cargo test -p kida-core compose_lifecycle_real -- --ignored --nocapture
+```
+
+Esta prueba usa los métodos internos, crea dos proyectos únicos y un archivo en
+`/tmp/kida-accept-.../compose.yaml`, con dos servicios, tres contenedores, una red
+y un volumen por proyecto. Comprueba Create → Start → Inspect → Stop, conserva
+las identidades de los recursos y compara el estado del proyecto de control
+antes y después. Imprime proyectos y recursos y deja ambos detenidos sin borrar
+contenedores, redes, volúmenes ni archivos. Las pruebas normales no ejecutan esta
+aceptación; sus resultados simulados no acreditan el comportamiento de un daemon
+real.
+
+Aceptación real de eliminación, con autorización **independiente** y desactivada por defecto:
+
+```sh
+KIDA_DOCKER_REMOVE_REAL=1 cargo test -p kida-core features::docker::lifecycle_tests::compose_remove_real -- --exact --ignored --nocapture
+```
+
+Crea recursos nuevos bajo un proyecto único y otro de control; elimina únicamente
+la creación de prueba con los contenedores detenidos y el Compose original ausente,
+verifica idempotencia y compara el control. Deja el control detenido, sus recursos y
+el registro para inspección. No ejecutar sin autorización expresa para crear y borrar
+estos recursos. Las pruebas simuladas cubren estado persistente, reinicio del consumidor,
+interrupciones, reintentos, conflictos, uso compartido y prohibición de comandos forzados.
 
 ## Programar comandos con SCHEDULER
 

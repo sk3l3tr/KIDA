@@ -5,6 +5,7 @@ use super::defaults::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct KidaConfig {
+    pub docker: DockerConfig,
     pub unix: UnixConfig,
     pub http: HttpConfig,
     pub backup: BackupConfig,
@@ -65,6 +66,7 @@ impl QueueConfig {
 impl Default for KidaConfig {
     fn default() -> Self {
         Self {
+            docker: DockerConfig::default(),
             unix: UnixConfig::default(),
             http: HttpConfig::default(),
             backup: BackupConfig::default(),
@@ -112,6 +114,19 @@ impl Default for SchedulerConfig {
     fn default() -> Self {
         Self {
             path: DEFAULT_SCHEDULER_PATH.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DockerConfig {
+    pub ownership_dir: String,
+}
+impl Default for DockerConfig {
+    fn default() -> Self {
+        Self {
+            ownership_dir: DEFAULT_DOCKER_OWNERSHIP_DIR.into(),
         }
     }
 }

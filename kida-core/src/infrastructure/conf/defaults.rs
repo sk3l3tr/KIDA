@@ -9,3 +9,5 @@ pub const DEFAULT_HTTP_PORT: u16 = 8989;
 
 pub const DEFAULT_QUEUE_CAPACITY: usize = 16;
 pub const DEFAULT_MAX_CONCURRENT_JOBS: usize = 2;
+
+pub const DEFAULT_DOCKER_OWNERSHIP_DIR: &str = "/etc/kida/docker.d";

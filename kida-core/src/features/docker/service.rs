@@ -10,6 +10,25 @@ use super::{
 pub struct DockerService;
 
 impl DockerService {
+    /// Validates a lifecycle project identifier without normalizing it or invoking Docker.
+    pub fn validate_compose_project_name(name: &str) -> Result<(), String> {
+        let valid_start = name
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit());
+        let valid_chars = name.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-')
+        });
+
+        if !valid_start || !valid_chars {
+            return Err(
+                "Invalid Compose project identifier: expected [a-z0-9][a-z0-9_-]*".to_string(),
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn compose_version() -> Result<ComposeVersion, String> {
         let output = Command::new("docker")
             .args(["compose", "version", "--short"])

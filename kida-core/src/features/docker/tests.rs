@@ -3,6 +3,40 @@ use serde_json::{Value, json};
 
 use super::{DockerService, service::map_compose_projects};
 
+#[test]
+fn validates_lifecycle_project_identifiers_without_normalizing() {
+    for name in ["a", "0", "alpha", "backup-004", "1_restore", "a_-9"] {
+        assert!(
+            DockerService::validate_compose_project_name(name).is_ok(),
+            "valid identifier rejected: {name:?}"
+        );
+    }
+
+    for name in [
+        "",
+        " ",
+        " alpha",
+        "alpha ",
+        "alpha beta",
+        "Alpha",
+        "ALPHA",
+        "a/b",
+        "-alpha",
+        "_alpha",
+        "a.b",
+        "a\n",
+        "a\0b",
+        "á",
+        "aβ",
+    ] {
+        assert_eq!(
+            DockerService::validate_compose_project_name(name).unwrap_err(),
+            "Invalid Compose project identifier: expected [a-z0-9][a-z0-9_-]*",
+            "invalid identifier accepted: {name:?}"
+        );
+    }
+}
+
 fn inspected() -> Vec<Value> {
     vec![
         json!({

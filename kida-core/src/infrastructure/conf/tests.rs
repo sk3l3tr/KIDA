@@ -41,6 +41,7 @@ fn assert_defaults(config: &KidaConfig) {
     assert_eq!(config.http.port, DEFAULT_HTTP_PORT);
     assert_eq!(config.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
     assert_eq!(config.scheduler.path, DEFAULT_SCHEDULER_PATH);
+    assert_eq!(config.docker.ownership_dir, DEFAULT_DOCKER_OWNERSHIP_DIR);
     assert_eq!(config.queue.capacity, DEFAULT_QUEUE_CAPACITY);
     assert_eq!(
         config.queue.max_concurrent_jobs,
@@ -316,4 +317,13 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
     assert_eq!(BackupService::delete(&job.id).unwrap().id, job.id);
     assert!(!stored_job.exists());
     assert!(BackupService::list().unwrap().is_empty());
+}
+
+#[test]
+fn docker_ownership_config_defaults_and_override() {
+    let defaults: KidaConfig = toml::from_str("[docker]\n").unwrap();
+    assert_eq!(defaults.docker.ownership_dir, DEFAULT_DOCKER_OWNERSHIP_DIR);
+    let custom: KidaConfig =
+        toml::from_str("[docker]\nownership_dir = '/tmp/private-docker'\n").unwrap();
+    assert_eq!(custom.docker.ownership_dir, "/tmp/private-docker");
 }
