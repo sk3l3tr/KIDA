@@ -84,6 +84,24 @@ pub fn ask(
     }
 }
 
+pub fn ask_validated<T>(
+    kind: &Kind,
+    path: &str,
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+    validate: impl Fn(Value) -> Result<T, InputError>,
+) -> Result<T, InputError> {
+    loop {
+        let value = ask(kind, path, reader, writer)?;
+        match validate(value) {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                writeln!(writer, "{error}; try again.").map_err(|e| InputError::new(path, e))?
+            }
+        }
+    }
+}
+
 fn scalar(
     kind: &Kind,
     path: &str,

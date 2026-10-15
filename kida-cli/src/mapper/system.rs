@@ -4,17 +4,18 @@ use crate::{cli::SystemCommand, protocol::CommandRequest};
 
 use super::{empty_params, request};
 
-impl From<SystemCommand> for CommandRequest {
-    fn from(command: SystemCommand) -> Self {
-        match command {
-            SystemCommand::PowerCycle { .. } => {
-                unreachable!("power cycle must be prepared before mapping")
-            }
-            SystemCommand::WakeCapabilities => request("system.wake_capabilities", empty_params()),
-            SystemCommand::Info => request("system.info", empty_params()),
-            SystemCommand::Health => request("system.health", empty_params()),
-            SystemCommand::Shutdown { time } => request("system.shutdown", json!({ "when": time })),
-            SystemCommand::Reboot { time } => request("system.reboot", json!({"when": time})),
-        }
+pub(super) fn map(
+    command: SystemCommand,
+) -> Result<CommandRequest, crate::input::error::InputError> {
+    match command {
+        SystemCommand::PowerCycle { .. } => Err(crate::input::error::InputError::new(
+            "input",
+            "power cycle must be prepared before mapping",
+        )),
+        SystemCommand::WakeCapabilities => Ok(request("system.wake_capabilities", empty_params())),
+        SystemCommand::Info => Ok(request("system.info", empty_params())),
+        SystemCommand::Health => Ok(request("system.health", empty_params())),
+        SystemCommand::Shutdown { time } => Ok(request("system.shutdown", json!({ "when": time }))),
+        SystemCommand::Reboot { time } => Ok(request("system.reboot", json!({"when": time}))),
     }
 }

@@ -9,15 +9,34 @@ use serde_json::Value;
 
 use crate::{cli::Command, protocol::CommandRequest};
 
-impl From<Command> for CommandRequest {
-    fn from(command: Command) -> Self {
-        match command {
-            Command::Scheduler { command } => command.into(),
-            Command::System { command } => command.into(),
-            Command::Docker { command } => command.into(),
-            Command::Backup { command } => command.into(),
-        }
+pub(crate) fn direct(command: Command) -> Result<CommandRequest, crate::input::error::InputError> {
+    match command {
+        Command::Scheduler { command } => scheduler::map(command),
+        Command::System { command } => system::map(command),
+        Command::Docker { command } => Ok(docker::map(command)),
+        Command::Backup { command } => backup::map(command),
     }
+}
+
+pub(crate) fn power_cycle(params: crate::input::system::PowerCycle) -> CommandRequest {
+    request(
+        "system.power_cycle",
+        serde_json::to_value(params).expect("power cycle input is JSON serializable"),
+    )
+}
+
+pub(crate) fn schedule(schedule: crate::input::scheduler::NewSchedule) -> CommandRequest {
+    request(
+        "scheduler.add",
+        serde_json::to_value(schedule).expect("scheduler DTO is JSON serializable"),
+    )
+}
+
+pub(crate) fn create(job: crate::input::backup::NewBackupJob) -> CommandRequest {
+    request(
+        "backup.config.create",
+        serde_json::to_value(job).expect("backup DTO is JSON serializable"),
+    )
 }
 
 fn request(command: impl Into<String>, params: Value) -> CommandRequest {
@@ -42,21 +61,7 @@ fn generate_request_id() -> String {
 
 impl From<crate::input::PreparedCommand> for CommandRequest {
     fn from(command: crate::input::PreparedCommand) -> Self {
-        match command {
-            crate::input::PreparedCommand::PowerCycle(params) => request(
-                "system.power_cycle",
-                serde_json::to_value(params).expect("power cycle input is JSON serializable"),
-            ),
-            crate::input::PreparedCommand::Schedule(schedule) => request(
-                "scheduler.add",
-                serde_json::to_value(schedule).expect("scheduler DTO is JSON serializable"),
-            ),
-            crate::input::PreparedCommand::Create(job) => request(
-                "backup.config.create",
-                serde_json::to_value(job).expect("backup DTO is JSON serializable"),
-            ),
-            crate::input::PreparedCommand::Other(command) => command.into(),
-        }
+        command.into_request()
     }
 }
 

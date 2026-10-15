@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use super::{
     error::InputError,
-    fields::{Kind, ask},
+    fields::{Kind, ask, ask_validated},
 };
 
 #[derive(Debug, Serialize)]
@@ -69,28 +69,21 @@ pub fn prepare(
         reader,
         writer,
     )?;
-    loop {
-        let result = if mode == "time" {
-            let value = ask(
-                &Kind::String,
-                "Wake time (HH:MM, server local timezone)",
-                reader,
-                writer,
-            )?;
-            validate(Some(value.as_str().unwrap().into()), None)
-        } else {
-            let value = ask(
-                &Kind::U64,
-                "Seconds until wake (minimum 120)",
-                reader,
-                writer,
-            )?;
-            validate(None, value.as_u64())
-        };
-        match result {
-            Ok(value) => return Ok(value),
-            Err(error) => writeln!(writer, "{error}; try again.")
-                .map_err(|e| InputError::new("powercicle", e))?,
-        }
+    if mode == "time" {
+        ask_validated(
+            &Kind::String,
+            "Wake time (HH:MM, server local timezone)",
+            reader,
+            writer,
+            |value| validate(Some(value.as_str().unwrap().into()), None),
+        )
+    } else {
+        ask_validated(
+            &Kind::U64,
+            "Seconds until wake (minimum 120)",
+            reader,
+            writer,
+            |value| validate(None, value.as_u64()),
+        )
     }
 }

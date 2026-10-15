@@ -16,6 +16,8 @@
 KIDA CLI is the terminal interface for checking and managing the server where
 KIDA is running. After installing KIDA, the command is available as `kida`.
 
+See the [changelog](CHANGELOG.md) for implementation changes and validation notes.
+
 # Using KIDA CLI
 
 The general command format is:

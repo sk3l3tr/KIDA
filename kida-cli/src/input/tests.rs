@@ -210,6 +210,30 @@ mod backup_parameter_tests {
     }
 
     #[test]
+    fn explicit_null_matches_deserialized_defaults() {
+        let parameters = from_parameters(CreateParameters {
+            compression: Some("tar_zstd".into()),
+            pre_backup: vec!["health".into()],
+            pre_backup_params: vec!["0=null".into()],
+            schedule: Some("null".into()),
+            ..minimal()
+        })
+        .unwrap();
+        let deserialized: NewBackupJob = serde_json::from_value(json!({
+            "name": "test-backup",
+            "sources": ["/etc/hosts"],
+            "targets": [{"path": "/tmp/backups"}],
+            "schedule": null,
+            "lifecycle": {"pre_backup": [{"command": "health", "params": null}]}
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(parameters).unwrap(),
+            serde_json::to_value(deserialized).unwrap()
+        );
+    }
+
+    #[test]
     fn retention_can_contain_only_protected_restore_points() {
         let parameters = CreateParameters {
             retention_protected_restore_points: vec!["point".into()],
@@ -737,5 +761,71 @@ mod scheduler_tests {
                 .to_string()
                 .contains("interrupt")
         );
+    }
+}
+
+#[cfg(test)]
+mod validated_field_tests {
+    use crate::input::{
+        error::InputError,
+        fields::{Kind, ask_validated},
+    };
+    use std::{
+        cell::Cell,
+        io::{self, Write},
+    };
+
+    #[test]
+    fn cancellation_does_not_call_the_validator() {
+        for script in ["", "\u{3}\n"] {
+            let calls = Cell::new(0);
+            let error = ask_validated(
+                &Kind::String,
+                "test",
+                &mut script.as_bytes(),
+                &mut Vec::new(),
+                |_| {
+                    calls.set(calls.get() + 1);
+                    Ok(())
+                },
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("cancelled"));
+            assert_eq!(calls.get(), 0);
+        }
+    }
+
+    #[test]
+    fn write_failure_during_retry_stops_immediately() {
+        struct LimitedWriter(usize);
+        impl Write for LimitedWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if self.0 == 0 {
+                    return Err(io::ErrorKind::BrokenPipe.into());
+                }
+                let count = bytes.len().min(self.0);
+                self.0 -= count;
+                Ok(count)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut reader = &b"invalid\nvalid\n"[..];
+        let calls = Cell::new(0);
+        let error = ask_validated(
+            &Kind::String,
+            "test",
+            &mut reader,
+            &mut LimitedWriter("test: ".len()),
+            |_| {
+                calls.set(calls.get() + 1);
+                Err::<(), _>(InputError::new("test", "invalid"))
+            },
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("broken pipe"));
+        assert_eq!(calls.get(), 1);
+        assert_eq!(reader, b"valid\n");
     }
 }
