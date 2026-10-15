@@ -41,6 +41,25 @@ pub struct SchedulerConfig {
 #[serde(default)]
 pub struct QueueConfig {
     pub capacity: usize,
+    pub max_concurrent_jobs: usize,
+}
+
+impl QueueConfig {
+    pub(super) fn validate(&self) -> Result<(), std::io::Error> {
+        if self.max_concurrent_jobs == 0
+            || self.max_concurrent_jobs > tokio::sync::Semaphore::MAX_PERMITS
+            || self
+                .capacity
+                .checked_add(self.max_concurrent_jobs)
+                .is_none()
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "queue.max_concurrent_jobs must be positive and fit semaphore and admission limits",
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Default for KidaConfig {
@@ -84,6 +103,7 @@ impl Default for QueueConfig {
     fn default() -> Self {
         Self {
             capacity: DEFAULT_QUEUE_CAPACITY,
+            max_concurrent_jobs: DEFAULT_MAX_CONCURRENT_JOBS,
         }
     }
 }

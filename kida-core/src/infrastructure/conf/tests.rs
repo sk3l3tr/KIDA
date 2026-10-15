@@ -42,6 +42,10 @@ fn assert_defaults(config: &KidaConfig) {
     assert_eq!(config.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
     assert_eq!(config.scheduler.path, DEFAULT_SCHEDULER_PATH);
     assert_eq!(config.queue.capacity, DEFAULT_QUEUE_CAPACITY);
+    assert_eq!(
+        config.queue.max_concurrent_jobs,
+        DEFAULT_MAX_CONCURRENT_JOBS
+    );
 }
 
 #[test]
@@ -69,6 +73,18 @@ fn toml_defaults_and_custom_values() {
     assert_eq!(old.backup.backup_dir, DEFAULT_BACKUP_DIRECTORY);
     assert_eq!(old.scheduler.path, DEFAULT_SCHEDULER_PATH);
     assert_eq!(old.queue.capacity, DEFAULT_QUEUE_CAPACITY);
+    assert_eq!(old.queue.max_concurrent_jobs, DEFAULT_MAX_CONCURRENT_JOBS);
+
+    let old_queue: KidaConfig = toml::from_str("[queue]\ncapacity = 3\n").unwrap();
+    assert_eq!(old_queue.queue.capacity, 3);
+    assert_eq!(
+        old_queue.queue.max_concurrent_jobs,
+        DEFAULT_MAX_CONCURRENT_JOBS
+    );
+
+    let concurrent: KidaConfig = toml::from_str("[queue]\nmax_concurrent_jobs = 4\n").unwrap();
+    assert_eq!(concurrent.queue.capacity, DEFAULT_QUEUE_CAPACITY);
+    assert_eq!(concurrent.queue.max_concurrent_jobs, 4);
 
     let custom: KidaConfig = toml::from_str(
         "[unix]\nsocket_path = '/tmp/custom.sock'\n[http]\nhost = '::1'\nport = 9002\n[backup]\nbackup_dir = '/tmp/custom-backups'\n[scheduler]\npath = '/tmp/custom-scheduler.toml'\n[queue]\ncapacity = 3\n",
@@ -94,10 +110,20 @@ fn manager_creates_missing_file_and_preserves_update_api() {
     updated.backup.backup_dir = "/tmp/updated-backups".into();
     updated.scheduler.path = "/tmp/updated-scheduler.toml".into();
     updated.queue.capacity = 3;
+    updated.queue.max_concurrent_jobs = 4;
     manager.update(updated).unwrap();
     assert_eq!(manager.get().backup.backup_dir, "/tmp/updated-backups");
     assert_eq!(manager.get().scheduler.path, "/tmp/updated-scheduler.toml");
     assert_eq!(manager.get().queue.capacity, 3);
+    assert_eq!(manager.get().queue.max_concurrent_jobs, 4);
+    assert_eq!(
+        ConfigManager::load_or_create(&path)
+            .unwrap()
+            .get()
+            .queue
+            .max_concurrent_jobs,
+        4
+    );
     assert_eq!(
         ConfigManager::load_or_create(&path)
             .unwrap()
@@ -122,6 +148,33 @@ fn manager_creates_missing_file_and_preserves_update_api() {
             .path,
         "/tmp/updated-scheduler.toml"
     );
+}
+
+#[test]
+fn invalid_concurrency_is_rejected_without_changing_configuration() {
+    let temp = TempDir::new();
+    let path = temp.0.join("kida.toml");
+    let mut manager = ConfigManager::load_or_create(&path).unwrap();
+    let original = fs::read_to_string(&path).unwrap();
+
+    for limit in [0, tokio::sync::Semaphore::MAX_PERMITS + 1] {
+        let mut invalid = manager.get().clone();
+        invalid.queue.max_concurrent_jobs = limit;
+        assert!(manager.update(invalid).is_err());
+        assert_defaults(manager.get());
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
+
+        let content = format!("[queue]\nmax_concurrent_jobs = {limit}\n");
+        let invalid_path = temp.0.join("invalid-limit.toml");
+        fs::write(&invalid_path, &content).unwrap();
+        assert!(ConfigManager::load_or_create(&invalid_path).is_err());
+        assert_eq!(fs::read_to_string(&invalid_path).unwrap(), content);
+    }
+
+    let mut invalid = manager.get().clone();
+    invalid.queue.capacity = usize::MAX;
+    assert!(manager.update(invalid).is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
 }
 
 // A separate process preserves the uninitialized singleton checks.

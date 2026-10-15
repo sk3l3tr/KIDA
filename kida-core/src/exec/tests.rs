@@ -196,3 +196,264 @@ mod worker_tests {
         std::fs::remove_file(path).unwrap();
     }
 }
+
+#[cfg(test)]
+mod concurrency_tests {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+    use tokio::{
+        sync::{Semaphore, mpsc},
+        time::timeout,
+    };
+
+    use crate::{
+        exec::{queue::QueuedCommand, worker::run_with_limits},
+        infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
+    };
+
+    const DEADLINE: Duration = Duration::from_secs(5);
+
+    fn job(id: &str, command: &str) -> QueuedCommand {
+        QueuedCommand {
+            execution_id: format!("execution-{id}"),
+            request: CommandRequest {
+                id: id.into(),
+                command: command.into(),
+                params: serde_json::Value::Null,
+            },
+        }
+    }
+
+    fn response(id: String, status: CommandStatus) -> CommandResponse {
+        CommandResponse {
+            id,
+            status,
+            data: None,
+            error: None,
+        }
+    }
+
+    struct Active(Arc<AtomicUsize>);
+
+    impl Active {
+        fn enter(active: Arc<AtomicUsize>, peak: &AtomicUsize) -> Self {
+            let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+            peak.fetch_max(count, Ordering::SeqCst);
+            Self(active)
+        }
+    }
+
+    impl Drop for Active {
+        fn drop(&mut self) {
+            self.0.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrency_respects_limit_and_closed_queue_drains_all_jobs() {
+        for limit in [1, 2, 3] {
+            let (sender, receiver) = mpsc::channel(8);
+            let (started, mut starts) = mpsc::unbounded_channel();
+            let gate = Arc::new(Semaphore::new(0));
+            let active = Arc::new(AtomicUsize::new(0));
+            let peak = Arc::new(AtomicUsize::new(0));
+            let completed = Arc::new(AtomicUsize::new(0));
+
+            let worker = tokio::spawn(run_with_limits(
+                receiver,
+                {
+                    let gate = gate.clone();
+                    let active = active.clone();
+                    let peak = peak.clone();
+                    let completed = completed.clone();
+                    move |request| {
+                        let gate = gate.clone();
+                        let active = active.clone();
+                        let peak = peak.clone();
+                        let completed = completed.clone();
+                        let started = started.clone();
+                        async move {
+                            let _active = Active::enter(active, &peak);
+                            started.send(request.id.clone()).unwrap();
+                            gate.acquire().await.unwrap().forget();
+                            completed.fetch_add(1, Ordering::SeqCst);
+                            response(request.id, CommandStatus::Ok)
+                        }
+                    }
+                },
+                limit,
+                8 + limit,
+            ));
+
+            for index in 0..8 {
+                sender
+                    .send(job(&index.to_string(), "test.concurrent"))
+                    .await
+                    .unwrap();
+            }
+            drop(sender);
+            for _ in 0..limit {
+                timeout(DEADLINE, starts.recv()).await.unwrap().unwrap();
+            }
+            assert_eq!(active.load(Ordering::SeqCst), limit);
+            assert!(!worker.is_finished());
+            gate.add_permits(8);
+            timeout(DEADLINE, worker).await.unwrap().unwrap();
+            assert_eq!(peak.load(Ordering::SeqCst), limit);
+            assert_eq!(active.load(Ordering::SeqCst), 0);
+            assert_eq!(completed.load(Ordering::SeqCst), 8);
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn backups_are_serial_but_waiting_backups_do_not_block_other_commands() {
+        let (sender, receiver) = mpsc::channel(3);
+        let (started, mut starts) = mpsc::unbounded_channel();
+        let gate = Arc::new(Semaphore::new(0));
+        let active = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        let worker = tokio::spawn(run_with_limits(
+            receiver,
+            {
+                let gate = gate.clone();
+                let active = active.clone();
+                let peak = peak.clone();
+                move |request| {
+                    let started = started.clone();
+                    let gate = gate.clone();
+                    let active = active.clone();
+                    let peak = peak.clone();
+                    async move {
+                        let _active = if request.command == "backup.run" {
+                            Some(Active::enter(active, &peak))
+                        } else {
+                            None
+                        };
+                        started.send(request.id.clone()).unwrap();
+                        if request.command == "backup.run" {
+                            gate.acquire().await.unwrap().forget();
+                        }
+                        response(request.id, CommandStatus::Ok)
+                    }
+                }
+            },
+            2,
+            5,
+        ));
+
+        sender.send(job("backup-1", "backup.run")).await.unwrap();
+        assert_eq!(
+            timeout(DEADLINE, starts.recv()).await.unwrap().unwrap(),
+            "backup-1"
+        );
+        sender.send(job("backup-2", "backup.run")).await.unwrap();
+        sender.send(job("other", "test.concurrent")).await.unwrap();
+        assert_eq!(
+            timeout(DEADLINE, starts.recv()).await.unwrap().unwrap(),
+            "other"
+        );
+        assert_eq!(active.load(Ordering::SeqCst), 1);
+        gate.add_permits(1);
+        assert_eq!(
+            timeout(DEADLINE, starts.recv()).await.unwrap().unwrap(),
+            "backup-2"
+        );
+        drop(sender);
+        gate.add_permits(1);
+        timeout(DEADLINE, worker).await.unwrap().unwrap();
+        assert_eq!(peak.load(Ordering::SeqCst), 1);
+        assert_eq!(active.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn errors_and_panics_release_backup_exclusion_and_execution_capacity() {
+        let (sender, receiver) = mpsc::channel(4);
+        let (started, mut starts) = mpsc::unbounded_channel();
+        let worker = tokio::spawn(run_with_limits(
+            receiver,
+            move |request| {
+                started.send(request.id.clone()).unwrap();
+                assert_ne!(
+                    request.id, "handler-panic",
+                    "panic constructing the handler future"
+                );
+                async move {
+                    assert_ne!(request.id, "future-panic", "panic executing the future");
+                    let status = if request.id == "error" {
+                        CommandStatus::Error
+                    } else {
+                        CommandStatus::Ok
+                    };
+                    response(request.id, status)
+                }
+            },
+            1,
+            5,
+        ));
+
+        for id in ["error", "handler-panic", "future-panic", "success"] {
+            sender.send(job(id, "backup.run")).await.unwrap();
+            assert_eq!(timeout(DEADLINE, starts.recv()).await.unwrap().unwrap(), id);
+        }
+        drop(sender);
+        timeout(DEADLINE, worker).await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn pending_backups_keep_admission_bounded() {
+        let (sender, receiver) = mpsc::channel(2);
+        let (started, mut starts) = mpsc::unbounded_channel();
+        let gate = Arc::new(Semaphore::new(0));
+        let worker = tokio::spawn(run_with_limits(
+            receiver,
+            {
+                let gate = gate.clone();
+                move |request| {
+                    let gate = gate.clone();
+                    let started = started.clone();
+                    async move {
+                        started.send(request.id.clone()).unwrap();
+                        gate.acquire().await.unwrap().forget();
+                        response(request.id, CommandStatus::Ok)
+                    }
+                }
+            },
+            1,
+            3,
+        ));
+
+        sender.send(job("first", "backup.run")).await.unwrap();
+        timeout(DEADLINE, starts.recv()).await.unwrap().unwrap();
+        for id in ["second", "third"] {
+            sender.send(job(id, "backup.run")).await.unwrap();
+        }
+        timeout(DEADLINE, async {
+            while sender.capacity() != 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        for id in ["fourth", "fifth"] {
+            sender.send(job(id, "backup.run")).await.unwrap();
+        }
+        assert!(
+            timeout(Duration::from_millis(50), sender.reserve())
+                .await
+                .is_err()
+        );
+        drop(sender);
+        gate.add_permits(5);
+        timeout(DEADLINE, worker).await.unwrap().unwrap();
+        let mut remaining = 0;
+        while starts.try_recv().is_ok() {
+            remaining += 1;
+        }
+        assert_eq!(remaining, 4);
+    }
+}
