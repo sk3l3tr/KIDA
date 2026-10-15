@@ -1,3 +1,4 @@
+mod diagnostics;
 mod lifecycle;
 mod model;
 mod ownership;
@@ -15,3 +16,11 @@ pub(crate) mod tests;
 
 #[cfg(test)]
 mod lifecycle_tests;
+
+pub use model::{
+    ComposeContainerDiagnostics, ComposeDiagnostics, ContainerDiagnosticError,
+    ContainerDiagnostics, ContainerLogs,
+};
+
+#[cfg(test)]
+mod diagnostics_tests;

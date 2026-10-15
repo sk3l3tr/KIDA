@@ -61,3 +61,41 @@ pub struct DockerNetwork {
     pub gateway: Option<String>,
     pub mac_address: Option<String>,
 }
+
+/// Current Docker observations, not a history. Exit codes do not establish OOM.
+#[derive(Debug, Serialize)]
+pub struct ContainerDiagnostics {
+    pub container: DockerContainer,
+    pub oom_killed: Option<bool>,
+    pub docker_error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ComposeContainerDiagnostics {
+    pub service: Option<String>,
+    pub diagnostics: ContainerDiagnostics,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ContainerDiagnosticError {
+    pub id: String,
+    pub error: String,
+}
+
+/// Only containers currently enumerated by Docker; undeployed services are unknown.
+#[derive(Debug, Serialize)]
+pub struct ComposeDiagnostics {
+    pub project: String,
+    pub containers: Vec<ComposeContainerDiagnostics>,
+    pub errors: Vec<ContainerDiagnosticError>,
+}
+
+/// Raw, bounded output. Callers must handle potentially sensitive content carefully.
+#[derive(Debug, Serialize)]
+pub struct ContainerLogs {
+    pub container: String,
+    pub tail: u32,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub warning: String,
+}

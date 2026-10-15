@@ -207,7 +207,7 @@ pub(super) fn map_compose_projects(inspected: &[Value]) -> Vec<ComposeProject> {
         .collect()
 }
 
-fn map_container(container: &Value) -> DockerContainer {
+pub(super) fn map_container(container: &Value) -> DockerContainer {
     let state = container.get("State").unwrap_or(&Value::Null);
     let config = container.get("Config").unwrap_or(&Value::Null);
     let host_config = container.get("HostConfig").unwrap_or(&Value::Null);

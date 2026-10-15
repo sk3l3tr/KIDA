@@ -366,6 +366,16 @@ impl Runner<'_> {
         args: &[OsString],
         capture_stdout: bool,
     ) -> Result<Vec<u8>, String> {
+        Ok(self.capture(args, capture_stdout, None).await?.0)
+    }
+
+    /// A log limit makes both channels strict and keeps their contents out of errors.
+    pub(super) async fn capture(
+        &self,
+        args: &[OsString],
+        capture_stdout: bool,
+        log_limit: Option<usize>,
+    ) -> Result<(Vec<u8>, Vec<u8>), String> {
         if Instant::now() >= self.deadline {
             return Err(timeout_error());
         }
@@ -386,13 +396,18 @@ impl Runner<'_> {
             .kill_on_drop(true);
         #[cfg(unix)]
         command.process_group(0);
-        let mut child = command.spawn().map_err(|e| {
+        let child = command.spawn().map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 format!("Compose unavailable: Docker executable missing: {e}")
             } else {
                 format!("Compose command failed: cannot execute Docker: {e}")
             }
         })?;
+        let mut reaper = ChildReaper {
+            child: Some(child),
+            runtime: tokio::runtime::Handle::current(),
+        };
+        let child = reaper.child.as_mut().unwrap();
         let _group = ProcessGroup(child.id());
         let stdout = child.stdout.take();
         let stderr = child.stderr.take().unwrap();
@@ -401,11 +416,19 @@ impl Runner<'_> {
                 child.wait(),
                 async {
                     match stdout {
-                        Some(stdout) => read_capped(stdout, STDOUT_LIMIT, true).await,
+                        Some(stdout) => {
+                            read_capped(stdout, log_limit.unwrap_or(STDOUT_LIMIT), true, "stdout")
+                                .await
+                        }
                         None => Ok((Vec::new(), false)),
                     }
                 },
-                read_capped(stderr, STDERR_LIMIT, false)
+                read_capped(
+                    stderr,
+                    log_limit.unwrap_or(STDERR_LIMIT),
+                    log_limit.is_some(),
+                    "stderr"
+                )
             )
         })
         .await;
@@ -429,6 +452,9 @@ impl Runner<'_> {
             }
         };
         if !status.success() {
+            if log_limit.is_some() {
+                return Err(format!("Docker logs command failed ({status})"));
+            }
             let mut detail = String::from_utf8_lossy(&err).into_owned();
             if truncated {
                 detail.push_str("\n[stderr truncated]");
@@ -451,7 +477,7 @@ impl Runner<'_> {
             return Err(format!("Compose {category} ({status}): {}", detail.trim()));
         }
         repository::check_deadline(self.deadline)?;
-        Ok(out)
+        Ok((out, err))
     }
 }
 
@@ -460,6 +486,7 @@ async fn read_capped(
     mut reader: impl AsyncRead + Unpin,
     limit: usize,
     fail_on_overflow: bool,
+    channel: &str,
 ) -> std::io::Result<(Vec<u8>, bool)> {
     let mut bytes = Vec::new();
     let mut block = [0; 8192];
@@ -475,10 +502,28 @@ async fn read_capped(
             if fail_on_overflow {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("stdout exceeds {limit} byte limit"),
+                    format!("{channel} exceeds {limit} byte limit"),
                 ));
             }
             truncated = true;
+        }
+    }
+}
+
+// Explicitly reap on consumer cancellation, even if no later Docker command is spawned.
+// Normal completion and timeout already wait in capture().
+struct ChildReaper {
+    child: Option<tokio::process::Child>,
+    runtime: tokio::runtime::Handle,
+}
+impl Drop for ChildReaper {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.take().filter(|child| child.id().is_some()) {
+            let _ = child.start_kill();
+            // Cancellation may drop this guard outside an entered runtime.
+            self.runtime.spawn(async move {
+                let _ = child.wait().await;
+            });
         }
     }
 }
@@ -509,12 +554,12 @@ mod capture_tests {
     #[tokio::test]
     async fn query_output_accepts_limit_and_rejects_one_extra_byte() {
         let data = vec![b'x'; STDOUT_LIMIT + 1];
-        let (bytes, truncated) = read_capped(&data[..STDOUT_LIMIT], STDOUT_LIMIT, true)
+        let (bytes, truncated) = read_capped(&data[..STDOUT_LIMIT], STDOUT_LIMIT, true, "stdout")
             .await
             .unwrap();
         assert_eq!(bytes.len(), STDOUT_LIMIT);
         assert!(!truncated);
-        let error = read_capped(data.as_slice(), STDOUT_LIMIT, true)
+        let error = read_capped(data.as_slice(), STDOUT_LIMIT, true, "stdout")
             .await
             .unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
@@ -525,7 +570,9 @@ mod capture_tests {
         for size in [STDERR_LIMIT, STDERR_LIMIT + 1, STDERR_LIMIT * 3] {
             let data = vec![b'x'; size];
             let mut reader = data.as_slice();
-            let (bytes, truncated) = read_capped(&mut reader, STDERR_LIMIT, false).await.unwrap();
+            let (bytes, truncated) = read_capped(&mut reader, STDERR_LIMIT, false, "stderr")
+                .await
+                .unwrap();
             assert_eq!(bytes, data[..STDERR_LIMIT]);
             assert_eq!(truncated, size > STDERR_LIMIT);
             assert!(reader.is_empty());

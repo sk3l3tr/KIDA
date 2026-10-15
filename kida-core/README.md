@@ -148,6 +148,59 @@ Los modelos `ComposeVersion`, `ComposeProject` y `ComposeService` se exportan de
 reutilización interna. El protocolo y la CLI mantienen únicamente estas consultas
 Compose; el lifecycle siguiente es interno.
 
+### Diagnóstico Docker interno
+
+Estos métodos asíncronos de `DockerService` son internos y no registran comandos
+ni cambian el protocolo o las respuestas de las consultas existentes:
+
+```rust
+let timeout = std::time::Duration::from_secs(10);
+let container = DockerService::inspect_container("my-container", timeout).await?;
+let project = DockerService::diagnose_compose_project("my-project", timeout).await?;
+let logs = DockerService::container_logs("my-container", 100, timeout).await?;
+```
+
+`ContainerDiagnostics` contiene `container: DockerContainer`, `oom_killed:
+Option<bool>` y `docker_error: Option<String>`. Valida identidad y datos técnicos
+antes del mapeo; datos incompletos o mal tipados son errores. El healthcheck es
+opcional; si está presente, su estado debe ser `healthy`, `unhealthy` o `starting`.
+Conserva fechas y valores reportados: son observaciones actuales, sin reconstruir
+historiales ni inferir OOM a partir del código de salida. OOM y error técnico
+ausentes son `None`; una cadena de error vacía se conserva.
+
+`ComposeDiagnostics` contiene `project`, `containers` (cada elemento con `service:
+Option<String>` y `diagnostics`) y `errors` (cada elemento con `id` y `error`).
+Valida el identificador de proyecto y enumera todos los contenedores presentes,
+incluidos los detenidos, mediante etiquetas Compose e IDs completos. Inspecciona
+cada ID y comprueba identidad y proyecto. Conserva los éxitos ante desapariciones,
+fallos o datos incompletos individuales. Un fallo o respuesta inválida al enumerar
+es global; una enumeración vacía válida produce un diagnóstico vacío. No permite
+inferir servicios declarados sin contenedores ni acredita propiedad de KIDA.
+Un único plazo cubre toda la operación; al agotarse, conserva resultados y marca
+los IDs pendientes sin iniciar más comandos.
+
+`ContainerLogs` contiene `container`, `tail: u32`, `stdout: Vec<u8>`, `stderr:
+Vec<u8>` y `warning`. Ejecuta `docker container logs --tail N` sin seguimiento;
+acepta de 1 a 10.000 líneas y requiere un timeout positivo, como las demás
+consultas. Limita cada canal a 1 MiB: exceder cualquiera devuelve un error,
+sin entregar contenido parcial. No interpreta, imprime ni persiste el contenido,
+y los errores de ejecución de logs tampoco lo incluyen. **Los logs pueden contener
+credenciales y datos personales**; el resultado incorpora esta advertencia para
+que el consumidor gestione su exposición. Docker puede no proporcionar logs con
+algunos drivers; stdout/stderr conservan exactamente los canales del proceso CLI.
+Las consultas reutilizan la terminación y recolección de procesos del lifecycle.
+
+Las pruebas automáticas usan Docker simulado con PATH aislado. La aceptación real
+requiere un daemon accesible y la imagen local `busybox:1.37`; no descarga imágenes
+ni utiliza red, y elimina únicamente su contenedor temporal de prueba:
+
+```bash
+KIDA_DOCKER_DIAGNOSTICS_REAL=1 cargo test -p kida-core features::docker::diagnostics_tests::diagnostics_real -- --exact --ignored --nocapture
+```
+
+Esta aceptación no provoca OOM ni altera contenedores de producción; OOM se
+verifica con evidencia explícita en las respuestas del Docker simulado.
+
 ### Lifecycle Compose interno
 
 `features::docker` exporta `ComposeOptions` y estos métodos de `DockerService`:
