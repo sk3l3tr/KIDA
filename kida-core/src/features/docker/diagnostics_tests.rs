@@ -65,11 +65,10 @@ fn diagnostics_drop_outside_runtime_child() {
             result = &mut query => panic!("query completed before cancellation: {result:?}"),
             pid = tokio::time::timeout(TIMEOUT, async {
                 loop {
-                    if let Ok(pid) = fs::read_to_string(dir.join("pid")) {
-                        if let Ok(pid) = pid.parse::<i32>() {
+                    if let Ok(pid) = fs::read_to_string(dir.join("pid"))
+                        && let Ok(pid) = pid.parse::<i32>() {
                             break pid;
                         }
-                    }
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             }) => pid.unwrap(),

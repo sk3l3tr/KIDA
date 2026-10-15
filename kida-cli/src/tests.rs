@@ -1,5 +1,44 @@
 // Must implement module tests here! Do not implement tests inside source files!
 
+#[test]
+fn client_error_debug_preserves_variant_names_and_causes() {
+    use crate::client::ClientError;
+
+    let io_error = std::io::Error::other("connection failed");
+    let json_error = || serde_json::from_str::<serde_json::Value>("invalid").unwrap_err();
+    let cases = [
+        (
+            ClientError::AgentUnavailable,
+            "AgentUnavailable".to_string(),
+        ),
+        (
+            ClientError::PermissionDenied,
+            "PermissionDenied".to_string(),
+        ),
+        (
+            ClientError::Connection(std::io::Error::other("connection failed")),
+            format!("Connection({io_error:?})"),
+        ),
+        (
+            ClientError::Serialization(json_error()),
+            format!("Serialization({:?})", json_error()),
+        ),
+        (
+            ClientError::InvalidResponse(json_error()),
+            format!("InvalidResponse({:?})", json_error()),
+        ),
+        (ClientError::EmptyResponse, "EmptyResponse".to_string()),
+    ];
+    for (error, expected) in cases {
+        assert_eq!(format!("{error:?}"), expected);
+    }
+
+    assert_eq!(
+        format!("{:#?}", ClientError::Connection(io_error)),
+        "Connection(\n    Custom {\n        kind: Other,\n        error: \"connection failed\",\n    },\n)"
+    );
+}
+
 #[cfg(test)]
 mod power_tests {
     use crate::{

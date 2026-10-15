@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::defaults::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct KidaConfig {
     pub docker: DockerConfig,
@@ -60,19 +60,6 @@ impl QueueConfig {
             ));
         }
         Ok(())
-    }
-}
-
-impl Default for KidaConfig {
-    fn default() -> Self {
-        Self {
-            docker: DockerConfig::default(),
-            unix: UnixConfig::default(),
-            http: HttpConfig::default(),
-            backup: BackupConfig::default(),
-            scheduler: SchedulerConfig::default(),
-            queue: QueueConfig::default(),
-        }
     }
 }
 

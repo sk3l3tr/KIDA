@@ -54,7 +54,7 @@ mod rule_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod service_tests {
     use std::{
         sync::{Arc, Barrier},
         time::{Duration, Instant},

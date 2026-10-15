@@ -96,6 +96,13 @@ impl ScheduleService {
         self.insert(input, ScheduleOrigin::User, now)
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub(crate) fn add_internal(
         &mut self,
         input: NewSchedule,
@@ -104,6 +111,13 @@ impl ScheduleService {
         self.insert(input, ScheduleOrigin::Internal, now)
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub(crate) fn replace_internal(
         &mut self,
         id: &str,
@@ -124,6 +138,13 @@ impl ScheduleService {
         self.remove(id, ScheduleOrigin::User)
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub(crate) fn delete_internal(&mut self, id: &str) -> Result<Value, String> {
         self.remove(id, ScheduleOrigin::Internal)
     }
@@ -295,6 +316,13 @@ impl ScheduleService {
         result
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub fn list(&self) -> Value {
         self.list_by_origin(ScheduleOriginFilter::User)
     }

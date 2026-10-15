@@ -7,7 +7,6 @@ use std::{
 
 use crate::protocol::{CommandRequest, CommandResponse};
 
-#[derive(Debug)]
 pub enum ClientError {
     AgentUnavailable,
     PermissionDenied,
@@ -15,6 +14,19 @@ pub enum ClientError {
     Serialization(serde_json::Error),
     InvalidResponse(serde_json::Error),
     EmptyResponse,
+}
+
+impl std::fmt::Debug for ClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AgentUnavailable => f.write_str("AgentUnavailable"),
+            Self::PermissionDenied => f.write_str("PermissionDenied"),
+            Self::Connection(error) => f.debug_tuple("Connection").field(error).finish(),
+            Self::Serialization(error) => f.debug_tuple("Serialization").field(error).finish(),
+            Self::InvalidResponse(error) => f.debug_tuple("InvalidResponse").field(error).finish(),
+            Self::EmptyResponse => f.write_str("EmptyResponse"),
+        }
+    }
 }
 
 pub struct KidaClient {
@@ -76,6 +88,7 @@ impl KidaClient {
         })
     }
 
+    #[allow(dead_code, reason = "Retain the client socket path accessor")]
     pub fn socket_path(&self) -> &Path {
         &self.socket_path
     }

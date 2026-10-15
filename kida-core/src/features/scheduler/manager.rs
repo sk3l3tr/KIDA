@@ -28,6 +28,13 @@ impl SchedulerManager {
         service.add(input, Utc::now())
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub fn list(&self) -> Result<Value, String> {
         Ok(self.lock()?.list())
     }
@@ -36,14 +43,35 @@ impl SchedulerManager {
         Ok(self.lock()?.list_by_origin(origin))
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub(crate) fn add_internal(&self, input: NewSchedule) -> Result<Value, String> {
         self.lock()?.add_internal(input, Utc::now())
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub(crate) fn replace_internal(&self, id: &str, input: NewSchedule) -> Result<Value, String> {
         self.lock()?.replace_internal(id, input, Utc::now())
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Scheduler interface retained for production integration; covered by tests"
+        )
+    )]
     pub(crate) fn delete_internal(&self, id: &str) -> Result<Value, String> {
         self.lock()?.delete_internal(id)
     }

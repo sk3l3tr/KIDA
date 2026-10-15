@@ -243,10 +243,10 @@ impl SystemPower {
             None
         };
 
-        if rtc_device.is_some() {
-            if let Err(error) = fs::File::open("/dev/rtc0") {
-                warnings.push(format!("Cannot open /dev/rtc0 for reading: {error}"));
-            }
+        if rtc_device.is_some()
+            && let Err(error) = fs::File::open("/dev/rtc0")
+        {
+            warnings.push(format!("Cannot open /dev/rtc0 for reading: {error}"));
         }
 
         warnings.push(

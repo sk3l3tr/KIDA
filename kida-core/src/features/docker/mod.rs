@@ -1,8 +1,40 @@
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker capability retained for production integration; covered by tests"
+    )
+)]
 mod diagnostics;
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker capability retained for production integration; covered by tests"
+    )
+)]
 mod lifecycle;
 mod model;
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker capability retained for production integration; covered by tests"
+    )
+)]
 mod ownership;
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker capability retained for production integration; covered by tests"
+    )
+)]
 mod repository;
+#[allow(
+    unused_imports,
+    reason = "Retain the Docker ownership interface for callers"
+)]
 pub use ownership::{ManagedProject, RemovalReport, ResourceOutcome};
 mod service;
 

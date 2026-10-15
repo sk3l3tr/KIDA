@@ -5,6 +5,13 @@ use crate::infrastructure::storage::{Storage, StorageError, TomlStorage};
 use super::model::KidaConfig;
 
 pub struct ConfigManager {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Configuration persistence is exercised by tests; runtime configuration is immutable"
+        )
+    )]
     storage: TomlStorage<KidaConfig>,
     config: KidaConfig,
 }
@@ -33,6 +40,13 @@ impl ConfigManager {
         &self.config
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Configuration persistence is exercised by tests; runtime configuration is immutable"
+        )
+    )]
     pub fn update(&mut self, config: KidaConfig) -> Result<(), Box<dyn std::error::Error>> {
         config.queue.validate()?;
         self.storage.save(&config)?;

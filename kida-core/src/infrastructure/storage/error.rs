@@ -10,9 +10,23 @@ pub enum StorageError {
     Io(#[from] io::Error),
 
     #[error("JSON serialization failed: {0}")]
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Used by Docker ownership JSON persistence; covered by tests"
+        )
+    )]
     JsonSerialize(serde_json::Error),
 
     #[error("invalid JSON file {path:?}: {source}")]
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Used by Docker ownership JSON persistence; covered by tests"
+        )
+    )]
     JsonDeserialize {
         path: PathBuf,
         #[source]

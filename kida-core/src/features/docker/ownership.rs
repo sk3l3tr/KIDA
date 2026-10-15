@@ -44,13 +44,12 @@ pub(super) async fn daemon(runner: &Runner<'_>) -> Result<String, String> {
 pub(super) fn reject_reserved_labels(document: &Value) -> Result<(), String> {
     match document {
         Value::Object(object) => {
-            if let Some(labels) = object.get("labels") {
-                if labels
+            if let Some(labels) = object.get("labels")
+                && labels
                     .as_object()
                     .is_some_and(|map| map.keys().any(|key| key.starts_with("io.kida.")))
-                {
-                    return Err(err("user supplied reserved io.kida.* labels"));
-                }
+            {
+                return Err(err("user supplied reserved io.kida.* labels"));
             }
             for value in object.values() {
                 reject_reserved_labels(value)?;
@@ -592,10 +591,10 @@ impl DockerService {
             }
         }
         record.completed = record.resources.iter().all(|r| r.done);
-        if report.errors.is_empty() {
-            if let Err(error) = repository::save(&record, deadline, &guard).await {
-                report.errors.push(error);
-            }
+        if report.errors.is_empty()
+            && let Err(error) = repository::save(&record, deadline, &guard).await
+        {
+            report.errors.push(error);
         }
         Ok(report)
     }

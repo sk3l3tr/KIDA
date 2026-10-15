@@ -64,10 +64,10 @@ where
         let content = serde_json::to_vec_pretty(data).map_err(StorageError::JsonSerialize)?;
 
         // 3. Crear directorio si es necesario.
-        if let Some(parent) = self.path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = self.path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)?;
         }
 
         // 4. Temporal único en el mismo filesystem.

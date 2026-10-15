@@ -149,93 +149,89 @@ impl BackupService {
 
         // 8. checksum
         // 8-11. Finalizar backup fuera del runtime asíncrono.
-        let result =
-            tokio::task::spawn_blocking(move || -> Result<BackupRunResult, BackupError> {
-                let checksum = sha256(&temp_path)?;
-                let size = fs::metadata(&temp_path)?.len();
+        tokio::task::spawn_blocking(move || -> Result<BackupRunResult, BackupError> {
+            let checksum = sha256(&temp_path)?;
+            let size = fs::metadata(&temp_path)?.len();
 
-                // 9. Replicar + verificar
-                let mut target_results = Vec::new();
+            // 9. Replicar + verificar
+            let mut target_results = Vec::new();
 
-                for target in &job.targets {
-                    if !target.path.is_dir() {
-                        target_results.push(BackupTargetResult {
-                            path: target.path.clone(),
-                            status: BackupTargetStatus::Unavailable,
-                            error: Some("target unavailable".to_string()),
-                        });
+            for target in &job.targets {
+                if !target.path.is_dir() {
+                    target_results.push(BackupTargetResult {
+                        path: target.path.clone(),
+                        status: BackupTargetStatus::Unavailable,
+                        error: Some("target unavailable".to_string()),
+                    });
 
-                        continue;
-                    }
-
-                    let destination = target.path.join(&artifact_name);
-
-                    let result = (|| -> Result<(), BackupError> {
-                        fs::copy(&temp_path, &destination)?;
-
-                        let destination_checksum = sha256(&destination)?;
-
-                        if destination_checksum != checksum {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                format!("checksum mismatch for {}", destination.display()),
-                            )
-                            .into());
-                        }
-
-                        Ok(())
-                    })();
-
-                    match result {
-                        Ok(()) => target_results.push(BackupTargetResult {
-                            path: target.path.clone(),
-                            status: BackupTargetStatus::Ok,
-                            error: None,
-                        }),
-
-                        Err(error) => target_results.push(BackupTargetResult {
-                            path: target.path.clone(),
-                            status: BackupTargetStatus::Failed,
-                            error: Some(error.to_string()),
-                        }),
-                    }
+                    continue;
                 }
 
-                // 10. Comprobar destinos required
-                let required_failed =
-                    job.targets
-                        .iter()
-                        .zip(&target_results)
-                        .any(|(target, result)| {
-                            target.required && !matches!(result.status, BackupTargetStatus::Ok)
-                        });
+                let destination = target.path.join(&artifact_name);
 
-                // 11. Eliminar temporal
-                let _ = fs::remove_file(&temp_path);
+                let result = (|| -> Result<(), BackupError> {
+                    fs::copy(&temp_path, &destination)?;
 
-                if required_failed {
-                    return Err(std::io::Error::other(
-                        "one or more required backup targets failed",
-                    )
-                    .into());
+                    let destination_checksum = sha256(&destination)?;
+
+                    if destination_checksum != checksum {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("checksum mismatch for {}", destination.display()),
+                        )
+                        .into());
+                    }
+
+                    Ok(())
+                })();
+
+                match result {
+                    Ok(()) => target_results.push(BackupTargetResult {
+                        path: target.path.clone(),
+                        status: BackupTargetStatus::Ok,
+                        error: None,
+                    }),
+
+                    Err(error) => target_results.push(BackupTargetResult {
+                        path: target.path.clone(),
+                        status: BackupTargetStatus::Failed,
+                        error: Some(error.to_string()),
+                    }),
                 }
+            }
 
-                Ok(BackupRunResult {
-                    job_id: job.id,
-                    artifact_name,
-                    checksum,
-                    size,
-                    targets: target_results,
-                })
+            // 10. Comprobar destinos required
+            let required_failed =
+                job.targets
+                    .iter()
+                    .zip(&target_results)
+                    .any(|(target, result)| {
+                        target.required && !matches!(result.status, BackupTargetStatus::Ok)
+                    });
+
+            // 11. Eliminar temporal
+            let _ = fs::remove_file(&temp_path);
+
+            if required_failed {
+                return Err(
+                    std::io::Error::other("one or more required backup targets failed").into(),
+                );
+            }
+
+            Ok(BackupRunResult {
+                job_id: job.id,
+                artifact_name,
+                checksum,
+                size,
+                targets: target_results,
             })
-            .await
-            .map_err(|error| {
-                BackupError::from(std::io::Error::other(format!(
-                    "Backup finalization task failed: {error}"
-                )))
-            })?;
-
-        result
+        })
+        .await
+        .map_err(|error| {
+            BackupError::from(std::io::Error::other(format!(
+                "Backup finalization task failed: {error}"
+            )))
+        })?
     }
 }
 

@@ -78,13 +78,13 @@ fn validate(value: &Value, requested: &str, exact: bool) -> Result<ContainerDiag
     if value["RestartCount"].as_u64().is_none() {
         return Err(invalid("RestartCount"));
     }
-    if let Some(health) = value["State"].get("Health") {
-        if !matches!(
+    if let Some(health) = value["State"].get("Health")
+        && !matches!(
             health["Status"].as_str(),
             Some("healthy" | "unhealthy" | "starting")
-        ) {
-            return Err(invalid("State.Health.Status"));
-        }
+        )
+    {
+        return Err(invalid("State.Health.Status"));
     }
     for (key, is_valid) in [
         ("OOMKilled", value["State"]["OOMKilled"].is_boolean()),

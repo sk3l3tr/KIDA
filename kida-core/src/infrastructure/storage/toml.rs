@@ -63,10 +63,10 @@ where
         let content = toml::to_string_pretty(data)?;
 
         // 3. Crear directorio si es necesario.
-        if let Some(parent) = self.path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = self.path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)?;
         }
 
         // 4. Temporal único en el mismo filesystem.

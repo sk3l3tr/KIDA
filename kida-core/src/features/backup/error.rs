@@ -13,6 +13,7 @@ pub enum BackupError {
     Storage(#[from] StorageError),
 
     #[error("invalid backup configuration '{path}': {source}")]
+    #[allow(dead_code, reason = "Retain the backup configuration error variant")]
     InvalidConfig {
         path: PathBuf,
 

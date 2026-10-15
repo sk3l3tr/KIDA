@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[allow(dead_code, reason = "Retain the backup configuration container")]
 pub struct BackupConfiguration {
     #[serde(default)]
     pub jobs: Vec<BackupJob>,
@@ -64,16 +65,11 @@ fn default_required() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Compression {
+    #[default]
     TarZstd,
-}
-
-impl Default for Compression {
-    fn default() -> Self {
-        Self::TarZstd
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

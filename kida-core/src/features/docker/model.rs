@@ -64,6 +64,13 @@ pub struct DockerNetwork {
 
 /// Current Docker observations, not a history. Exit codes do not establish OOM.
 #[derive(Debug, Serialize)]
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker diagnostic type retained for production integration; covered by tests"
+    )
+)]
 pub struct ContainerDiagnostics {
     pub container: DockerContainer,
     pub oom_killed: Option<bool>,
@@ -71,12 +78,26 @@ pub struct ContainerDiagnostics {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker diagnostic type retained for production integration; covered by tests"
+    )
+)]
 pub struct ComposeContainerDiagnostics {
     pub service: Option<String>,
     pub diagnostics: ContainerDiagnostics,
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker diagnostic type retained for production integration; covered by tests"
+    )
+)]
 pub struct ContainerDiagnosticError {
     pub id: String,
     pub error: String,
@@ -84,6 +105,13 @@ pub struct ContainerDiagnosticError {
 
 /// Only containers currently enumerated by Docker; undeployed services are unknown.
 #[derive(Debug, Serialize)]
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker diagnostic type retained for production integration; covered by tests"
+    )
+)]
 pub struct ComposeDiagnostics {
     pub project: String,
     pub containers: Vec<ComposeContainerDiagnostics>,
@@ -92,6 +120,13 @@ pub struct ComposeDiagnostics {
 
 /// Raw, bounded output. Callers must handle potentially sensitive content carefully.
 #[derive(Debug, Serialize)]
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "Docker diagnostic type retained for production integration; covered by tests"
+    )
+)]
 pub struct ContainerLogs {
     pub container: String,
     pub tail: u32,

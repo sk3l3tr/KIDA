@@ -1,7 +1,7 @@
 // Must implement tests cases here! Do not implement tests inside source files!
 
 #[cfg(test)]
-mod tests {
+mod repository_tests {
     use super::super::{
         model::{BackupJob, NewBackupJob},
         repository::{BackupRepository, StoredBackupJob},

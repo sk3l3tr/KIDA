@@ -210,10 +210,10 @@ async fn lifecycle(options: &ComposeOptions, action: &str) -> Result<(), String>
     if action == "create" {
         compose.push("--no-recreate".into());
     }
-    if action != "create" {
-        if let Some(record) = &managed {
-            super::ownership::validate(&runner, record, false).await?;
-        }
+    if action != "create"
+        && let Some(record) = &managed
+    {
+        super::ownership::validate(&runner, record, false).await?;
     }
     let result = Box::pin(runner.run(&compose, false)).await;
     if action == "create" {
@@ -275,12 +275,12 @@ async fn check_create(runner: &Runner<'_>, model: &Resolved) -> Result<(), Strin
     }
     let names = runner.text(&["ps", "-a", "--format", "{{.Names}}"]).await?;
     for service in model.services.values().filter(|s| s.profiles.is_empty()) {
-        if let Some(name) = &service.container_name {
-            if names.lines().any(|existing| existing == name) {
-                return Err(format!(
-                    "Compose conflict: container name '{name}' is occupied"
-                ));
-            }
+        if let Some(name) = &service.container_name
+            && names.lines().any(|existing| existing == name)
+        {
+            return Err(format!(
+                "Compose conflict: container name '{name}' is occupied"
+            ));
         }
     }
     Ok(())

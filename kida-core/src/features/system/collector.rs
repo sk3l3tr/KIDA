@@ -202,16 +202,16 @@ fn temperature_status(
         return "CRITICAL";
     }
 
-    if let Some(critical) = critical {
-        if value >= critical {
-            return "CRITICAL";
-        }
+    if let Some(critical) = critical
+        && value >= critical
+    {
+        return "CRITICAL";
     }
 
-    if let Some(max) = max {
-        if value >= max {
-            return "WARNING";
-        }
+    if let Some(max) = max
+        && value >= max
+    {
+        return "WARNING";
     }
 
     "OK"

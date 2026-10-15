@@ -11,6 +11,13 @@ pub struct DockerService;
 
 impl DockerService {
     /// Validates a lifecycle project identifier without normalizing it or invoking Docker.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Used by Docker lifecycle capabilities; covered by tests"
+        )
+    )]
     pub fn validate_compose_project_name(name: &str) -> Result<(), String> {
         let valid_start = name
             .bytes()
