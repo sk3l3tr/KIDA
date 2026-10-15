@@ -331,9 +331,9 @@ fn power_cycle_existing_scheduler_preserves_params_and_execution_time() {
 
     crate::conf::tests::init_test_config();
 
-    let created = chrono::DateTime::parse_from_rfc3339(
-        "2026-10-14T12:00:00Z",
-    ).unwrap().with_timezone(&Utc);
+    let created = chrono::DateTime::parse_from_rfc3339("2026-10-14T12:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
     let params = json!({"wake_after_seconds": 28800});
 
     for rule in [
@@ -353,14 +353,16 @@ fn power_cycle_existing_scheduler_preserves_params_and_execution_time() {
         ));
         let mut service = ScheduleService::load(&path, created).unwrap();
 
-        service.add(
-            NewSchedule {
-                command: "system.power_cycle".to_string(),
-                params: params.clone(),
-                schedule: rule,
-            },
-            created,
-        ).unwrap();
+        service
+            .add(
+                NewSchedule {
+                    command: "system.power_cycle".to_string(),
+                    params: params.clone(),
+                    schedule: rule,
+                },
+                created,
+            )
+            .unwrap();
 
         // Exercise the scheduler's existing persistence and reload.
         let mut service = ScheduleService::load(&path, created).unwrap();
@@ -380,12 +382,8 @@ fn power_cycle_existing_scheduler_preserves_params_and_execution_time() {
             assert_eq!(queued.request.params, params);
             assert!(receiver.try_recv().is_err());
 
-            let request = PowerCycleRequest::try_from(
-                queued.request.params,
-            ).unwrap();
-            let local_execution = execution.with_timezone(
-                &chrono_tz::Europe::Madrid,
-            );
+            let request = PowerCycleRequest::try_from(queued.request.params).unwrap();
+            let local_execution = execution.with_timezone(&chrono_tz::Europe::Madrid);
             let expected_wake = execution + TimeDelta::seconds(28800);
 
             let result = super::SystemPower::power_cycle_with(
@@ -402,7 +400,8 @@ fn power_cycle_existing_scheduler_preserves_params_and_execution_time() {
                         when: when.to_string(),
                     })
                 },
-            ).unwrap();
+            )
+            .unwrap();
 
             assert_eq!(
                 result.wake_at,
