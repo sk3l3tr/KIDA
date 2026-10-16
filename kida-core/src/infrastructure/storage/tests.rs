@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize, Serializer, ser::Error};
 
-use super::{StorageError, StorageFactory, StorageFormat, atomic_write};
+use super::{JsonStorage, Storage, StorageError, TomlStorage, atomic_write};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Record {
@@ -50,11 +50,18 @@ impl Drop for Directory {
 
 #[test]
 fn both_formats_create_read_and_replace_without_temporary_files() {
-    for format in [StorageFormat::Json, StorageFormat::Toml] {
-        let directory = Directory::new();
+    let json_directory = Directory::new();
+    let toml_directory = Directory::new();
+    let json =
+        JsonStorage::<Record>::new(json_directory.0.join("nested").join("data").join("record"));
+    let toml =
+        TomlStorage::<Record>::new(toml_directory.0.join("nested").join("data").join("record"));
+    for (storage, directory) in [
+        (&json as &dyn Storage<Record>, &json_directory),
+        (&toml as &dyn Storage<Record>, &toml_directory),
+    ] {
         let parent = directory.0.join("nested").join("data");
         let path = parent.join("record");
-        let storage = StorageFactory::create::<Record>(format, &path);
         storage.save(&record("first")).unwrap();
         assert_eq!(storage.load().unwrap(), record("first"));
         storage.save(&record("second")).unwrap();
@@ -67,32 +74,42 @@ fn both_formats_create_read_and_replace_without_temporary_files() {
 
 #[test]
 fn both_formats_preserve_corrupt_files_and_report_the_format_and_path() {
-    for format in [StorageFormat::Json, StorageFormat::Toml] {
-        let directory = Directory::new();
+    let json_directory = Directory::new();
+    let toml_directory = Directory::new();
+    let json = JsonStorage::<Record>::new(json_directory.0.join("record"));
+    let toml = TomlStorage::<Record>::new(toml_directory.0.join("record"));
+    for (storage, directory, expected_error) in [
+        (
+            &json as &dyn Storage<Record>,
+            &json_directory,
+            (|error: &StorageError| matches!(error, StorageError::JsonDeserialize { .. }))
+                as fn(&StorageError) -> bool,
+        ),
+        (
+            &toml as &dyn Storage<Record>,
+            &toml_directory,
+            (|error: &StorageError| matches!(error, StorageError::TomlDeserialize { .. }))
+                as fn(&StorageError) -> bool,
+        ),
+    ] {
         let path = directory.0.join("record");
         let corrupt = b"invalid[";
         fs::write(&path, corrupt).unwrap();
-        let storage = StorageFactory::create::<Record>(format, &path);
         for error in [
             storage.load().unwrap_err(),
             storage.save(&record("valid")).unwrap_err(),
         ] {
-            match (format, error) {
-                (
-                    StorageFormat::Json,
-                    StorageError::JsonDeserialize {
-                        path: failed_path, ..
-                    },
-                )
-                | (
-                    StorageFormat::Toml,
-                    StorageError::TomlDeserialize {
-                        path: failed_path, ..
-                    },
-                ) => {
+            assert!(expected_error(&error), "Unexpected error: {error}");
+            match error {
+                StorageError::JsonDeserialize {
+                    path: failed_path, ..
+                }
+                | StorageError::TomlDeserialize {
+                    path: failed_path, ..
+                } => {
                     assert_eq!(failed_path, path);
                 }
-                (_, error) => panic!("Unexpected error for {format:?}: {error}"),
+                error => panic!("Unexpected error: {error}"),
             }
         }
         assert_eq!(fs::read(&path).unwrap(), corrupt);
@@ -102,10 +119,15 @@ fn both_formats_preserve_corrupt_files_and_report_the_format_and_path() {
 
 #[test]
 fn both_formats_report_missing_files_without_creating_directories() {
-    for format in [StorageFormat::Json, StorageFormat::Toml] {
-        let directory = Directory::new();
+    let json_directory = Directory::new();
+    let toml_directory = Directory::new();
+    let json = JsonStorage::<Record>::new(json_directory.0.join("missing").join("record"));
+    let toml = TomlStorage::<Record>::new(toml_directory.0.join("missing").join("record"));
+    for (storage, directory) in [
+        (&json as &dyn Storage<Record>, &json_directory),
+        (&toml as &dyn Storage<Record>, &toml_directory),
+    ] {
         let path = directory.0.join("missing").join("record");
-        let storage = StorageFactory::create::<Record>(format, &path);
         assert!(
             matches!(storage.load(), Err(StorageError::NotFound { path: failed_path }) if failed_path == path)
         );
@@ -115,12 +137,27 @@ fn both_formats_report_missing_files_without_creating_directories() {
 
 #[test]
 fn serialization_errors_do_not_create_directories_or_modify_existing_files() {
-    for format in [StorageFormat::Json, StorageFormat::Toml] {
-        for existing in [false, true] {
-            let directory = Directory::new();
+    for existing in [false, true] {
+        let json_directory = Directory::new();
+        let toml_directory = Directory::new();
+        let json = JsonStorage::<Record>::new(json_directory.0.join("nested").join("record"));
+        let toml = TomlStorage::<Record>::new(toml_directory.0.join("nested").join("record"));
+        for (storage, directory, expected_error) in [
+            (
+                &json as &dyn Storage<Record>,
+                &json_directory,
+                (|error: &StorageError| matches!(error, StorageError::JsonSerialize(_)))
+                    as fn(&StorageError) -> bool,
+            ),
+            (
+                &toml as &dyn Storage<Record>,
+                &toml_directory,
+                (|error: &StorageError| matches!(error, StorageError::TomlSerialize(_)))
+                    as fn(&StorageError) -> bool,
+            ),
+        ] {
             let parent = directory.0.join("nested");
             let path = parent.join("record");
-            let storage = StorageFactory::create::<Record>(format, &path);
             let original = if existing {
                 storage.save(&record("original")).unwrap();
                 Some(fs::read(&path).unwrap())
@@ -129,11 +166,7 @@ fn serialization_errors_do_not_create_directories_or_modify_existing_files() {
             };
             let error = storage.save(&record("reject")).unwrap_err();
             assert!(error.to_string().contains("injected serialization failure"));
-            assert!(matches!(
-                (format, error),
-                (StorageFormat::Json, StorageError::JsonSerialize(_))
-                    | (StorageFormat::Toml, StorageError::TomlSerialize(_))
-            ));
+            assert!(expected_error(&error), "Unexpected error: {error}");
             if let Some(original) = original {
                 assert_eq!(fs::read(&path).unwrap(), original);
                 assert_eq!(fs::read_dir(parent).unwrap().count(), 1);

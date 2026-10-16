@@ -1,7 +1,5 @@
 //! KIDA generic persistence module
 mod error;
-#[allow(dead_code, reason = "Retain the storage format selection interface")]
-mod factory;
 #[cfg_attr(
     not(test),
     allow(
@@ -13,8 +11,6 @@ mod json;
 mod toml;
 
 pub use error::StorageError;
-#[allow(unused_imports, reason = "Retain the storage factory interface")]
-pub use factory::{StorageFactory, StorageFormat};
 pub use json::JsonStorage;
 pub use toml::TomlStorage;
 

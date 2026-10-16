@@ -1,7 +1,7 @@
 use std::{
     io::{BufRead, BufReader, Write},
     os::unix::net::UnixStream,
-    path::{Path, PathBuf},
+    path::PathBuf,
     time::Duration,
 };
 
@@ -86,10 +86,5 @@ impl KidaClient {
 
             _ => ClientError::Connection(err),
         })
-    }
-
-    #[allow(dead_code, reason = "Retain the client socket path accessor")]
-    pub fn socket_path(&self) -> &Path {
-        &self.socket_path
     }
 }

@@ -6,7 +6,7 @@ Revisión del listado: 2026-10-16. La depuración inicial parte de `44d9aac`; la
 
 Este documento contiene únicamente trabajo pendiente con un beneficio concreto. Las tareas implementadas y sus verificaciones se consultan en el historial Git.
 
-Se han eliminado Q01–Q08 y la tarea conjunta Q10/Q11 por estar completadas. Q12 se actualiza porque la fábrica de almacenamiento sí tiene consumidores en pruebas desde Q06. Q13 se acota a separar grupos de pruebas existentes. Se mantienen los identificadores originales para conservar las referencias de las conversaciones y commits.
+Se han eliminado Q01–Q08, la tarea conjunta Q10/Q11 y Q12 por estar completadas. Q13 se acota a separar grupos de pruebas existentes. Se mantienen los identificadores originales para conservar las referencias de las conversaciones y commits.
 
 Se retira Q09 como tarea independiente: el registro de comandos ya está centralizado en el catálogo de Q01 y la recuperación del lifecycle está cubierta por Q03. Persisten llamadas desde features al ejecutor, pero no se ha identificado un defecto adicional que justifique introducir otra operación compartida o mecanismo de inyección. La dirección de una dependencia, por sí sola, no justifica ampliar esta limpieza.
 
@@ -14,17 +14,8 @@ Se retira Q09 como tarea independiente: el registro de comandos ya está central
 
 | ID | Prioridad | Trabajo pendiente | Beneficio |
 | --- | --- | --- | --- |
-| Q12 | Baja | Retirar la fábrica de almacenamiento sin uso en producción y el accessor de socket sin llamadas | Reducir interfaces y supresiones innecesarias |
 | Q13 | Media | Separar los grupos existentes de pruebas Docker | Ejecutar y diagnosticar grupos sin depender de los anteriores |
 | Q14 | Baja | Explicitar el resolver actual del workspace | Eliminar el aviso sin cambiar la resolución de dependencias |
-
-## Q12. Interfaces sin uso en producción
-
-**Evidencia actual.** [StorageFactory y StorageFormat](../../kida-core/src/infrastructure/storage/factory.rs) solo tienen consumidores en [las pruebas de almacenamiento](../../kida-core/src/infrastructure/storage/tests.rs). Los servicios construyen los almacenamientos concretos directamente. [storage/mod.rs](../../kida-core/src/infrastructure/storage/mod.rs) mantiene supresiones para conservar esa fábrica. El accessor `KidaClient::socket_path` de [client.rs](../../kida-cli/src/client.rs) sigue sin llamadas y tiene su propia supresión.
-
-**Cambio acotado.** Retirar fábrica, selector de formato, reexports y supresiones asociados; adaptar las pruebas para construir `JsonStorage` y `TomlStorage` directamente con preparación local mínima. Retirar el accessor sin eliminar el campo que usa el transporte. No crear otra fábrica para sustituirlos ni extender esta tarea a una eliminación general de `allow(dead_code)`.
-
-**Aceptación.** Mantener íntegros los escenarios y aserciones de almacenamiento de Q06, incluidas las pruebas de errores y conservación de datos. Comprobar referencias, todos los targets y Clippy estricto. Conservar las capacidades Docker de lifecycle/ownership, la API de actualización de configuración y cualquier otra funcionalidad con pruebas o consumidores concretos.
 
 ## Q13. Grupos independientes de pruebas Docker
 
