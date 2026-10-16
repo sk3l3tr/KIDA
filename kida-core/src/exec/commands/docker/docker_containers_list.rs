@@ -5,6 +5,10 @@ use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, Com
 use crate::features::docker::DockerService;
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
+    super::super::run_blocking(request, exec_blocking).await
+}
+
+fn exec_blocking(request: CommandRequest) -> CommandResponse {
     match DockerService::list() {
         Ok(containers) => CommandResponse {
             id: request.id,

@@ -19,7 +19,7 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 | Q01 | Alta | **Completada.** Sincronizar comandos registrados y ejecutables | Corrección + refactorización |
 | Q02 | Alta | **Completada.** Dar un único propietario a la limpieza del temporal de backup | Corrección |
 | Q03 | Alta | **Completada.** Hacer explícita la recuperación y sus errores en el lifecycle | Decisión de contrato + corrección |
-| Q04 | Media | Sacar operaciones bloqueantes de los handlers asíncronos | Refactorización |
+| Q04 | Media | **Completada.** Sacar operaciones bloqueantes de los handlers asíncronos | Refactorización |
 | Q05 | Alta | Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
 | Q06 | Media | Compartir la escritura atómica de JSON y TOML | Refactorización |
 | Q07 | Media | Reducir la duplicación de handlers de acciones Docker | Refactorización |
@@ -78,6 +78,10 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 ---
 
 ## Q04. Handlers asíncronos que realizan trabajo bloqueante
+
+**Estado: completada (2026-10-16).** Los handlers Docker, sistema y scheduler mantienen su API asíncrona y ejecutan el trabajo completo en `spawn_blocking`. El manager del scheduler es clonable y comparte estado mediante `Arc<Mutex<ScheduleService>>`; tanto los handlers como el timer adquieren ese mutex dentro del trabajo bloqueante. El timer espera cada operación antes de su pausa de 100 ms y conserva la propagación de errores. Los fallos de tareas de comandos devuelven `ERROR` con ID y diagnóstico del comando. No se añaden timeouts ni reintentos; un trabajo bloqueante iniciado puede continuar aunque se cancele su espera. El alcance se limita a los adaptadores Docker/sistema/scheduler y al timer; no modifica los handlers de configuración de backup ni su servicio.
+
+**Validación de la corrección.** 155 tests superados (58 unitarios y 2 de integración CLI, 95 CORE), 9 ignorados; los escenarios aislados ejecutan expresamente el nuevo test hijo. Formato y Clippy estricto correctos; revisión independiente aprobada. Las ocho pruebas nuevas cubren progreso de un runtime de un solo hilo con Docker/apagado/reinicio simulados y mutex ocupado para alta/listado/baja/timer, estado compartido entre clones, errores de mutex envenenado, conversión de panic a respuesta y continuidad del trabajo tras cancelar su espera. Los comandos de energía usan un PATH cerrado con ejecutables falsos; no se ha comprobado hardware ni Docker real. La primera suite CORE en sandbox falló en tres pruebas de sockets; la suite completa pasó fuera de ella sin modificar ni omitir pruebas.
 
 **Evidencia.** Los handlers de [exec/commands/docker](../../kida-core/src/exec/commands/docker) llaman directamente a métodos síncronos de [DockerService](../../kida-core/src/features/docker/service.rs), que usan `std::process::Command::output`. Los handlers de sistema llaman directamente al recolector y a [SystemPower](../../kida-core/src/features/system/power.rs), con procesos y E/S síncronos. [SchedulerManager](../../kida-core/src/features/scheduler/manager.rs), líneas 26–89, toma un `std::sync::Mutex` mientras el servicio puede guardar archivos y hacer `sync_all`; el [timer](../../kida-core/src/features/scheduler/timer.rs) lo llama desde su bucle asíncrono.
 

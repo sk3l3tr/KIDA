@@ -1,4 +1,4 @@
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use chrono::Utc;
 use serde_json::Value;
@@ -10,15 +10,16 @@ use super::{
     service::ScheduleService,
 };
 
+#[derive(Clone)]
 pub struct SchedulerManager {
-    service: Mutex<ScheduleService>,
+    service: Arc<Mutex<ScheduleService>>,
     queue: CommandQueue,
 }
 
 impl SchedulerManager {
     pub fn new(service: ScheduleService, queue: CommandQueue) -> Self {
         Self {
-            service: Mutex::new(service),
+            service: Arc::new(Mutex::new(service)),
             queue,
         }
     }
@@ -91,3 +92,7 @@ impl SchedulerManager {
             .map_err(|_| "Scheduler state lock is poisoned".to_string())
     }
 }
+
+#[cfg(test)]
+#[path = "manager_tests.rs"]
+mod tests;

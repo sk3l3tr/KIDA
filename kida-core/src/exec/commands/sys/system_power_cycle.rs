@@ -4,6 +4,10 @@ use crate::features::system::SystemPower;
 use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
+    super::super::run_blocking(request, exec_blocking).await
+}
+
+fn exec_blocking(request: CommandRequest) -> CommandResponse {
     match SystemPower::power_cycle(request.params) {
         Ok(result) => CommandResponse {
             id: request.id,

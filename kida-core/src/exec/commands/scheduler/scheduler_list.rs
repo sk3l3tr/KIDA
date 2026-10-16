@@ -13,6 +13,11 @@ struct ListParams {
 }
 
 pub async fn exec(request: CommandRequest, manager: &SchedulerManager) -> CommandResponse {
+    let manager = manager.clone();
+    super::super::run_blocking(request, move |request| exec_blocking(request, &manager)).await
+}
+
+fn exec_blocking(request: CommandRequest, manager: &SchedulerManager) -> CommandResponse {
     let result = if request.params.is_null() {
         Ok(ListParams::default())
     } else if !request.params.is_object() {
