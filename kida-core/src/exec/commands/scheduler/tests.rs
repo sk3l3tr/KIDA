@@ -35,7 +35,7 @@ mod mod_tests {
             request(
                 "scheduler.add",
                 json!({
-                    "command": "health",
+                    "command": "scheduler.list",
                     "schedule": {"type": "interval", "seconds": 60}
                 }),
             ),
@@ -53,7 +53,7 @@ mod mod_tests {
             request(
                 "scheduler.add",
                 json!({
-                    "command": "health",
+                    "command": "scheduler.list",
                     "params": null,
                     "schedule": {"type": "interval", "seconds": 60}
                 }),
@@ -110,7 +110,7 @@ mod mod_tests {
         let internal = service
             .add_internal(
                 NewSchedule {
-                    command: "health".into(),
+                    command: "scheduler.list".into(),
                     params: Value::Null,
                     schedule: ScheduleRule::Interval { seconds: 3600 },
                 },
@@ -146,7 +146,7 @@ mod mod_tests {
 
         let user = manager
             .add(NewSchedule {
-                command: "health".into(),
+                command: "scheduler.list".into(),
                 params: json!({"origin":"INTERNAL","permissions":"internal"}),
                 schedule: ScheduleRule::Interval { seconds: 3600 },
             })
@@ -184,7 +184,7 @@ mod mod_tests {
             ));
         }
         for key in ["origin", "internal", "permissions"] {
-            let mut params = json!({"command":"health","params":null,"schedule":{"type":"interval","seconds":60}});
+            let mut params = json!({"command":"scheduler.list","params":null,"schedule":{"type":"interval","seconds":60}});
             params[key] = json!("INTERNAL");
             assert!(matches!(
                 scheduler_add::exec(request("scheduler.add", params), &manager)
@@ -216,7 +216,7 @@ mod mod_tests {
             .replace_internal(
                 id,
                 NewSchedule {
-                    command: "health".into(),
+                    command: "scheduler.list".into(),
                     params: json!([null, true]),
                     schedule: ScheduleRule::Interval { seconds: 3600 },
                 },

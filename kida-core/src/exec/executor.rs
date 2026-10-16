@@ -4,6 +4,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     exec::{
+        catalog::{self, CommandKind, SchedulerCommand},
         commands::{
             self,
             backup::config::{backup_create, backup_delete, backup_list},
@@ -39,31 +40,7 @@ pub fn command_queue() -> Result<CommandQueue, &'static str> {
 }
 
 pub fn is_registered(command: &str) -> bool {
-    matches!(
-        command,
-        "health"
-            | "system.info"
-            | "system.health"
-            | "system.shutdown"
-            | "system.reboot"
-            | "system.wake_capabilities"
-            | "system.power_cycle"
-            | "docker.compose.version"
-            | "docker.compose.projects.list"
-            | "docker.compose.project.inspect"
-            | "docker.containers.list"
-            | "docker.container.stop"
-            | "docker.container.start"
-            | "docker.container.restart"
-            | "docker.container.delete"
-            | "backup.config.list"
-            | "backup.config.create"
-            | "backup.config.delete"
-            | "backup.run"
-            | "scheduler.add"
-            | "scheduler.list"
-            | "scheduler.delete"
-    )
+    catalog::resolve(command).is_some()
 }
 
 pub async fn execute(request: CommandRequest) -> CommandResponse {
@@ -74,30 +51,41 @@ pub async fn execute(request: CommandRequest) -> CommandResponse {
 }
 
 pub async fn execute_now(request: CommandRequest) -> CommandResponse {
-    match request.command.as_str() {
-        "system.info" => system_info::exec(request).await,
-        "system.health" => system_health::exec(request).await,
-        "system.shutdown" => system_shutdown::exec(request).await,
-        "system.reboot" => system_reboot::exec(request).await,
-        "system.wake_capabilities" => system_wake_capabilities::exec(request).await,
-        "system.power_cycle" => system_power_cycle::exec(request).await,
+    let Some(command) = catalog::resolve(&request.command) else {
+        return CommandResponse {
+            id: request.id,
+            status: CommandStatus::Error,
+            data: None,
+            error: Some(format!("Unknown command: {}", request.command)),
+        };
+    };
 
-        "docker.compose.version" => docker_compose_version::exec(request).await,
-        "docker.compose.projects.list" => docker_compose_projects_list::exec(request).await,
-        "docker.compose.project.inspect" => docker_compose_project_inspect::exec(request).await,
+    match command {
+        CommandKind::SystemInfo => system_info::exec(request).await,
+        CommandKind::SystemHealth => system_health::exec(request).await,
+        CommandKind::SystemShutdown => system_shutdown::exec(request).await,
+        CommandKind::SystemReboot => system_reboot::exec(request).await,
+        CommandKind::SystemWakeCapabilities => system_wake_capabilities::exec(request).await,
+        CommandKind::SystemPowerCycle => system_power_cycle::exec(request).await,
 
-        "docker.containers.list" => docker_containers_list::exec(request).await,
-        "docker.container.stop" => docker_container_stop::exec(request).await,
-        "docker.container.start" => docker_container_start::exec(request).await,
-        "docker.container.restart" => docker_container_restart::exec(request).await,
-        "docker.container.delete" => docker_container_delete::exec(request).await,
+        CommandKind::DockerComposeVersion => docker_compose_version::exec(request).await,
+        CommandKind::DockerComposeProjectsList => docker_compose_projects_list::exec(request).await,
+        CommandKind::DockerComposeProjectInspect => {
+            docker_compose_project_inspect::exec(request).await
+        }
 
-        "backup.config.list" => backup_list::exec(request).await,
-        "backup.config.create" => backup_create::exec(request).await,
-        "backup.config.delete" => backup_delete::exec(request).await,
-        "backup.run" => commands::backup::backup_run::exec(request).await,
+        CommandKind::DockerContainersList => docker_containers_list::exec(request).await,
+        CommandKind::DockerContainerStop => docker_container_stop::exec(request).await,
+        CommandKind::DockerContainerStart => docker_container_start::exec(request).await,
+        CommandKind::DockerContainerRestart => docker_container_restart::exec(request).await,
+        CommandKind::DockerContainerDelete => docker_container_delete::exec(request).await,
 
-        "scheduler.add" | "scheduler.list" | "scheduler.delete" => {
+        CommandKind::BackupConfigList => backup_list::exec(request).await,
+        CommandKind::BackupConfigCreate => backup_create::exec(request).await,
+        CommandKind::BackupConfigDelete => backup_delete::exec(request).await,
+        CommandKind::BackupRun => commands::backup::backup_run::exec(request).await,
+
+        CommandKind::Scheduler(command) => {
             let manager = match crate::features::scheduler::runtime::manager() {
                 Ok(manager) => manager,
                 Err(error) => {
@@ -110,21 +98,18 @@ pub async fn execute_now(request: CommandRequest) -> CommandResponse {
                 }
             };
 
-            match request.command.as_str() {
-                "scheduler.add" => commands::scheduler::scheduler_add::exec(request, manager).await,
-                "scheduler.list" => {
+            match command {
+                SchedulerCommand::Add => {
+                    commands::scheduler::scheduler_add::exec(request, manager).await
+                }
+                SchedulerCommand::List => {
                     commands::scheduler::scheduler_list::exec(request, manager).await
                 }
-                _ => commands::scheduler::scheduler_delete::exec(request, manager).await,
+                SchedulerCommand::Delete => {
+                    commands::scheduler::scheduler_delete::exec(request, manager).await
+                }
             }
         }
-
-        _ => CommandResponse {
-            id: request.id,
-            status: CommandStatus::Error,
-            data: None,
-            error: Some(format!("Unknown command: {}", request.command)),
-        },
     }
 }
 

@@ -89,7 +89,7 @@ mod service_tests {
         let definition = service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"marker": null}),
                     schedule: ScheduleRule::Interval { seconds: 60 },
                 },
@@ -129,7 +129,7 @@ mod service_tests {
         assert_eq!(manager.list().unwrap(), json!([]));
 
         if let Ok(queued) = receiver.try_recv() {
-            assert_eq!(queued.request.command, "health");
+            assert_eq!(queued.request.command, "scheduler.list");
             assert_eq!(queued.request.params, json!({"marker": null}));
         }
         assert!(receiver.try_recv().is_err());
@@ -163,7 +163,7 @@ mod service_tests {
                 schedules: vec![StoredSchedule {
                     origin: ScheduleOrigin::User,
                     id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: params.clone(),
                     schedule: ScheduleRule::Interval { seconds: 60 },
                     anchor_at: "2026-10-10T12:00:00Z".to_string(),
@@ -197,7 +197,7 @@ mod service_tests {
                 StoredSchedule {
                     origin: ScheduleOrigin::User,
                     id: expired_id,
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: Value::Null,
                     schedule: ScheduleRule::Once {
                         at: "2026-10-10T12:01:00Z".to_string(),
@@ -207,7 +207,7 @@ mod service_tests {
                 StoredSchedule {
                     origin: ScheduleOrigin::User,
                     id: interval_id.clone(),
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"nested": null}),
                     schedule: ScheduleRule::Interval { seconds: 60 },
                     anchor_at: "2026-10-10T12:00:00Z".to_string(),
@@ -231,6 +231,60 @@ mod service_tests {
     }
 
     #[test]
+    fn retired_health_is_rejected_without_changing_persistence() {
+        let path =
+            std::env::temp_dir().join(format!("kida-retired-health-{}.toml", Uuid::new_v4()));
+        let now = parse_once("2026-10-10T12:00:00Z").unwrap();
+        let mut service = ScheduleService::load(&path, now).unwrap();
+        let retired = NewSchedule {
+            command: "health".into(),
+            params: Value::Null,
+            schedule: ScheduleRule::Interval { seconds: 60 },
+        };
+        assert_eq!(
+            service.add(retired.clone(), now).unwrap_err(),
+            "unknown command: health"
+        );
+        assert_eq!(service.list(), json!([]));
+        assert!(!path.exists());
+
+        let repository = ScheduleRepository::new(&path);
+        let id = Uuid::new_v4().to_string();
+        repository
+            .save(&[StoredSchedule {
+                id: id.clone(),
+                origin: ScheduleOrigin::User,
+                command: retired.command,
+                params: retired.params,
+                schedule: retired.schedule,
+                anchor_at: now.to_rfc3339(),
+            }])
+            .unwrap();
+        let original = std::fs::read(&path).unwrap();
+        // Also preserve an existing file when a new health schedule is rejected.
+        assert_eq!(
+            service
+                .add(
+                    NewSchedule {
+                        command: "health".into(),
+                        params: Value::Null,
+                        schedule: ScheduleRule::Interval { seconds: 60 },
+                    },
+                    now
+                )
+                .unwrap_err(),
+            "unknown command: health"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        match ScheduleService::load(&path, now) {
+            Err(error) => assert_eq!(error, format!("schedule {id}: unknown command: health")),
+            Ok(_) => panic!("retired health schedule must prevent loading"),
+        }
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn add_validates_persists_and_keeps_memory_on_save_failure() {
         let path = std::env::temp_dir().join(format!("kida-scheduler-add-{}.toml", Uuid::new_v4()));
         let now = parse_once("2026-10-10T12:00:00Z").unwrap();
@@ -243,14 +297,14 @@ mod service_tests {
                 schedule: ScheduleRule::Interval { seconds: 60 },
             },
             NewSchedule {
-                command: "health".to_string(),
+                command: "scheduler.list".to_string(),
                 params: Value::Null,
                 schedule: ScheduleRule::Once {
                     at: now.to_rfc3339(),
                 },
             },
             NewSchedule {
-                command: "health".to_string(),
+                command: "scheduler.list".to_string(),
                 params: Value::Null,
                 schedule: ScheduleRule::Interval { seconds: 0 },
             },
@@ -266,7 +320,7 @@ mod service_tests {
         let response = service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: Value::Null,
                     schedule: ScheduleRule::Interval { seconds: 60 },
                 },
@@ -275,7 +329,7 @@ mod service_tests {
             .unwrap();
 
         Uuid::parse_str(response["id"].as_str().unwrap()).unwrap();
-        assert_eq!(response["command"], "health");
+        assert_eq!(response["command"], "scheduler.list");
         assert_eq!(response["params"], Value::Null);
         assert_eq!(
             response["schedule"],
@@ -303,7 +357,7 @@ mod service_tests {
             service
                 .add(
                     NewSchedule {
-                        command: "health".to_string(),
+                        command: "scheduler.list".to_string(),
                         params: json!({"nested": null}),
                         schedule: ScheduleRule::Interval { seconds: 120 },
                     },
@@ -326,7 +380,7 @@ mod service_tests {
         let first = service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"nested": null}),
                     schedule: ScheduleRule::Interval { seconds: 60 },
                 },
@@ -337,7 +391,7 @@ mod service_tests {
         let second = service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: Value::Null,
                     schedule: ScheduleRule::Interval { seconds: 120 },
                 },
@@ -386,7 +440,7 @@ mod service_tests {
             queue
                 .enqueue(CommandRequest {
                     id: format!("filler-{index}"),
-                    command: "health".into(),
+                    command: "scheduler.list".into(),
                     params: Value::Null,
                 })
                 .unwrap();
@@ -416,7 +470,7 @@ mod service_tests {
             let late = parse_once("2026-10-10T12:37:35Z").unwrap();
             let mut service = ScheduleService::load(&path, anchor).unwrap();
             let input = NewSchedule {
-                command: "health".into(),
+                command: "scheduler.list".into(),
                 params: json!({"rule": index}),
                 schedule,
             };
@@ -506,7 +560,7 @@ mod service_tests {
                 service
                     .add(
                         NewSchedule {
-                            command: "health".into(),
+                            command: "scheduler.list".into(),
                             params: json!("recurring"),
                             schedule: ScheduleRule::Interval { seconds: 1 },
                         },
@@ -515,7 +569,7 @@ mod service_tests {
                     .unwrap();
             }
             let input = NewSchedule {
-                command: "health".into(),
+                command: "scheduler.list".into(),
                 params: json!("pending-once"),
                 schedule: ScheduleRule::Once {
                     at: (anchor + chrono::TimeDelta::seconds(1)).to_rfc3339(),
@@ -571,7 +625,7 @@ mod service_tests {
         let mut service = ScheduleService::load(&path, anchor).unwrap();
         for (index, seconds) in [180, 60, 60, 120, 240].into_iter().enumerate() {
             let input = NewSchedule {
-                command: "health".into(),
+                command: "scheduler.list".into(),
                 params: json!(index),
                 schedule: ScheduleRule::Interval { seconds },
             };
@@ -627,7 +681,7 @@ mod service_tests {
             service
                 .add(
                     NewSchedule {
-                        command: "health".into(),
+                        command: "scheduler.list".into(),
                         params: json!(index),
                         schedule,
                     },
@@ -638,7 +692,7 @@ mod service_tests {
         service
             .add(
                 NewSchedule {
-                    command: "health".into(),
+                    command: "scheduler.list".into(),
                     params: json!(3),
                     schedule: ScheduleRule::Once {
                         at: "2026-10-10T12:02:00Z".into(),
@@ -703,7 +757,7 @@ mod service_tests {
             service
                 .add(
                     NewSchedule {
-                        command: "health".into(),
+                        command: "scheduler.list".into(),
                         params: Value::Null,
                         schedule,
                     },
@@ -735,7 +789,7 @@ mod service_tests {
         let cron = service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"source": "cron"}),
                     schedule: ScheduleRule::Cron {
                         expression: "30 2 * * *".to_string(),
@@ -749,7 +803,7 @@ mod service_tests {
         let interval = service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"source": "interval"}),
                     schedule: ScheduleRule::Interval { seconds: 60 },
                 },
@@ -760,7 +814,7 @@ mod service_tests {
         service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"source": "once"}),
                     schedule: ScheduleRule::Once {
                         at: "2026-10-25T00:45:00Z".to_string(),
@@ -820,7 +874,7 @@ mod service_tests {
         service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: Value::Null,
                     schedule: ScheduleRule::Once {
                         at: due.to_rfc3339(),
@@ -833,7 +887,7 @@ mod service_tests {
         service
             .add(
                 NewSchedule {
-                    command: "health".to_string(),
+                    command: "scheduler.list".to_string(),
                     params: json!({"source": "interval"}),
                     schedule: ScheduleRule::Interval { seconds: 60 },
                 },
@@ -981,7 +1035,7 @@ mod origin_tests {
 
     fn input(params: Value) -> NewSchedule {
         NewSchedule {
-            command: "health".into(),
+            command: "scheduler.list".into(),
             params,
             schedule: ScheduleRule::Interval { seconds: 60 },
         }
@@ -1106,7 +1160,7 @@ mod origin_tests {
             .unwrap();
         for entry in listed.as_array().unwrap() {
             let request = receiver.try_recv().unwrap().request;
-            assert_eq!(request.command, "health");
+            assert_eq!(request.command, "scheduler.list");
             assert_eq!(request.params, entry["params"]);
         }
         assert!(receiver.try_recv().is_err());

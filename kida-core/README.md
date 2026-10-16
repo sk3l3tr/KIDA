@@ -402,16 +402,16 @@ Si omites la sección o el campo, se usa `/etc/kida/scheduler.toml`. Reinicia CO
 
 Envía la definición directamente en `params`, con `command`, `params` y `schedule`. Los parámetros del comando programado son obligatorios y pueden contener cualquier valor JSON, incluido `null`.
 
-Para intentar ejecutar `health` cada 60 segundos:
+Para intentar ejecutar `scheduler.list` cada 60 segundos:
 
 ```bash
 curl -sS http://127.0.0.1:8989/command \
   -H 'Content-Type: application/json' \
   --data '{
-    "id": "schedule-health",
+    "id": "schedule-list",
     "command": "scheduler.add",
     "params": {
-      "command": "health",
+      "command": "scheduler.list",
       "params": {},
       "schedule": {"type": "interval", "seconds": 60}
     }
@@ -431,7 +431,7 @@ curl -sS http://127.0.0.1:8989/command \
     "id": "schedule-once",
     "command": "scheduler.add",
     "params": {
-      "command": "health",
+      "command": "scheduler.list",
       "params": null,
       "schedule": {"type": "once", "at": "2027-01-15T10:00:00+01:00"}
     }
@@ -447,7 +447,7 @@ curl -sS http://127.0.0.1:8989/command \
     "id": "schedule-cron",
     "command": "scheduler.add",
     "params": {
-      "command": "health",
+      "command": "scheduler.list",
       "params": {},
       "schedule": {
         "type": "cron",
@@ -459,6 +459,8 @@ curl -sS http://127.0.0.1:8989/command \
 ```
 
 CRON acepta cinco campos: minuto, hora, día del mes, mes y día de la semana. La zona debe ser IANA; si omites `timezone`, se usa `UTC`. Cuando el día del mes y el día de la semana están restringidos, basta que coincida uno de ellos. En cambios horarios, las horas locales inexistentes se omiten y cada coincidencia de una hora repetida se intenta una sola vez, en su primera aparición.
+
+El comando histórico `health` está retirado; `system.health` sigue siendo una consulta de sensores independiente. Una programación pendiente guardada con `health` impide cargar el scheduler: el error identifica su UUID y comando, y el archivo se conserva intacto. Antes de arrancar CORE, retira esa programación o cambia su comando y parámetros por los que realmente necesites.
 
 El alta valida el comando registrado y la regla temporal. Los parámetros específicos del comando y los recursos referenciados se validan al ejecutar, no al crear la programación.
 

@@ -188,7 +188,7 @@ pub(crate) async fn scheduler_protection_through_transports() {
     let manager = runtime::manager().unwrap();
     let internal = manager
         .add_internal(NewSchedule {
-            command: "health".into(),
+            command: "scheduler.list".into(),
             params: json!({"nested":[null,true]}),
             schedule: ScheduleRule::Interval { seconds: 3600 },
         })
@@ -217,7 +217,7 @@ pub(crate) async fn scheduler_protection_through_transports() {
             ),
             (
                 "scheduler.add",
-                json!({"origin":"INTERNAL","command":"health","params":null,"schedule":{"type":"interval","seconds":60}}),
+                json!({"origin":"INTERNAL","command":"scheduler.list","params":null,"schedule":{"type":"interval","seconds":60}}),
                 "ERROR",
                 None,
             ),

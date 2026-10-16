@@ -1,3 +1,91 @@
+#[cfg(test)]
+mod executor_tests {
+    use crate::{
+        exec::{
+            catalog::{self, CommandKind, SchedulerCommand},
+            executor,
+        },
+        infrastructure::comm::protocol::{CommandRequest, CommandStatus},
+    };
+
+    #[test]
+    fn public_commands_resolve_to_executable_variants() {
+        let commands = [
+            ("system.info", CommandKind::SystemInfo),
+            ("system.health", CommandKind::SystemHealth),
+            ("system.shutdown", CommandKind::SystemShutdown),
+            ("system.reboot", CommandKind::SystemReboot),
+            (
+                "system.wake_capabilities",
+                CommandKind::SystemWakeCapabilities,
+            ),
+            ("system.power_cycle", CommandKind::SystemPowerCycle),
+            ("docker.compose.version", CommandKind::DockerComposeVersion),
+            (
+                "docker.compose.projects.list",
+                CommandKind::DockerComposeProjectsList,
+            ),
+            (
+                "docker.compose.project.inspect",
+                CommandKind::DockerComposeProjectInspect,
+            ),
+            ("docker.containers.list", CommandKind::DockerContainersList),
+            ("docker.container.stop", CommandKind::DockerContainerStop),
+            ("docker.container.start", CommandKind::DockerContainerStart),
+            (
+                "docker.container.restart",
+                CommandKind::DockerContainerRestart,
+            ),
+            (
+                "docker.container.delete",
+                CommandKind::DockerContainerDelete,
+            ),
+            ("backup.config.list", CommandKind::BackupConfigList),
+            ("backup.config.create", CommandKind::BackupConfigCreate),
+            ("backup.config.delete", CommandKind::BackupConfigDelete),
+            ("backup.run", CommandKind::BackupRun),
+            (
+                "scheduler.add",
+                CommandKind::Scheduler(SchedulerCommand::Add),
+            ),
+            (
+                "scheduler.list",
+                CommandKind::Scheduler(SchedulerCommand::List),
+            ),
+            (
+                "scheduler.delete",
+                CommandKind::Scheduler(SchedulerCommand::Delete),
+            ),
+        ];
+        // execute_now matches every variant exhaustively, without running handlers here.
+        for (name, kind) in commands {
+            assert_eq!(catalog::resolve(name), Some(kind));
+            assert!(executor::is_registered(name));
+        }
+    }
+
+    #[tokio::test]
+    async fn retired_and_unknown_commands_preserve_error_responses() {
+        for command in ["health", "unknown.command", "", "System.health"] {
+            assert!(!executor::is_registered(command));
+            assert_eq!(catalog::resolve(command), None);
+            let request = || CommandRequest {
+                id: "unknown-request".into(),
+                command: command.into(),
+                params: serde_json::Value::Null,
+            };
+            let direct = executor::execute_now(request()).await;
+            let public = executor::execute(request()).await;
+            for response in [direct, public] {
+                assert_eq!(response.id, "unknown-request");
+                assert!(matches!(response.status, CommandStatus::Error));
+                assert!(response.data.is_none());
+                assert_eq!(response.error, Some(format!("Unknown command: {command}")));
+            }
+        }
+    }
+}
+
 // Must implement tests cases here! Do not implement tests inside source files!
 #[cfg(test)]
 mod queue_tests {
@@ -14,7 +102,7 @@ mod queue_tests {
         let capacity = conf::tests::init_test_config().queue.capacity;
         let (queue, mut receiver) = CommandQueue::new();
         let shared = queue.clone();
-        let commands = ["health", "backup.run", "scheduler.list"];
+        let commands = ["scheduler.list", "backup.run", "scheduler.list"];
         let mut execution_ids = Vec::new();
 
         for index in 0..capacity {
@@ -33,7 +121,7 @@ mod queue_tests {
         assert!(matches!(
             shared.enqueue(CommandRequest {
                 id: "discarded".to_string(),
-                command: "health".to_string(),
+                command: "scheduler.list".to_string(),
                 params: json!(null),
             }),
             Err(QueueError::Full)
@@ -58,7 +146,7 @@ mod queue_tests {
         assert!(matches!(
             queue.enqueue(CommandRequest {
                 id: "closed".to_string(),
-                command: "health".to_string(),
+                command: "scheduler.list".to_string(),
                 params: json!(null),
             }),
             Err(QueueError::Closed)
@@ -134,7 +222,7 @@ mod worker_tests {
             params: json!({
                 "command": "scheduler.add",
                 "params": {
-                    "command": "health",
+                    "command": "scheduler.list",
                     "params": null,
                     "schedule": {
                         "type": "interval",
@@ -166,7 +254,7 @@ mod worker_tests {
         assert!(scheduled_result.error.is_none());
 
         let created = scheduled_result.data.unwrap();
-        assert_eq!(created["command"], "health");
+        assert_eq!(created["command"], "scheduler.list");
         assert_eq!(created["params"], json!(null));
 
         let listed = runtime::manager().unwrap().list().unwrap();
@@ -178,8 +266,32 @@ mod worker_tests {
             .unwrap();
         assert_eq!(persisted.len(), 1);
         assert_eq!(persisted[0].id, created["id"].as_str().unwrap());
-        assert_eq!(persisted[0].command, "health");
+        assert_eq!(persisted[0].command, "scheduler.list");
         assert_eq!(persisted[0].params, json!(null));
+        assert!(received.try_recv().is_err());
+
+        // Follow a safe scheduled command through its actual handler response.
+        let admitted_list = executor::execute(CommandRequest {
+            id: "schedule-a-list".into(),
+            command: "scheduler.add".into(),
+            params: json!({
+                "command": "scheduler.list",
+                "params": null,
+                "schedule": {
+                    "type": "once",
+                    "at": (Utc::now() + TimeDelta::seconds(2)).to_rfc3339()
+                }
+            }),
+        })
+        .await;
+        assert!(matches!(admitted_list.status, CommandStatus::Ok));
+        let list_result = tokio::time::timeout(Duration::from_secs(5), received.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(list_result.status, CommandStatus::Ok));
+        assert!(list_result.error.is_none());
+        assert_eq!(list_result.data, Some(listed));
         assert!(received.try_recv().is_err());
 
         timer_task.abort();

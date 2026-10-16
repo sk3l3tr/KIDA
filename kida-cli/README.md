@@ -35,14 +35,6 @@ kida docker --help
 kida docker container --help
 ```
 
-## Check KIDA
-
-Check whether KIDA is available and responding:
-
-```bash
-kida health
-```
-
 ## System commands
 
 ### View system information
