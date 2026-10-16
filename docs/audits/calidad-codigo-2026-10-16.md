@@ -6,7 +6,7 @@ Revisión del listado: 2026-10-16. La depuración inicial parte de `44d9aac`; la
 
 Este documento contiene únicamente trabajo pendiente con un beneficio concreto. Las tareas implementadas y sus verificaciones se consultan en el historial Git.
 
-Se han eliminado Q01–Q08, la tarea conjunta Q10/Q11 y Q12 por estar completadas. Q13 se acota a separar grupos de pruebas existentes. Se mantienen los identificadores originales para conservar las referencias de las conversaciones y commits.
+Se han eliminado Q01–Q08, la tarea conjunta Q10/Q11 y Q12–Q13 por estar completadas. Se mantienen los identificadores originales para conservar las referencias de las conversaciones y commits.
 
 Se retira Q09 como tarea independiente: el registro de comandos ya está centralizado en el catálogo de Q01 y la recuperación del lifecycle está cubierta por Q03. Persisten llamadas desde features al ejecutor, pero no se ha identificado un defecto adicional que justifique introducir otra operación compartida o mecanismo de inyección. La dirección de una dependencia, por sí sola, no justifica ampliar esta limpieza.
 
@@ -14,16 +14,7 @@ Se retira Q09 como tarea independiente: el registro de comandos ya está central
 
 | ID | Prioridad | Trabajo pendiente | Beneficio |
 | --- | --- | --- | --- |
-| Q13 | Media | Separar los grupos existentes de pruebas Docker | Ejecutar y diagnosticar grupos sin depender de los anteriores |
 | Q14 | Baja | Explicitar el resolver actual del workspace | Eliminar el aviso sin cambiar la resolución de dependencias |
-
-## Q13. Grupos independientes de pruebas Docker
-
-**Evidencia actual.** En [lifecycle_tests.rs](../../kida-core/src/features/docker/lifecycle_tests.rs), un único padre ejecuta `lifecycle_child`. El hijo agrupa escenarios de lifecycle y llama a `ownership_checks`, `persistence_checks` y `concurrency_checks`. Un fallo en un grupo impide ejecutar los posteriores y el runner solo identifica la prueba agregada.
-
-**Cambio acotado.** Separar esos cuatro grupos en pruebas con nombre propio, cada una con su directorio y subproceso. Reutilizar la preparación del fake y el lanzamiento del hijo mediante un helper local. Mantener inicialmente juntos los escenarios de cada grupo; no crear un framework ni convertir cada aserción en una prueba independiente. Conservar también el caso de ejecutable ausente y la comprobación de persistencia entre procesos.
-
-**Aceptación.** Cada grupo debe poder ejecutarse por filtro y el fallo de uno no debe impedir que el runner ejecute los demás. Mantener todas las aserciones, barreras, fallos inyectados, deadlines y comprobaciones de procesos. Cada padre debe verificar que su hijo ejecutó pruebas. No cambiar globalmente PATH, retirar aceptaciones ignoradas de Docker real ni presentar el fake como aceptación contra un daemon.
 
 ## Q14. Resolver explícito sin migración
 

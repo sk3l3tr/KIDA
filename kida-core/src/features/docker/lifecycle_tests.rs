@@ -6,58 +6,82 @@ use std::{collections::BTreeSet, fs, path::PathBuf, process::Command, time::Dura
 #[cfg(unix)]
 #[test]
 fn lifecycle_with_isolated_fake_docker() {
+    run_isolated_fake_docker("lifecycle_child", false);
+}
+
+#[cfg(unix)]
+#[test]
+fn ownership_with_isolated_fake_docker() {
+    run_isolated_fake_docker("ownership_child", false);
+}
+
+#[cfg(unix)]
+#[test]
+fn persistence_with_isolated_fake_docker() {
+    run_isolated_fake_docker("persistence_child", false);
+}
+
+#[cfg(unix)]
+#[test]
+fn concurrency_with_isolated_fake_docker() {
+    run_isolated_fake_docker("concurrency_child", false);
+}
+
+#[cfg(unix)]
+#[test]
+fn lifecycle_with_missing_docker() {
+    run_isolated_fake_docker("lifecycle_child", true);
+}
+
+#[cfg(unix)]
+fn run_isolated_fake_docker(child: &str, missing: bool) {
     use std::os::unix::fs::PermissionsExt;
     let dir = std::env::temp_dir().join(format!("kida-lifecycle-{}", uuid::Uuid::new_v4()));
-    fs::create_dir_all(&dir).unwrap();
+    fs::create_dir_all(dir.join("ownership")).unwrap();
     fs::write(dir.join("docker"), include_str!("fake_docker.py")).unwrap();
     fs::set_permissions(dir.join("docker"), fs::Permissions::from_mode(0o755)).unwrap();
     fs::write(dir.join("compose with spaces.yaml"), "services: {}\n").unwrap();
     fs::write(dir.join("scenario"), "normal").unwrap();
-    let run = |missing: bool| {
-        let mut paths = vec![dir.clone()];
-        paths.extend(std::env::split_paths(
-            &std::env::var_os("PATH").unwrap_or_default(),
-        ));
-        let mut cmd = Command::new(std::env::current_exe().unwrap());
-        cmd.args([
-            "--exact",
-            "features::docker::lifecycle_tests::lifecycle_child",
-            "--ignored",
-            "--nocapture",
-        ])
-        .env("KIDA_LIFECYCLE_DIR", &dir)
-        .env("COMPOSE_PROFILES", "should-not-enable")
-        .env("COMPOSE_REMOVE_ORPHANS", "true")
-        .env(
-            "PATH",
-            if missing {
-                dir.join("missing").into_os_string()
-            } else {
-                std::env::join_paths(paths).unwrap()
-            },
-        );
+    let mut paths = vec![dir.clone()];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let mut cmd = Command::new(std::env::current_exe().unwrap());
+    cmd.args([
+        "--exact",
+        &format!("features::docker::lifecycle_tests::{child}"),
+        "--ignored",
+        "--nocapture",
+    ])
+    .env("KIDA_LIFECYCLE_DIR", &dir)
+    .env_remove("KIDA_OWNERSHIP_RELOAD")
+    .env_remove("KIDA_LIFECYCLE_MISSING")
+    .env("COMPOSE_PROFILES", "should-not-enable")
+    .env("COMPOSE_REMOVE_ORPHANS", "true")
+    .env(
+        "PATH",
         if missing {
-            cmd.env("KIDA_LIFECYCLE_MISSING", "1");
-        }
-        cmd.output().unwrap()
-    };
-    let outputs = [run(false), run(true)];
-    fs::remove_dir_all(dir).unwrap();
-    for output in outputs {
-        assert!(
-            output.status.success(),
-            "{}\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            dir.join("missing").into_os_string()
+        } else {
+            std::env::join_paths(paths).unwrap()
+        },
+    );
+    if missing {
+        cmd.env("KIDA_LIFECYCLE_MISSING", "1");
     }
+    let output = cmd.output().unwrap();
+    fs::remove_dir_all(dir).unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
 }
 
 #[cfg(unix)]
-#[tokio::test]
-#[ignore = "subprocess with isolated fake Docker PATH"]
-async fn lifecycle_child() {
+fn isolated_options() -> (PathBuf, ComposeOptions) {
     let dir = PathBuf::from(std::env::var_os("KIDA_LIFECYCLE_DIR").unwrap());
     fs::write(
         dir.join("config.toml"),
@@ -74,6 +98,14 @@ async fn lifecycle_child() {
         "KIDA_INTERPOLATION".into(),
         "literal $HOME; $(false) with spaces".into(),
     );
+    (dir, options)
+}
+
+#[cfg(unix)]
+#[tokio::test]
+#[ignore = "subprocess with isolated fake Docker PATH"]
+async fn ownership_child() {
+    let (dir, options) = isolated_options();
     if let Ok(reference) = std::env::var("KIDA_OWNERSHIP_RELOAD") {
         let reference = serde_json::from_str(&reference).unwrap();
         let report = DockerService::compose_remove(&reference, Duration::from_secs(20))
@@ -82,6 +114,31 @@ async fn lifecycle_child() {
         assert_eq!(report.removed.len(), 4);
         return;
     }
+    DockerService::compose_create(&options).await.unwrap();
+    Box::pin(ownership_checks(&dir, &options)).await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+#[ignore = "subprocess with isolated fake Docker PATH"]
+async fn persistence_child() {
+    let (dir, options) = isolated_options();
+    Box::pin(persistence_checks(&dir, &options)).await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+#[ignore = "subprocess with isolated fake Docker PATH"]
+async fn concurrency_child() {
+    let (dir, _) = isolated_options();
+    Box::pin(concurrency_checks(&dir)).await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+#[ignore = "subprocess with isolated fake Docker PATH"]
+async fn lifecycle_child() {
+    let (dir, mut options) = isolated_options();
     if std::env::var_os("KIDA_LIFECYCLE_MISSING").is_some() {
         assert!(
             DockerService::compose_create(&options)
@@ -198,9 +255,6 @@ async fn lifecycle_child() {
         &records[0]["args"].as_array().unwrap()[7..],
         &[json!("config"), json!("--format"), json!("json")]
     );
-    Box::pin(ownership_checks(&dir, &options)).await;
-    Box::pin(persistence_checks(&dir, &options)).await;
-    Box::pin(concurrency_checks(&dir)).await;
     scenario("normal");
     for (mode, expected) in [
         ("reserved-label", "reserved io.kida.*"),
@@ -752,7 +806,7 @@ async fn ownership_checks(dir: &std::path::Path, options: &ComposeOptions) {
     let output = Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            "features::docker::lifecycle_tests::lifecycle_child",
+            "features::docker::lifecycle_tests::ownership_child",
             "--ignored",
             "--nocapture",
         ])
@@ -768,6 +822,7 @@ async fn ownership_checks(dir: &std::path::Path, options: &ComposeOptions) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
     fs::write(&options.file, source).unwrap();
     scenario("normal");
     fs::remove_file(&state_path).unwrap();
