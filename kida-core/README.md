@@ -114,7 +114,20 @@ Compose es configuración confiable del administrador, no un sandbox: un bind
 incorrecto puede afectar a datos reales. La validación funcional de los datos
 restaurados corresponde al administrador.
 
-Esta fase incorpora configuración, cargador, tipos compartidos y catálogo de copias. La ejecución,
+El extractor interno `features::backup::health::restore::restore` recibe un
+artefacto resuelto y un destino nuevo cuyo padre debe existir. Verifica tamaño y
+SHA-256 antes de crear el directorio y lee el mismo descriptor durante la
+extracción. Conserva la estructura relativa y permisos ordinarios, sin restaurar
+propietarios ni bits especiales. Solo acepta archivos regulares y directorios;
+rechaza enlaces, entradas especiales y rutas que puedan escapar. El productor
+actual de backup desreferencia los enlaces al crear la copia.
+
+Si falla, conserva los datos parciales y devuelve la ruta y procedencia del
+directorio creado para su recuperación posterior; nunca borra el origen ni un
+destino preexistente. La integración con el ciclo de vida y la limpieza Health
+permanece pendiente.
+
+Esta fase incorpora configuración, cargador, tipos compartidos, catálogo de copias y restauración segura. La ejecución,
 límites activos, comprobación de políticas Compose, diagnóstico, TTL y comandos
 Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
 

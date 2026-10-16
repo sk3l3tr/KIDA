@@ -36,6 +36,10 @@ Interfaces de 02: `BackupService::resolve_artifact(reference, version)` devuelve
 
 El destino no puede existir. Rechazar rutas absolutas, componentes `..`, enlaces que escapen o permitan escrituras fuera y tipos de entrada peligrosos. Ningún fallo autoriza borrar el origen, un destino preexistente o rutas ajenas. Registrar procedencia del directorio para permitir limpieza posterior segura.
 
+Interfaz de 03: `health::restore::restore(&ResolvedBackupArtifact, destination)` es bloqueante y requiere que el directorio padre exista y sea confiable. Devuelve `RestoredDirectory` con ruta canónica e identidad Unix (dispositivo/inodo). `RestoreError.partial` identifica exclusivamente el directorio creado por esta llamada; si falla su inspección inicial, la identidad queda ausente y no autoriza limpieza. 06/07 deben conservar esta evidencia para 08, además de la ruta de restauración del snapshot. La función no borra datos parciales ni destinos anteriores.
+
+La extracción usa el mismo descriptor verificado, sin reabrir el origen. Acepta archivos regulares y directorios; rechaza todos los symlinks/hardlinks y entradas especiales. Es compatible con el productor actual, que desreferencia enlaces. Conserva rutas relativas y permisos ordinarios, sin bits setuid/setgid/sticky ni restauración de propietarios. El directorio del run permanece privado durante extracción y pasa a `0755` al terminar. Los directorios internos reciben sus permisos después de extraer; el coordinador de limpieza deberá poder recorrer directorios con permisos restrictivos, siempre verificando procedencia. El checksum se verifica antes de reservar destino y se exige completar la lectura de zstd, incluso después del terminador tar.
+
 ## Ejecución compartida · tipos 01, coordinación 07
 
 `run_id` UUID; modos `AUTOMATIC` y `MANUAL`; estados `CREATED`, `STARTING`, `RUNNING`, `STOPPED`, `ERROR`; resultados independientes `FAILED`, `UNHEALTHY`, `UNKNOWN`, `DEGRADED`, `HEALTHY`. No usar `DELETED` como estado operativo.

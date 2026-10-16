@@ -523,6 +523,34 @@ fn catalog_job(targets: Vec<BackupTarget>) -> BackupJob {
     .unwrap()
 }
 
+#[test]
+fn health_restores_the_actual_backup_format_without_changing_sources() {
+    use crate::features::backup::health::{model::ResolvedBackupArtifact, restore::restore};
+    let root = TestDirectory::new();
+    let source = root.0.join("original");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("file"), b"backup contents").unwrap();
+    let path = root.0.join("actual.tar.zst");
+    create_artifact(std::slice::from_ref(&source), &path).unwrap();
+    let artifact = ResolvedBackupArtifact {
+        artifact_id: Uuid::new_v4().to_string(),
+        job_id: Uuid::new_v4().to_string(),
+        artifact_name: "actual.tar.zst".into(),
+        created_at: Utc::now().to_rfc3339(),
+        checksum: sha256(&path).unwrap(),
+        size: fs::metadata(&path).unwrap().len(),
+        path,
+    };
+    let restored = restore(&artifact, &root.0.join("run")).unwrap();
+    let copy = restored
+        .path
+        .join(source.strip_prefix("/").unwrap())
+        .join("file");
+    assert_eq!(fs::read(&copy).unwrap(), b"backup contents");
+    fs::write(copy, b"changed restored data").unwrap();
+    assert_eq!(fs::read(source.join("file")).unwrap(), b"backup contents");
+}
+
 fn finalize_case(
     root: &Path,
     job: &BackupJob,
