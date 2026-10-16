@@ -147,8 +147,18 @@ insuficiente. Observa hasta el timeout o un resultado concluyente. Los logs no
 influyen en el resultado: se omiten por defecto y su publicación autorizada
 filtra valores sensibles conocidos con límites de tamaño.
 
+El repositorio interno `health::history::ExecutionRepository` guarda historial
+JSON en `executions/<run_id>.json` e informes Markdown en `reports/<run_id>.md`,
+bajo `backup_health.data_root`. El informe definitivo se escribe tras conocer
+el intento de limpieza; errores de limpieza también quedan documentados.
+Guarda primero el JSON para reconstruir un Markdown perdido si falla el cierre.
+Eliminar un informe conserva el historial y deja una marca que impide recrearlo
+durante la conciliación. Los registros corruptos se informan y no se sobrescriben.
+El repositorio conserva la procedencia del directorio restaurado, redacta los
+valores sensibles conocidos y omite logs por defecto.
+
 Esta fase incorpora configuración, cargador, tipos compartidos, catálogo de copias,
-restauración segura, adaptación Compose y diagnóstico. La ejecución,
+restauración segura, adaptación Compose, diagnóstico e historial/informes. La ejecución,
 límites activos, TTL y comandos
 Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
 

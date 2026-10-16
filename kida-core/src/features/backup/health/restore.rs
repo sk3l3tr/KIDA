@@ -12,14 +12,14 @@ use super::model::ResolvedBackupArtifact;
 use crate::features::backup::{artifacts::sha256_file, error::BackupError};
 
 /// Persist this evidence before later cleanup; a path alone does not prove ownership.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestoredDirectory {
     pub path: PathBuf,
     /// Missing only if inspection failed immediately after creating the directory.
     pub identity: Option<DirectoryIdentity>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirectoryIdentity {
     pub device: u64,
     pub inode: u64,

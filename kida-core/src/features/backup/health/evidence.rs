@@ -35,18 +35,22 @@ impl EvidencePolicy {
     }
 
     pub fn logs(&mut self, logs: &ContainerLogs) -> Result<String, &'static str> {
+        let stdout =
+            std::str::from_utf8(&logs.stdout).map_err(|_| "logs omitted: invalid UTF-8")?;
+        let stderr =
+            std::str::from_utf8(&logs.stderr).map_err(|_| "logs omitted: invalid UTF-8")?;
+        self.excerpt(&format!("stdout:\n{stdout}\nstderr:\n{stderr}"))
+    }
+
+    pub fn excerpt(&mut self, text: &str) -> Result<String, &'static str> {
         if !self.allow_logs {
             return Err("logs omitted: safe publication was not authorized");
         }
         if self.remaining == 0 {
             return Err("logs omitted: total evidence limit reached");
         }
-        let stdout =
-            std::str::from_utf8(&logs.stdout).map_err(|_| "logs omitted: invalid UTF-8")?;
-        let stderr =
-            std::str::from_utf8(&logs.stderr).map_err(|_| "logs omitted: invalid UTF-8")?;
         // Redact whole input before truncation, including secrets crossing a boundary.
-        let safe = self.redact(&format!("stdout:\n{stdout}\nstderr:\n{stderr}"));
+        let safe = self.redact(text);
         let excerpt = prefix(&safe, self.remaining.min(EXCERPT_BYTES)).to_owned();
         self.remaining -= excerpt.len();
         Ok(excerpt)

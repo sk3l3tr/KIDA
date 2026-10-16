@@ -31,7 +31,7 @@ where
     fn save(&self, data: &T) -> Result<(), StorageError>;
 }
 
-fn atomic_write(path: &Path, content: &[u8]) -> Result<(), StorageError> {
+pub(crate) fn atomic_write(path: &Path, content: &[u8]) -> Result<(), StorageError> {
     write_atomic(path, content, true)
 }
 
