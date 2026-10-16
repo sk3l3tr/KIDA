@@ -23,7 +23,7 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 | Q05 | Alta | **Completada.** Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
 | Q06 | Media | **Completada.** Compartir la escritura atómica de JSON y TOML | Refactorización |
 | Q07 | Media | **Completada.** Reducir la duplicación de handlers de acciones Docker | Refactorización |
-| Q08 | Media | Unificar búsqueda y construcción del repositorio de backups | Refactorización |
+| Q08 | Media | **Completada.** Unificar búsqueda y construcción del repositorio de backups | Refactorización |
 | Q09 | Media | Reducir el acoplamiento de features al ejecutor del protocolo | Refactorización gradual |
 | Q10 | Media | Verificar el contrato duplicado entre CORE y CLI | Mantenimiento de contrato |
 | Q11 | Baja | Desacoplar el renderer del modelo de entrada del scheduler | Refactorización |
@@ -142,6 +142,10 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 ---
 
 ## Q08. Búsqueda y creación del repositorio de backup repetidas
+
+**Estado: completada (2026-10-16).** `BackupRepository::get` y `delete` comparten un helper privado que devuelve ruta y job; `delete` elimina exactamente esa ruta. La búsqueda mantiene el recorrido de `read_dir`, la primera coincidencia por ID o nombre, el filtrado de extensiones y la propagación de errores, sin usar un listado ordenado ni deducir el nombre del archivo a partir del ID. Un segundo helper privado del servicio construye el repositorio desde `conf::get().backup.backup_dir`, conservando la conversión de errores de configuración. Los constructores explícitos y `create_in` siguen disponibles para las pruebas. No se añaden migraciones ni gestión de archivos heredados.
+
+**Validación de la corrección.** 172 tests superados (58 unitarios y 2 de integración CLI, 112 CORE), 10 ignorados; suite completa fuera del sandbox para permitir los transportes locales. Formato y Clippy estricto correctos; revisión independiente aprobada con repetición de las ocho pruebas del repositorio. Las cinco nuevas cubren directorio ausente y vacío con errores exactos, búsqueda y borrado por ID o nombre en archivos no canónicos, extensiones ignoradas, conservación de TOML corrupto y primera coincidencia ante nombres duplicados o colisiones entre ID y nombre. También verifican que la corrupción anterior a una coincidencia aborta la búsqueda y que la posterior no se lee. Se conservan las pruebas existentes de configuración no inicializada y del flujo create/list/run/delete con directorio configurado. No se han probado modificaciones concurrentes del directorio; la extracción conserva la conducta previa.
 
 **Evidencia.** [repository.rs de backup](../../kida-core/src/features/backup/repository.rs), `get` (63–84) y `delete` (86–108), repiten recorrido, filtrado TOML, carga y comparación por ID/nombre. En [service.rs](../../kida-core/src/features/backup/service.rs), `list`, `create`, `delete` y `run` repiten la construcción del repositorio desde `conf::get().backup.backup_dir`.
 

@@ -45,23 +45,13 @@ pub struct BackupService;
 
 impl BackupService {
     pub fn list() -> Result<Vec<BackupJob>, BackupError> {
-        let repository = BackupRepository::new(
-            &conf::get()
-                .map_err(std::io::Error::other)?
-                .backup
-                .backup_dir,
-        );
+        let repository = configured_repository()?;
 
         repository.list()
     }
 
     pub fn create(input: NewBackupJob) -> Result<BackupJob, BackupError> {
-        let repository = BackupRepository::new(
-            &conf::get()
-                .map_err(std::io::Error::other)?
-                .backup
-                .backup_dir,
-        );
+        let repository = configured_repository()?;
         Self::create_in(input, &repository)
     }
 
@@ -86,23 +76,13 @@ impl BackupService {
     }
 
     pub fn delete(identifier: &str) -> Result<BackupJob, BackupError> {
-        let repository = BackupRepository::new(
-            &conf::get()
-                .map_err(std::io::Error::other)?
-                .backup
-                .backup_dir,
-        );
+        let repository = configured_repository()?;
 
         repository.delete(identifier)
     }
 
     pub async fn run(identifier: &str) -> Result<BackupRunResult, BackupError> {
-        let repository = BackupRepository::new(
-            &conf::get()
-                .map_err(std::io::Error::other)?
-                .backup
-                .backup_dir,
-        );
+        let repository = configured_repository()?;
         let job = repository.get(identifier)?;
 
         // 1. Validar sources
@@ -171,6 +151,15 @@ impl BackupService {
                 )))
             })?
     }
+}
+
+fn configured_repository() -> Result<BackupRepository, BackupError> {
+    Ok(BackupRepository::new(
+        &conf::get()
+            .map_err(std::io::Error::other)?
+            .backup
+            .backup_dir,
+    ))
 }
 
 fn finalize_backup(

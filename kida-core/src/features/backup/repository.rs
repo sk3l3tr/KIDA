@@ -61,29 +61,16 @@ impl BackupRepository {
     }
 
     pub fn get(&self, identifier: &str) -> Result<BackupJob, BackupError> {
-        if !self.directory.exists() {
-            return Err(not_found(identifier).into());
-        }
-
-        for entry in fs::read_dir(&self.directory)? {
-            let path = entry?.path();
-
-            if !is_toml(&path) {
-                continue;
-            }
-
-            let storage = TomlStorage::<StoredBackupJob>::new(path);
-            let job = storage.load()?.0;
-
-            if job.id == identifier || job.name == identifier {
-                return Ok(job);
-            }
-        }
-
-        Err(not_found(identifier).into())
+        self.find(identifier).map(|(_, job)| job)
     }
 
     pub fn delete(&self, identifier: &str) -> Result<BackupJob, BackupError> {
+        let (path, job) = self.find(identifier)?;
+        fs::remove_file(path)?;
+        Ok(job)
+    }
+
+    fn find(&self, identifier: &str) -> Result<(PathBuf, BackupJob), BackupError> {
         if !self.directory.exists() {
             return Err(not_found(identifier).into());
         }
@@ -99,8 +86,7 @@ impl BackupRepository {
             let job = storage.load()?.0;
 
             if job.id == identifier || job.name == identifier {
-                fs::remove_file(&path)?;
-                return Ok(job);
+                return Ok((path, job));
             }
         }
 
