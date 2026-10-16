@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -21,6 +21,25 @@ use crate::{
     exec::executor,
     infrastructure::comm::protocol::{CommandRequest, CommandStatus},
 };
+
+// Ownership moves with the blocking task, including when its async waiter is cancelled.
+struct TemporaryArtifact {
+    path: PathBuf,
+}
+
+impl Drop for TemporaryArtifact {
+    fn drop(&mut self) {
+        if let Err(error) = fs::remove_file(&self.path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            let _ = writeln!(
+                std::io::stderr(),
+                "WARN: Failed to remove backup temporary artifact {}: {error}",
+                self.path.display()
+            );
+        }
+    }
+}
 
 pub struct BackupService;
 
@@ -120,119 +139,119 @@ impl BackupService {
 
         let artifact_name = format!("{}-{}.tar.zst", job.name, chrono_timestamp());
 
-        let temp_path =
-            std::env::temp_dir().join(format!("kida-{}-{artifact_name}", Uuid::new_v4()));
+        let artifact = TemporaryArtifact {
+            path: std::env::temp_dir().join(format!("kida-{}-{artifact_name}", Uuid::new_v4())),
+        };
 
-        // 4. Crear artefacto en un hilo bloqueante.
+        // 4. The blocking task owns the temporary until creation has finished.
         let sources = job.sources.clone();
-        let artifact_path = temp_path.clone();
+        let creation = tokio::task::spawn_blocking(move || {
+            let result = create_artifact(&sources, &artifact.path);
+            (artifact, result)
+        })
+        .await
+        .map_err(|error| {
+            BackupError::from(std::io::Error::other(format!(
+                "Backup artifact task failed: {error}"
+            )))
+        });
 
-        let artifact_result: Result<(), BackupError> =
-            match tokio::task::spawn_blocking(move || create_artifact(&sources, &artifact_path))
-                .await
-            {
-                Ok(result) => result,
-                Err(error) => Err(std::io::Error::other(format!(
-                    "Backup artifact task failed: {error}"
-                ))
-                .into()),
-            };
-
-        // 5/6/7. Dejamos de acceder a sources y restauramos servicios SIEMPRE.
+        // 5/6/7. Attempt post_backup after creation has stopped accessing sources.
         let post_result = run_lifecycle(&job.lifecycle.post_backup).await;
 
         // Si crear artefacto falló, post_backup ya se ha ejecutado.
+        let (artifact, artifact_result) = creation?;
         artifact_result?;
 
         // post_backup también invalida globalmente la ejecución.
         post_result?;
 
-        // 8. checksum
-        // 8-11. Finalizar backup fuera del runtime asíncrono.
-        tokio::task::spawn_blocking(move || -> Result<BackupRunResult, BackupError> {
-            let checksum = sha256(&temp_path)?;
-            let size = fs::metadata(&temp_path)?.len();
-
-            // 9. Replicar + verificar
-            let mut target_results = Vec::new();
-
-            for target in &job.targets {
-                if !target.path.is_dir() {
-                    target_results.push(BackupTargetResult {
-                        path: target.path.clone(),
-                        status: BackupTargetStatus::Unavailable,
-                        error: Some("target unavailable".to_string()),
-                    });
-
-                    continue;
-                }
-
-                let destination = target.path.join(&artifact_name);
-
-                let result = (|| -> Result<(), BackupError> {
-                    fs::copy(&temp_path, &destination)?;
-
-                    let destination_checksum = sha256(&destination)?;
-
-                    if destination_checksum != checksum {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            format!("checksum mismatch for {}", destination.display()),
-                        )
-                        .into());
-                    }
-
-                    Ok(())
-                })();
-
-                match result {
-                    Ok(()) => target_results.push(BackupTargetResult {
-                        path: target.path.clone(),
-                        status: BackupTargetStatus::Ok,
-                        error: None,
-                    }),
-
-                    Err(error) => target_results.push(BackupTargetResult {
-                        path: target.path.clone(),
-                        status: BackupTargetStatus::Failed,
-                        error: Some(error.to_string()),
-                    }),
-                }
-            }
-
-            // 10. Comprobar destinos required
-            let required_failed =
-                job.targets
-                    .iter()
-                    .zip(&target_results)
-                    .any(|(target, result)| {
-                        target.required && !matches!(result.status, BackupTargetStatus::Ok)
-                    });
-
-            // 11. Eliminar temporal
-            let _ = fs::remove_file(&temp_path);
-
-            if required_failed {
-                return Err(
-                    std::io::Error::other("one or more required backup targets failed").into(),
-                );
-            }
-
-            Ok(BackupRunResult {
-                job_id: job.id,
-                artifact_name,
-                checksum,
-                size,
-                targets: target_results,
-            })
-        })
-        .await
-        .map_err(|error| {
-            BackupError::from(std::io::Error::other(format!(
-                "Backup finalization task failed: {error}"
-            )))
-        })?
+        // 8-11. Finalization owns and cleans the temporary, even on early return.
+        tokio::task::spawn_blocking(move || finalize_backup(job, artifact_name, artifact))
+            .await
+            .map_err(|error| {
+                BackupError::from(std::io::Error::other(format!(
+                    "Backup finalization task failed: {error}"
+                )))
+            })?
     }
+}
+
+fn finalize_backup(
+    job: BackupJob,
+    artifact_name: String,
+    artifact: TemporaryArtifact,
+) -> Result<BackupRunResult, BackupError> {
+    let checksum = sha256(&artifact.path)?;
+    let size = fs::metadata(&artifact.path)?.len();
+
+    // 9. Replicar + verificar
+    let mut target_results = Vec::new();
+
+    for target in &job.targets {
+        if !target.path.is_dir() {
+            target_results.push(BackupTargetResult {
+                path: target.path.clone(),
+                status: BackupTargetStatus::Unavailable,
+                error: Some("target unavailable".to_string()),
+            });
+
+            continue;
+        }
+
+        let destination = target.path.join(&artifact_name);
+
+        let result = (|| -> Result<(), BackupError> {
+            fs::copy(&artifact.path, &destination)?;
+
+            let destination_checksum = sha256(&destination)?;
+
+            if destination_checksum != checksum {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("checksum mismatch for {}", destination.display()),
+                )
+                .into());
+            }
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => target_results.push(BackupTargetResult {
+                path: target.path.clone(),
+                status: BackupTargetStatus::Ok,
+                error: None,
+            }),
+
+            Err(error) => target_results.push(BackupTargetResult {
+                path: target.path.clone(),
+                status: BackupTargetStatus::Failed,
+                error: Some(error.to_string()),
+            }),
+        }
+    }
+
+    // 10. Comprobar destinos required
+    let required_failed = job
+        .targets
+        .iter()
+        .zip(&target_results)
+        .any(|(target, result)| {
+            target.required && !matches!(result.status, BackupTargetStatus::Ok)
+        });
+
+    if required_failed {
+        return Err(std::io::Error::other("one or more required backup targets failed").into());
+    }
+
+    Ok(BackupRunResult {
+        job_id: job.id,
+        artifact_name,
+        checksum,
+        size,
+        targets: target_results,
+    })
 }
 
 async fn run_lifecycle(commands: &[LifecycleCommand]) -> Result<(), BackupError> {
@@ -299,3 +318,7 @@ fn sha256(path: &Path) -> Result<String, BackupError> {
 fn chrono_timestamp() -> String {
     chrono::Utc::now().format("%Y-%m-%dT%H-%M-%S").to_string()
 }
+
+#[cfg(test)]
+#[path = "service_tests.rs"]
+mod tests;
