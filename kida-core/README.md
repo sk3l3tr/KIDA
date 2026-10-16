@@ -81,8 +81,7 @@ compose = "./docker-compose.health.yml"
 
 Todos los campos son obligatorios y no admiten valores vacíos. `reference`
 identifica un backup existente por ID o nombre, sin coincidencias ambiguas.
-`version` acepta `latest` o un UUID de artefacto; el catálogo y su comprobación
-de existencia corresponden a la tarea 02, todavía pendiente. No se incorporarán
+`version` acepta `latest` o un UUID de artefacto registrado. No se incorporarán
 copias históricas sin registro. Cada definición debe tener un ID único y estable;
 no se crea un registro global de definiciones en esta fase.
 
@@ -115,9 +114,45 @@ Compose es configuración confiable del administrador, no un sandbox: un bind
 incorrecto puede afectar a datos reales. La validación funcional de los datos
 restaurados corresponde al administrador.
 
-Esta fase incorpora configuración, cargador y tipos compartidos. La ejecución,
+Esta fase incorpora configuración, cargador, tipos compartidos y catálogo de copias. La ejecución,
 límites activos, comprobación de políticas Compose, diagnóstico, TTL y comandos
 Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
+
+### Catálogo de copias
+
+Cada `backup.run` nuevo incorpora un UUID al nombre:
+`<nombre>-<fecha-UTC>-<artifact_id>.tar.zst`. El nombre del backup no puede
+contener componentes de ruta. Los campos de su respuesta se conservan.
+
+Tras replicar, CORE registra la copia en
+`<backup_health.data_root>/artifacts/<backup-job-id>/<artifact-id>.json`, con
+identidad, fecha UTC, SHA-256, tamaño y rutas absolutas de los destinos
+verificados. El usuario de CORE necesita poder escribir en `data_root`.
+El catálogo no incorpora copias anteriores ni está sujeto a la retención de
+historial e informes Health.
+
+La publicación usa archivos temporales en el mismo directorio y enlaces duros
+para no sobrescribir destinos ni registros existentes, incluso ante colisiones.
+Los sistemas de archivos de los targets y del catálogo deben permitir enlaces
+duros. Un fallo conserva los destinos anteriores; no se usa una alternativa
+que pueda sobrescribirlos. Los temporales propios se retiran al terminar.
+
+Un destino requerido fallido mantiene el resultado de error de `backup.run`,
+aunque otra copia verificada quede registrada. Si falla la escritura del catálogo,
+el comando devuelve error y conserva los archivos ya copiados; esas copias no
+están disponibles para Health sin un registro válido. Un backup sin destinos
+verificados no publica metadatos; los fallos opcionales mantienen su tratamiento
+actual en la respuesta.
+
+La API interna síncrona `BackupService::resolve_artifact(reference, version)`
+devuelve `ResolvedBackupArtifact` y comprueba tamaño y SHA-256. Resuelve el job
+por ID/nombre sin ambigüedad. `latest` elige la fecha más reciente y, en empate,
+el UUID mayor. Prueba los destinos registrados en orden, sin cambiar a una
+versión anterior cuando la elegida falla. Una selección explícita consulta solo
+su registro; `latest` falla ante registros corruptos en el catálogo del job.
+Esta operación hace I/O bloqueante y debe llamarse desde el trabajo bloqueante
+de la futura orquestación Health. La restauración volverá a verificar el archivo
+que lea; la resolución no conserva un descriptor abierto ni impide cambios externos.
 
 ## Crear configuraciones de backup
 

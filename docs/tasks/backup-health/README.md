@@ -9,7 +9,7 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 | ID | Tarea | Estado | Implementación | Validación |
 | --- | --- | --- | --- | --- |
 | 01 | [Configuración y definiciones](01-config-definiciones.md) | Verificada | [Configuración](../../../kida-core/src/infrastructure/conf/backup_health.rs), [cargador y tipos](../../../kida-core/src/features/backup/health/) | [Pruebas y resultados](01-config-definiciones.md#validación-realizada) |
-| 02 | [Catálogo de artefactos](02-catalogo-artefactos.md) | Pendiente | — | — |
+| 02 | [Catálogo de artefactos](02-catalogo-artefactos.md) | Verificada | [Catálogo](../../../kida-core/src/features/backup/artifacts.rs), [replicación](../../../kida-core/src/features/backup/service.rs) | [Pruebas y revisión](02-catalogo-artefactos.md#validación-y-revisión) |
 | 03 | [Restauración segura](03-restauracion-segura.md) | Pendiente | — | — |
 | 04 | [Compose para Health](04-compose-health.md) | Pendiente | — | — |
 | 05 | [Diagnóstico](05-diagnostico.md) | Pendiente | — | — |

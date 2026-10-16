@@ -1,14 +1,18 @@
 use std::{
-    fs::{self, File},
-    io::{Read, Write},
+    fs::{self, File, OpenOptions},
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
-use sha2::{Digest, Sha256};
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::{
+    artifacts::{
+        ArtifactRepository, StoredArtifact, canonical_id, is_filename, sha256, sha256_file,
+    },
     error::BackupError,
+    health::model::ResolvedBackupArtifact,
     model::{
         BackupJob, BackupRunResult, BackupTargetResult, BackupTargetStatus, LifecycleCommand,
         NewBackupJob,
@@ -81,6 +85,22 @@ impl BackupService {
         repository.delete(identifier)
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Artifact resolution awaits Health lifecycle integration"
+        )
+    )]
+    pub fn resolve_artifact(
+        identifier: &str,
+        version: &str,
+    ) -> Result<ResolvedBackupArtifact, BackupError> {
+        let config = conf::get().map_err(io::Error::other)?;
+        let job = configured_repository()?.get_unique(identifier)?;
+        ArtifactRepository::new(&config.backup_health.data_root).resolve(&job.id, version)
+    }
+
     pub async fn run(identifier: &str) -> Result<BackupRunResult, BackupError> {
         let repository = configured_repository()?;
         let job = repository.get(identifier)?;
@@ -110,14 +130,30 @@ impl BackupService {
             }
         }
 
+        let artifact_id = Uuid::new_v4().to_string();
+        canonical_id(&job.id)?;
+        let created_at = Utc::now();
+        let artifact_name = artifact_name(&job.name, &created_at, &artifact_id);
+        if !is_filename(&artifact_name) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "backup name must not contain path components",
+            )
+            .into());
+        }
+        let catalog = ArtifactRepository::new(
+            &conf::get()
+                .map_err(io::Error::other)?
+                .backup_health
+                .data_root,
+        );
+
         // 3. pre_backup
         if let Err(error) = run_lifecycle(&job.lifecycle.pre_backup).await {
             // Intentar recuperación aunque falle el pre_backup.
             let post = run_post_backup(&job.lifecycle.post_backup).await;
             return complete_with_post(Err(error), post);
         }
-
-        let artifact_name = format!("{}-{}.tar.zst", job.name, chrono_timestamp());
 
         let artifact = TemporaryArtifact {
             path: std::env::temp_dir().join(format!("kida-{}-{artifact_name}", Uuid::new_v4())),
@@ -143,13 +179,22 @@ impl BackupService {
         let artifact = complete_with_post(creation, post)?;
 
         // 8-11. Finalization owns and cleans the temporary, even on early return.
-        tokio::task::spawn_blocking(move || finalize_backup(job, artifact_name, artifact))
-            .await
-            .map_err(|error| {
-                BackupError::from(std::io::Error::other(format!(
-                    "Backup finalization task failed: {error}"
-                )))
-            })?
+        tokio::task::spawn_blocking(move || {
+            finalize_backup(
+                job,
+                artifact_id,
+                created_at,
+                artifact_name,
+                artifact,
+                catalog,
+            )
+        })
+        .await
+        .map_err(|error| {
+            BackupError::from(std::io::Error::other(format!(
+                "Backup finalization task failed: {error}"
+            )))
+        })?
     }
 }
 
@@ -164,14 +209,18 @@ fn configured_repository() -> Result<BackupRepository, BackupError> {
 
 fn finalize_backup(
     job: BackupJob,
+    artifact_id: String,
+    created_at: DateTime<Utc>,
     artifact_name: String,
     artifact: TemporaryArtifact,
+    catalog: ArtifactRepository,
 ) -> Result<BackupRunResult, BackupError> {
     let checksum = sha256(&artifact.path)?;
     let size = fs::metadata(&artifact.path)?.len();
 
     // 9. Replicar + verificar
     let mut target_results = Vec::new();
+    let mut destinations = Vec::new();
 
     for target in &job.targets {
         if !target.path.is_dir() {
@@ -186,28 +235,17 @@ fn finalize_backup(
 
         let destination = target.path.join(&artifact_name);
 
-        let result = (|| -> Result<(), BackupError> {
-            fs::copy(&artifact.path, &destination)?;
-
-            let destination_checksum = sha256(&destination)?;
-
-            if destination_checksum != checksum {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("checksum mismatch for {}", destination.display()),
-                )
-                .into());
-            }
-
-            Ok(())
-        })();
+        let result = copy_replica(&artifact.path, &destination, &checksum, size);
 
         match result {
-            Ok(()) => target_results.push(BackupTargetResult {
-                path: target.path.clone(),
-                status: BackupTargetStatus::Ok,
-                error: None,
-            }),
+            Ok(destination) => {
+                destinations.push(destination);
+                target_results.push(BackupTargetResult {
+                    path: target.path.clone(),
+                    status: BackupTargetStatus::Ok,
+                    error: None,
+                });
+            }
 
             Err(error) => target_results.push(BackupTargetResult {
                 path: target.path.clone(),
@@ -226,9 +264,30 @@ fn finalize_backup(
             target.required && !matches!(result.status, BackupTargetStatus::Ok)
         });
 
+    let registration = if destinations.is_empty() {
+        Ok(())
+    } else {
+        catalog.create(&StoredArtifact {
+            artifact_id,
+            job_id: job.id.clone(),
+            artifact_name: artifact_name.clone(),
+            created_at: created_at.to_rfc3339(),
+            checksum: checksum.clone(),
+            size,
+            destinations,
+        })
+    };
     if required_failed {
-        return Err(std::io::Error::other("one or more required backup targets failed").into());
+        let primary = io::Error::other("one or more required backup targets failed").into();
+        return match registration {
+            Ok(()) => Err(primary),
+            Err(catalog) => Err(BackupError::ArtifactRegistration {
+                primary: Box::new(primary),
+                catalog: Box::new(catalog),
+            }),
+        };
     }
+    registration?;
 
     Ok(BackupRunResult {
         job_id: job.id,
@@ -315,26 +374,48 @@ fn create_artifact(sources: &[PathBuf], destination: &Path) -> Result<(), Backup
     Ok(())
 }
 
-fn sha256(path: &Path) -> Result<String, BackupError> {
-    let mut file = File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 64 * 1024];
-
-    loop {
-        let read = file.read(&mut buffer)?;
-
-        if read == 0 {
-            break;
-        }
-
-        hasher.update(&buffer[..read]);
+fn copy_replica(
+    source: &Path,
+    destination: &Path,
+    checksum: &str,
+    size: u64,
+) -> Result<PathBuf, BackupError> {
+    let parent = fs::canonicalize(
+        destination
+            .parent()
+            .ok_or_else(|| io::Error::other("missing backup target parent"))?,
+    )?;
+    let destination = parent.join(
+        destination
+            .file_name()
+            .ok_or_else(|| io::Error::other("invalid artifact filename"))?,
+    );
+    let mut input = File::open(source)?;
+    let path = parent.join(format!(".kida-copy-{}.tmp", Uuid::new_v4()));
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&path)?;
+    let _staging = TemporaryArtifact { path: path.clone() };
+    io::copy(&mut input, &mut file)?;
+    file.sync_all()?;
+    if file.metadata()?.len() != size || sha256_file(&mut file)? != checksum {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "backup replica checksum or size mismatch",
+        )
+        .into());
     }
-
-    Ok(format!("{:x}", hasher.finalize()))
+    fs::hard_link(path, &destination)?;
+    Ok(destination)
 }
 
-fn chrono_timestamp() -> String {
-    chrono::Utc::now().format("%Y-%m-%dT%H-%M-%S").to_string()
+fn artifact_name(name: &str, created_at: &DateTime<Utc>, id: &str) -> String {
+    format!(
+        "{name}-{}-{id}.tar.zst",
+        created_at.format("%Y-%m-%dT%H-%M-%S")
+    )
 }
 
 #[cfg(test)]

@@ -64,6 +64,22 @@ impl BackupRepository {
         self.find(identifier).map(|(_, job)| job)
     }
 
+    pub fn get_unique(&self, identifier: &str) -> Result<BackupJob, BackupError> {
+        let mut matches = self
+            .list()?
+            .into_iter()
+            .filter(|job| job.id == identifier || job.name == identifier);
+        let job = matches.next().ok_or_else(|| not_found(identifier))?;
+        if matches.next().is_some() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("backup health: ambiguous backup reference: {identifier}"),
+            )
+            .into());
+        }
+        Ok(job)
+    }
+
     pub fn delete(&self, identifier: &str) -> Result<BackupJob, BackupError> {
         let (path, job) = self.find(identifier)?;
         fs::remove_file(path)?;

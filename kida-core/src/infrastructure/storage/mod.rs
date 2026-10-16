@@ -32,6 +32,14 @@ where
 }
 
 fn atomic_write(path: &Path, content: &[u8]) -> Result<(), StorageError> {
+    write_atomic(path, content, true)
+}
+
+fn atomic_create(path: &Path, content: &[u8]) -> Result<(), StorageError> {
+    write_atomic(path, content, false)
+}
+
+fn write_atomic(path: &Path, content: &[u8], replace: bool) -> Result<(), StorageError> {
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
     {
@@ -47,12 +55,17 @@ fn atomic_write(path: &Path, content: &[u8]) -> Result<(), StorageError> {
     let result = (|| -> Result<(), StorageError> {
         file.write_all(content)?;
         file.sync_all()?;
-        fs::rename(&temp_path, path)?;
+        if replace {
+            fs::rename(&temp_path, path)?;
+        } else {
+            // Publish a complete file atomically, failing if the destination exists.
+            fs::hard_link(&temp_path, path)?;
+        }
         Ok(())
     })();
     drop(file);
 
-    if result.is_err() {
+    if !replace || result.is_err() {
         // Preserve the original error; only remove the temporary we created.
         let _ = fs::remove_file(&temp_path);
     }

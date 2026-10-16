@@ -195,3 +195,36 @@ fn failed_replacement_cleans_its_temporary_and_preserves_unrelated_files() {
     expected.sort();
     assert_eq!(directory.entries(), expected);
 }
+
+#[test]
+fn json_create_rejects_serialization_before_io_and_never_replaces_existing_content() {
+    let directory = Directory::new();
+    let parent = directory.0.join("new");
+    let path = parent.join("record.json");
+    let storage = JsonStorage::new(&path);
+    assert!(storage.create(&record("reject")).is_err());
+    assert!(!parent.exists());
+    storage.create(&record("first")).unwrap();
+    assert!(storage.create(&record("second")).is_err());
+    assert_eq!(storage.load().unwrap(), record("first"));
+    assert_eq!(fs::read_dir(parent).unwrap().count(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn json_create_preserves_existing_symlinks_and_their_targets() {
+    let directory = Directory::new();
+    let sentinel = directory.0.join("sentinel");
+    fs::write(&sentinel, "untouched").unwrap();
+    let missing = directory.0.join("missing");
+    let path = directory.0.join("record.json");
+    for target in [&sentinel, &missing] {
+        std::os::unix::fs::symlink(target, &path).unwrap();
+        assert!(JsonStorage::new(&path).create(&record("new")).is_err());
+        assert_eq!(fs::read_link(&path).unwrap(), *target);
+        assert_eq!(fs::read_to_string(&sentinel).unwrap(), "untouched");
+        assert!(!missing.exists());
+        assert_eq!(directory.entries().len(), 2);
+        fs::remove_file(&path).unwrap();
+    }
+}

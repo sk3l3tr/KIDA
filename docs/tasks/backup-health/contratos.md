@@ -32,6 +32,8 @@ El UUID forma parte del nombre del artefacto nuevo: la marca temporal actual tie
 
 La resolución devuelve identidad, job, fecha, ruta, checksum esperado y tamaño. 03 recibe ese artefacto y `<restore_root>/<run_id>`; verifica el contenido antes de extraer y devuelve el directorio nuevo o un error con evidencia de lo creado. Evitar que se cambie el archivo entre verificación y lectura. Conservar la estructura relativa del tar existente, sin renombrar los datos según los servicios Compose.
 
+Interfaces de 02: `BackupService::resolve_artifact(reference, version)` devuelve `ResolvedBackupArtifact`; es síncrona y hace I/O bloqueante. `BackupRepository::get_unique` comparte la búsqueda sin ambigüedad con el cargador Health, sin cambiar `get`. `artifacts::ArtifactRepository` guarda registros con `destinations` absolutas y los campos de identidad/tamaño/hash descritos arriba. La publicación sin sobrescritura usa enlaces duros en el mismo directorio; los targets y `data_root` deben soportarlos. La resolución verifica el archivo, pero 03 debe verificar de nuevo el descriptor del que extraiga para evitar sustituciones posteriores.
+
 El destino no puede existir. Rechazar rutas absolutas, componentes `..`, enlaces que escapen o permitan escrituras fuera y tipos de entrada peligrosos. Ningún fallo autoriza borrar el origen, un destino preexistente o rutas ajenas. Registrar procedencia del directorio para permitir limpieza posterior segura.
 
 ## Ejecución compartida · tipos 01, coordinación 07

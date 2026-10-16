@@ -1,3 +1,4 @@
+pub mod artifacts;
 pub mod error;
 #[cfg_attr(
     not(test),

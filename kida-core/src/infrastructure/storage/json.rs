@@ -2,7 +2,7 @@ use std::{fs, io::ErrorKind, marker::PhantomData, path::PathBuf};
 
 use serde::{Serialize, de::DeserializeOwned};
 
-use super::{Storage, StorageError, atomic_write};
+use super::{Storage, StorageError, atomic_create, atomic_write};
 
 pub struct JsonStorage<T> {
     path: PathBuf,
@@ -58,5 +58,13 @@ where
         let content = serde_json::to_vec_pretty(data).map_err(StorageError::JsonSerialize)?;
 
         atomic_write(&self.path, &content)
+    }
+}
+
+impl<T: Serialize> JsonStorage<T> {
+    /// Publish a new JSON file without replacing an existing file or symlink.
+    pub fn create(&self, data: &T) -> Result<(), StorageError> {
+        let content = serde_json::to_vec_pretty(data).map_err(StorageError::JsonSerialize)?;
+        atomic_create(&self.path, &content)
     }
 }

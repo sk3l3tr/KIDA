@@ -1,4 +1,5 @@
 use super::*;
+use crate::features::backup::model::BackupTarget;
 use std::{process::Command, time::Duration};
 use tokio::sync::oneshot;
 
@@ -181,8 +182,9 @@ async fn backup_child() {
     fs::write(
         root.join("config.toml"),
         format!(
-            "[backup]\nbackup_dir = {:?}\n",
-            root.join("jobs").to_str().unwrap()
+            "[backup]\nbackup_dir = {:?}\n[backup_health]\ndata_root = {:?}\n",
+            root.join("jobs").to_str().unwrap(),
+            root.join("health-data").to_str().unwrap()
         ),
     )
     .unwrap();
@@ -377,6 +379,18 @@ async fn backup_child() {
             let destination = target.join(&result.artifact_name);
             assert_eq!(sha256(&destination).unwrap(), result.checksum);
             assert_eq!(fs::metadata(&destination).unwrap().len(), result.size);
+            for reference in [&job.id, &job.name] {
+                let selected = BackupService::resolve_artifact(reference, "latest").unwrap();
+                assert_eq!(selected.path, fs::canonicalize(&destination).unwrap());
+                assert_eq!(selected.checksum, result.checksum);
+                assert!(result.artifact_name.contains(&selected.artifact_id));
+                assert_eq!(
+                    BackupService::resolve_artifact(reference, &selected.artifact_id)
+                        .unwrap()
+                        .artifact_id,
+                    selected.artifact_id
+                );
+            }
             let decoder = zstd::Decoder::new(File::open(destination).unwrap()).unwrap();
             let mut archive = tar::Archive::new(decoder);
             let restored = root.join("restored");
@@ -499,4 +513,217 @@ async fn blocking_task_failure_remains_the_source_when_post_fails() {
     let diagnostic = error.to_string();
     assert!(diagnostic.starts_with(&source));
     assert!(diagnostic.contains("post_backup failed: step 1 (backup.run)"));
+}
+
+fn catalog_job(targets: Vec<BackupTarget>) -> BackupJob {
+    serde_json::from_value(serde_json::json!({
+        "id": Uuid::new_v4().to_string(), "name": "catalog-test",
+        "sources": [], "targets": targets, "compression": "tar_zstd"
+    }))
+    .unwrap()
+}
+
+fn finalize_case(
+    root: &Path,
+    job: &BackupJob,
+    id: &str,
+    date: DateTime<Utc>,
+    payload: &str,
+    data_root: &Path,
+) -> Result<BackupRunResult, BackupError> {
+    let source = root.join("source.txt");
+    fs::write(&source, payload).unwrap();
+    let path = root.join(format!("temporary-{id}.tar.zst"));
+    create_artifact(&[source], &path).unwrap();
+    finalize_backup(
+        job.clone(),
+        id.into(),
+        date,
+        artifact_name(&job.name, &date, id),
+        TemporaryArtifact { path },
+        ArtifactRepository::new(data_root),
+    )
+}
+
+#[test]
+fn same_timestamp_backups_keep_both_versions_and_resolve_real_registered_copies() {
+    let directory = TestDirectory::new();
+    let target = directory.0.join("target");
+    fs::create_dir(&target).unwrap();
+    let job = catalog_job(vec![BackupTarget {
+        path: target,
+        required: true,
+        filesystem_uuid: None,
+    }]);
+    let date = DateTime::parse_from_rfc3339("2026-10-16T10:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let first_id = Uuid::new_v4().to_string();
+    let second_id = Uuid::new_v4().to_string();
+    let first = finalize_case(&directory.0, &job, &first_id, date, "first", &directory.0).unwrap();
+    let second =
+        finalize_case(&directory.0, &job, &second_id, date, "second", &directory.0).unwrap();
+    assert_ne!(first.artifact_name, second.artifact_name);
+    let repository = ArtifactRepository::new(&directory.0);
+    for (id, result) in [(&first_id, &first), (&second_id, &second)] {
+        let selected = repository.resolve(&job.id, id).unwrap();
+        assert_eq!(selected.checksum, result.checksum);
+        assert_eq!(sha256(&selected.path).unwrap(), result.checksum);
+        assert_eq!(selected.artifact_name, result.artifact_name);
+    }
+    assert_eq!(
+        repository.resolve(&job.id, "latest").unwrap().artifact_id,
+        first_id.max(second_id)
+    );
+    assert_eq!(fs::read_dir(&directory.0).unwrap().count(), 3); // source, targets, catalog
+}
+
+#[test]
+fn registers_partial_success_without_hiding_required_failure_or_catalog_failure() {
+    for catalog_failure in [false, true] {
+        let directory = TestDirectory::new();
+        let target = directory.0.join("target");
+        let blocked_target = directory.0.join("blocked-target");
+        fs::create_dir(&target).unwrap();
+        fs::create_dir(&blocked_target).unwrap();
+        let job = catalog_job(vec![
+            BackupTarget {
+                path: target,
+                required: true,
+                filesystem_uuid: None,
+            },
+            BackupTarget {
+                path: blocked_target.clone(),
+                required: true,
+                filesystem_uuid: None,
+            },
+        ]);
+        let id = Uuid::new_v4().to_string();
+        let date = Utc::now();
+        fs::write(
+            blocked_target.join(artifact_name(&job.name, &date, &id)),
+            "untouched",
+        )
+        .unwrap();
+        let data_root = directory.0.join("data");
+        if catalog_failure {
+            fs::write(&data_root, "blocked catalog").unwrap();
+        }
+        let error =
+            finalize_case(&directory.0, &job, &id, date, "payload", &data_root).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .starts_with("backup I/O error: one or more required backup targets failed")
+        );
+        if catalog_failure {
+            assert!(matches!(error, BackupError::ArtifactRegistration { .. }));
+            assert!(
+                error
+                    .to_string()
+                    .contains("artifact catalog registration failed")
+            );
+            assert_eq!(
+                std::error::Error::source(&error).unwrap().to_string(),
+                "backup I/O error: one or more required backup targets failed"
+            );
+            assert!(
+                ArtifactRepository::new(&data_root)
+                    .resolve(&job.id, "latest")
+                    .is_err()
+            );
+        } else {
+            assert!(
+                ArtifactRepository::new(&data_root)
+                    .resolve(&job.id, &id)
+                    .is_ok()
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(blocked_target.join(artifact_name(&job.name, &date, &id))).unwrap(),
+            "untouched"
+        );
+        assert!(!directory.0.join(format!("temporary-{id}.tar.zst")).exists());
+    }
+}
+
+#[test]
+fn metadata_failure_is_not_success_and_no_valid_replica_is_not_registered() {
+    let directory = TestDirectory::new();
+    let target = directory.0.join("target");
+    fs::create_dir(&target).unwrap();
+    let job = catalog_job(vec![BackupTarget {
+        path: target.clone(),
+        required: true,
+        filesystem_uuid: None,
+    }]);
+    let blocked_data = directory.0.join("blocked-data");
+    fs::write(&blocked_data, "untouched").unwrap();
+    assert!(
+        finalize_case(
+            &directory.0,
+            &job,
+            &Uuid::new_v4().to_string(),
+            Utc::now(),
+            "payload",
+            &blocked_data
+        )
+        .is_err()
+    );
+    assert_eq!(fs::read_dir(&target).unwrap().count(), 1);
+    assert_eq!(fs::read_to_string(&blocked_data).unwrap(), "untouched");
+    assert!(
+        ArtifactRepository::new(&blocked_data)
+            .resolve(&job.id, "latest")
+            .is_err()
+    );
+
+    let id = Uuid::new_v4().to_string();
+    let date = Utc::now();
+    fs::write(
+        target.join(artifact_name(&job.name, &date, &id)),
+        "existing",
+    )
+    .unwrap();
+    assert!(finalize_case(&directory.0, &job, &id, date, "payload", &directory.0).is_err());
+    assert!(!directory.0.join("artifacts").exists());
+}
+
+#[test]
+fn replica_collision_or_failed_verification_preserves_existing_files_and_cleans_staging() {
+    let directory = TestDirectory::new();
+    let source = directory.0.join("source");
+    fs::write(&source, "payload").unwrap();
+    let checksum = sha256(&source).unwrap();
+    let target = directory.0.join("target");
+    fs::create_dir(&target).unwrap();
+    let destination = target.join("copy.tar.zst");
+    fs::write(&destination, "existing").unwrap();
+    assert!(copy_replica(&source, &destination, &checksum, 7).is_err());
+    assert_eq!(fs::read_to_string(&destination).unwrap(), "existing");
+    fs::remove_file(&destination).unwrap();
+    fs::create_dir(&destination).unwrap();
+    assert!(copy_replica(&source, &destination, &checksum, 7).is_err());
+    assert!(destination.is_dir());
+    fs::remove_dir(&destination).unwrap();
+    assert!(copy_replica(&source, &destination, &"a".repeat(64), 7).is_err());
+    assert_eq!(fs::read_dir(&target).unwrap().count(), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn replica_publication_never_follows_or_replaces_destination_symlinks() {
+    let directory = TestDirectory::new();
+    let source = directory.0.join("source");
+    fs::write(&source, "payload").unwrap();
+    let sentinel = directory.0.join("sentinel");
+    fs::write(&sentinel, "untouched").unwrap();
+    for link_target in [&sentinel, &directory.0.join("absent")] {
+        let destination = directory.0.join("copy.tar.zst");
+        std::os::unix::fs::symlink(link_target, &destination).unwrap();
+        assert!(copy_replica(&source, &destination, &sha256(&source).unwrap(), 7).is_err());
+        assert_eq!(fs::read_link(&destination).unwrap(), *link_target);
+        assert_eq!(fs::read_to_string(&sentinel).unwrap(), "untouched");
+        fs::remove_file(destination).unwrap();
+    }
 }

@@ -19,6 +19,13 @@ pub enum BackupError {
         post: Box<BackupError>,
     },
 
+    #[error("{primary}; artifact catalog registration failed: {catalog}")]
+    ArtifactRegistration {
+        #[source]
+        primary: Box<BackupError>,
+        catalog: Box<BackupError>,
+    },
+
     #[error(transparent)]
     Storage(#[from] StorageError),
 

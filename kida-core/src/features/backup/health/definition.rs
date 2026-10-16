@@ -39,20 +39,7 @@ pub(crate) fn load_in(
     // Opening verifies readability without invoking Docker or creating anything.
     fs::File::open(&compose_path)?;
 
-    let reference = &definition.backup.reference;
-    let mut matches = repository
-        .list()?
-        .into_iter()
-        .filter(|job| job.id == *reference || job.name == *reference);
-    let backup_job = matches.next().ok_or_else(|| {
-        Error::new(
-            ErrorKind::NotFound,
-            format!("Backup job not found: {reference}"),
-        )
-    })?;
-    if matches.next().is_some() {
-        return Err(invalid(&format!("ambiguous backup reference: {reference}")).into());
-    }
+    let backup_job = repository.get_unique(&definition.backup.reference)?;
 
     Ok(ResolvedHealthDefinition {
         definition,
