@@ -127,8 +127,22 @@ directorio creado para su recuperación posterior; nunca borra el origen ni un
 destino preexistente. La integración con el ciclo de vida y la limpieza Health
 permanece pendiente.
 
-Esta fase incorpora configuración, cargador, tipos compartidos, catálogo de copias y restauración segura. La ejecución,
-límites activos, comprobación de políticas Compose, diagnóstico, TTL y comandos
+El adaptador interno `health::compose::HealthCompose` prepara un proyecto exclusivo
+`kida-bh-<run_id>` y pasa `KIDA_RESTORE_DIR` solo a sus procesos Docker. Obtiene el
+inventario mediante Compose y exige políticas sin autoarranque antes de crear o
+iniciar. Excluye perfiles opcionales y conserva réplicas, ruta/hash e imágenes
+configuradas. Para servicios con build sin imagen declarada, el informe deberá
+completar la imagen desde la inspección real del contenedor.
+
+La creación conserva la identidad reservada y los recursos registrados incluso
+si falla parcialmente. Start/Stop comprueban esa identidad; Remove reutiliza la
+eliminación selectiva existente, sin parar por la fuerza ni borrar recursos
+externos o compartidos. El coordinador aún pendiente debe persistir la evidencia
+y comprobar los errores del informe de limpieza.
+
+Esta fase incorpora configuración, cargador, tipos compartidos, catálogo de copias,
+restauración segura y adaptación Compose. La ejecución,
+límites activos, diagnóstico, TTL y comandos
 Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
 
 ### Catálogo de copias
@@ -477,7 +491,8 @@ No existe exclusión frente a clientes Docker externos. Las reinspecciones reduc
 ventana de carrera; Docker rechaza eliminar redes conectadas y volúmenes utilizados.
 La protección evita adopciones accidentales y copias simples de etiquetas, pero no
 protege frente a un administrador que controle Docker y el registro. No hay limpieza
-al arrancar ni integración con Backup Health, Worker o Scheduler.
+al arrancar. Backup Health dispone de un adaptador interno; su coordinación con
+Worker y Scheduler sigue pendiente.
 
 El lifecycle mantiene exclusión por proyecto, incluida la consulta de referencia y la
 persistencia; proyectos distintos pueden avanzar simultáneamente. El registro

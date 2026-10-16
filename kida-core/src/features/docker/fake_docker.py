@@ -16,6 +16,7 @@ if mode == 'concurrent':
 a = sys.argv[1:]
 with (root / 'calls').open('a') as log:
     log.write(json.dumps({'args': a, 'variable': os.environ.get('KIDA_INTERPOLATION'),
+                          'restore_dir': os.environ.get('KIDA_RESTORE_DIR'),
                           'profiles': os.environ.get('COMPOSE_PROFILES'),
                           'remove_orphans': os.environ.get('COMPOSE_REMOVE_ORPHANS')}) + '\n')
 
@@ -82,6 +83,8 @@ if state_path.exists():
     if a[0] == 'inspect':
         emit([r for r in state['container'] if r['Id'] in a[1:]])
     if a[0] == 'compose' and any(x in a for x in ['start', 'stop']):
+        if mode == 'start-error' and 'start' in a:
+            fail('injected start failure')
         for row in state['container']:
             row['State']['Running'] = 'start' in a
         save()
@@ -96,6 +99,8 @@ if a[0] == 'compose':
     if tail == ['config', '--format', 'json']:
         if mode in ['config-error', 'missing-env-file']:
             fail('invalid Compose document')
+        if (root / 'health-model.json').exists():
+            emit(json.loads((root / 'health-model.json').read_text()))
         if mode in ['config-limit', 'config-overflow']:
             model = json.dumps({'services': {'web': {}}})
             size = 8 * 1024 * 1024 + (mode == 'config-overflow')
@@ -133,7 +138,13 @@ if a[0] == 'compose':
             extra = json.loads(Path(a[8]).read_text())
             owner = next(iter(extra['services'].values()))['labels']['io.kida.owner']
             tags = {'io.kida.owner': owner, 'com.docker.compose.project': project}
-            for i, service in enumerate(['web', 'db']):
+            services = ['web', 'db']
+            if (root / 'health-model.json').exists():
+                model = json.loads((root / 'health-model.json').read_text())
+                services = [name for name, service in model['services'].items()
+                            if not service.get('profiles')
+                            for _ in range(service.get('scale', service.get('deploy', {}).get('replicas', 1)))]
+            for i, service in enumerate(services):
                 state['container'].append({'Id': str(i + 1) * 64, 'Name': service, 'Config': {'Labels': dict(tags, **{'com.docker.compose.service': service, 'com.docker.compose.project.config_files': a[4] + ',' + a[8], 'com.docker.compose.project.working_dir': str(root)})}, 'State': {'Running': False}, 'Mounts': [{'Type': 'volume', 'Name': project + '_data'}], 'NetworkSettings': {'Networks': {project + '_default': {'NetworkID': ''}}}})
             state['network'] = [{'Id': 'a' * 64, 'Name': project + '_default', 'Labels': dict(tags, **{'com.docker.compose.network': 'default'}), 'Containers': {}}]
             state['volume'] = [{'Name': project + '_data', 'CreatedAt': '2026-10-15T10:00:00Z', 'Driver': 'local', 'Scope': 'local', 'Options': None, 'Mountpoint': '/var/lib/docker/volumes/alpha_data/_data', 'Labels': dict(tags, **{'com.docker.compose.volume': 'data'})}]

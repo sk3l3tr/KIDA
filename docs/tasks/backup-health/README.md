@@ -11,7 +11,7 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 | 01 | [Configuración y definiciones](01-config-definiciones.md) | Verificada | [Configuración](../../../kida-core/src/infrastructure/conf/backup_health.rs), [cargador y tipos](../../../kida-core/src/features/backup/health/) | [Pruebas y resultados](01-config-definiciones.md#validación-realizada) |
 | 02 | [Catálogo de artefactos](02-catalogo-artefactos.md) | Verificada | [Catálogo](../../../kida-core/src/features/backup/artifacts.rs), [replicación](../../../kida-core/src/features/backup/service.rs) | [Pruebas y revisión](02-catalogo-artefactos.md#validación-y-revisión) |
 | 03 | [Restauración segura](03-restauracion-segura.md) | Verificada | [Extractor](../../../kida-core/src/features/backup/health/restore.rs) | [Pruebas y revisión](03-restauracion-segura.md#validación-y-revisión) |
-| 04 | [Compose para Health](04-compose-health.md) | Pendiente | — | — |
+| 04 | [Compose para Health](04-compose-health.md) | Verificada | [Adaptador](../../../kida-core/src/features/backup/health/compose.rs) | [Pruebas y revisión](04-compose-health.md#validación-y-revisión) |
 | 05 | [Diagnóstico](05-diagnostico.md) | Pendiente | — | — |
 | 06 | [Historial e informes](06-historial-informes.md) | Pendiente | — | — |
 | 07 | [Ciclo de vida](07-ciclo-vida.md) | Pendiente | — | — |

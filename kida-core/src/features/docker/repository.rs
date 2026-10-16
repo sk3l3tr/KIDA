@@ -81,9 +81,15 @@ pub(super) async fn reserve_async(
     file: PathBuf,
     deadline: Instant,
     guard: &ProjectGuard,
+    reference: &mut Option<ManagedProject>,
 ) -> Result<Record, String> {
+    let identity = ManagedProject {
+        owner: uuid::Uuid::new_v4().to_string(),
+        project,
+    };
+    *reference = Some(identity.clone());
     disk(deadline, guard, move || {
-        reserve(&project, daemon, &model, &file, deadline)
+        reserve(identity, daemon, &model, &file, deadline)
     })
     .await
 }
@@ -191,7 +197,7 @@ pub(super) fn active(project: &str) -> Result<Option<Record>, String> {
     }
     Ok(matches.pop())
 }
-fn hash(path: &Path) -> Result<String, String> {
+pub(super) fn hash(path: &Path) -> Result<String, String> {
     Ok(format!(
         "{:x}",
         Sha256::digest(fs::read(path).map_err(err)?)
@@ -236,7 +242,7 @@ pub(super) fn creation_paths(root: &Path, owner: &str) -> Result<(PathBuf, PathB
     Ok((path, overlay))
 }
 fn reserve(
-    project: &str,
+    reference: ManagedProject,
     daemon: String,
     model: &Resolved,
     file: &Path,
@@ -251,8 +257,8 @@ fn reserve(
     {
         return Err(err("user supplied reserved io.kida.* labels"));
     }
-    let owner = uuid::Uuid::new_v4().to_string();
-    let (_, overlay) = creation_paths(&directory()?, &owner)?;
+    let owner = &reference.owner;
+    let (_, overlay) = creation_paths(&directory()?, owner)?;
     fs::create_dir_all(directory()?).map_err(err)?;
     let mut extra = json!({"services": {}, "networks": {}, "volumes": {}});
     let mut expected = BTreeMap::new();
@@ -280,10 +286,7 @@ fn reserve(
     }
     let mut record = Record {
         version: 1,
-        reference: ManagedProject {
-            owner,
-            project: project.to_owned(),
-        },
+        reference,
         daemon,
         created_at: chrono::Utc::now().to_rfc3339(),
         file: file.into(),

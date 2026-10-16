@@ -378,6 +378,42 @@ fn shared(identity: &Identity, snapshot: &Inventory) -> bool {
     }
 }
 impl DockerService {
+    /// Creation evidence from the registry, not a fresh daemon inventory.
+    pub async fn compose_managed_resources(
+        reference: &ManagedProject,
+        timeout: Duration,
+    ) -> Result<Vec<ResourceOutcome>, String> {
+        if timeout.is_zero() {
+            return Err(err("timeout must be positive"));
+        }
+        let deadline = Instant::now()
+            .checked_add(timeout)
+            .ok_or_else(|| err("timeout too large"))?;
+        Self::validate_compose_project_name(&reference.project)?;
+        let guard = std::sync::Arc::new(
+            timeout_at(deadline, project_lock(&reference.project).lock_owned())
+                .await
+                .map_err(|_| err("project lock timeout"))?,
+        );
+        let reference = reference.clone();
+        repository::disk(deadline, &guard, move || {
+            let record = repository::records()?
+                .into_iter()
+                .find(|record| record.reference == reference)
+                .ok_or_else(|| err("creation record missing"))?;
+            Ok(record
+                .resources
+                .into_iter()
+                .map(|resource| ResourceOutcome {
+                    kind: resource.kind,
+                    identity: resource.id,
+                    reason: "recorded at creation".into(),
+                })
+                .collect())
+        })
+        .await
+    }
+
     pub async fn compose_managed_project(project: &str) -> Result<ManagedProject, String> {
         let deadline = Instant::now() + Duration::from_secs(30);
         Self::validate_compose_project_name(project)?;

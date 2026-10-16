@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::{
     io::{AsyncRead, AsyncReadExt},
@@ -16,7 +16,7 @@ use tokio::{
     time::{Instant, timeout_at},
 };
 
-use super::{DockerService, repository};
+use super::{DockerService, ManagedProject, repository};
 
 const STDOUT_LIMIT: usize = 8 * 1024 * 1024;
 const STDERR_LIMIT: usize = 64 * 1024;
@@ -34,6 +34,12 @@ pub struct ComposeOptions {
     /// Budget for starting and continuing work, including locks and checks.
     /// Started disk I/O finishes safely even after expiry; response time is not strictly bounded.
     pub timeout: Duration,
+    /// Reject effective automatic restart policies before create/start.
+    pub require_no_restart: bool,
+    /// Pin start/stop to a previously reserved owner, never adopt a reused name.
+    pub expected_owner: Option<String>,
+    /// Optional precondition for callers that prepared an inventory before creation.
+    pub expected_configuration: Option<ComposeConfiguration>,
 }
 
 impl ComposeOptions {
@@ -43,6 +49,9 @@ impl ComposeOptions {
             file: file.into(),
             variables: BTreeMap::new(),
             timeout: Duration::from_secs(300),
+            require_no_restart: false,
+            expected_owner: None,
+            expected_configuration: None,
         }
     }
 }
@@ -50,19 +59,53 @@ impl ComposeOptions {
 impl DockerService {
     /// Create stopped containers, rejecting existing project resources and occupied names.
     pub async fn compose_create(options: &ComposeOptions) -> Result<(), String> {
-        lifecycle(options, "create").await
+        lifecycle(options, "create", &mut None).await.map(|_| ())
     }
 
     /// Start existing containers whose native Compose provenance matches this input.
     /// Does not wait for health checks.
     pub async fn compose_start(options: &ComposeOptions) -> Result<(), String> {
-        lifecycle(options, "start").await
+        lifecycle(options, "start", &mut None).await.map(|_| ())
     }
 
     /// Stop existing containers without removing containers, networks or volumes.
     pub async fn compose_stop(options: &ComposeOptions) -> Result<(), String> {
-        lifecycle(options, "stop").await
+        lifecycle(options, "stop", &mut None).await.map(|_| ())
     }
+
+    /// Keep the reserved identity available even if creation/capture fails.
+    pub async fn compose_create_tracked(
+        options: &ComposeOptions,
+        reference: &mut Option<ManagedProject>,
+    ) -> Result<(), String> {
+        if reference.is_some() {
+            return Err(input_error("creation identity is already assigned"));
+        }
+        lifecycle(options, "create", reference).await.map(|_| ())
+    }
+
+    /// Resolve through native Compose, without creating resources or storing its environment.
+    pub async fn compose_configuration(
+        options: &ComposeOptions,
+    ) -> Result<ComposeConfiguration, String> {
+        lifecycle(options, "config", &mut None)
+            .await?
+            .ok_or_else(|| input_error("missing resolved configuration"))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComposeConfiguration {
+    pub file: PathBuf,
+    pub checksum: String,
+    pub services: Vec<ComposeServiceConfiguration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComposeServiceConfiguration {
+    pub name: String,
+    pub image: Option<String>,
+    pub replicas: u32,
 }
 
 type ProjectLocks = Mutex<BTreeMap<String, Weak<tokio::sync::Mutex<()>>>>;
@@ -88,7 +131,11 @@ fn timeout_error() -> String {
     "Compose timeout: operation deadline exceeded".into()
 }
 
-async fn lifecycle(options: &ComposeOptions, action: &str) -> Result<(), String> {
+async fn lifecycle(
+    options: &ComposeOptions,
+    action: &str,
+    reference: &mut Option<ManagedProject>,
+) -> Result<Option<ComposeConfiguration>, String> {
     let entered = Instant::now();
     DockerService::validate_compose_project_name(&options.project).map_err(input_error)?;
     for (key, value) in &options.variables {
@@ -149,6 +196,13 @@ async fn lifecycle(options: &ComposeOptions, action: &str) -> Result<(), String>
     let project = options.project.clone();
     let mut managed =
         repository::disk(deadline, &guard, move || repository::active(&project)).await?;
+    if let Some(owner) = &options.expected_owner
+        && managed
+            .as_ref()
+            .is_none_or(|record| &record.reference.owner != owner)
+    {
+        return Err("Compose conflict: managed owner changed or is missing".into());
+    }
     if action == "create" && managed.is_some() {
         return Err("Compose conflict: project has a pending or active ownership record".into());
     }
@@ -183,6 +237,41 @@ async fn lifecycle(options: &ComposeOptions, action: &str) -> Result<(), String>
         if model.services.is_empty() {
             return Err("Compose invalid output: resolved document has no services".into());
         }
+        if options.require_no_restart {
+            model.check_no_restart()?;
+        }
+        if action == "config" || options.expected_configuration.is_some() {
+            let input = file.clone();
+            let checksum =
+                repository::disk(deadline, &guard, move || repository::hash(&input)).await?;
+            let configuration = ComposeConfiguration {
+                file: file.clone(),
+                checksum,
+                services: model
+                    .services
+                    .iter()
+                    .filter(|(_, service)| service.profiles.is_empty())
+                    .map(|(name, service)| {
+                        Ok(ComposeServiceConfiguration {
+                            name: name.clone(),
+                            image: service.image.clone(),
+                            replicas: service.replicas()?,
+                        })
+                    })
+                    .collect::<Result<_, String>>()?,
+            };
+            if configuration.services.is_empty() {
+                return Err(input_error("resolved document has no enabled services"));
+            }
+            if let Some(expected) = &options.expected_configuration
+                && expected != &configuration
+            {
+                return Err("Compose conflict: prepared configuration changed".into());
+            }
+            if action == "config" {
+                return Ok(Some(configuration));
+            }
+        }
         if action == "create" {
             check_create(&runner, &model).await?;
         } else {
@@ -197,6 +286,7 @@ async fn lifecycle(options: &ComposeOptions, action: &str) -> Result<(), String>
                 file.clone(),
                 deadline,
                 &guard,
+                reference,
             )
             .await?;
             compose.extend([
@@ -230,7 +320,7 @@ async fn lifecycle(options: &ComposeOptions, action: &str) -> Result<(), String>
     } else {
         result?;
     }
-    Ok(())
+    Ok(None)
 }
 
 // Decode Compose's resolved JSON contract, not the source Compose document.
@@ -249,6 +339,53 @@ pub(super) struct Service {
     container_name: Option<String>,
     #[serde(default)]
     profiles: Vec<String>,
+    image: Option<String>,
+    restart: Option<String>,
+    scale: Option<u32>,
+    deploy: Option<Deploy>,
+}
+#[derive(Deserialize)]
+struct Deploy {
+    replicas: Option<u32>,
+    restart_policy: Option<RestartPolicy>,
+}
+#[derive(Deserialize)]
+struct RestartPolicy {
+    condition: Option<String>,
+}
+impl Service {
+    fn replicas(&self) -> Result<u32, String> {
+        let replicas = self.deploy.as_ref().and_then(|deploy| deploy.replicas);
+        if let (Some(scale), Some(replicas)) = (self.scale, replicas)
+            && scale != replicas
+        {
+            return Err(input_error("scale and deploy.replicas disagree"));
+        }
+        Ok(self.scale.or(replicas).unwrap_or(1))
+    }
+}
+impl Resolved {
+    fn check_no_restart(&self) -> Result<(), String> {
+        for (name, service) in self
+            .services
+            .iter()
+            .filter(|(_, service)| service.profiles.is_empty())
+        {
+            let restart = service.restart.as_deref().unwrap_or("no");
+            let deploy_restart = service
+                .deploy
+                .as_ref()
+                .and_then(|deploy| deploy.restart_policy.as_ref());
+            if !matches!(restart, "no" | "")
+                || deploy_restart.is_some_and(|policy| policy.condition.as_deref() != Some("none"))
+            {
+                return Err(input_error(format!(
+                    "service '{name}' must disable automatic restart"
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 #[derive(Deserialize)]
 pub(super) struct Resource {
