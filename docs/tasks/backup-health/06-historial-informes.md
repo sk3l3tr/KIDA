@@ -38,4 +38,4 @@ Pruebas focalizadas: roundtrip/procedencia/listados y consultas sin crear direct
 - `CARGO_TARGET_DIR=/tmp/kida-health-target cargo clippy --workspace --all-targets --locked -- -D warnings`, formato y comprobaciones de diff: correctos. Sin dependencias nuevas ni cambios en `Cargo.lock`.
 - Revisión independiente de `review_task06`: diez pruebas ejecutadas, diff y documentación revisados; sin defectos accionables. También se prueba que el motivo de omisión de logs respete el límite de descripción de 2 KiB.
 
-Estado: **Verificada**, pendiente de commit.
+Estado: **Completa**. Commit de implementación: `e6269a2`.
