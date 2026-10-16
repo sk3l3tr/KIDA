@@ -70,6 +70,10 @@ El timeout limita la observación diagnóstica desde el inicio de esta fase, no 
 
 Capturar evidencias antes de borrar Docker, sin interpretar logs. Usar logs Docker acotados, limitar además el total persistido y eliminar valores sensibles conocidos antes de guardarlos; nunca volcar entorno ni Compose completo. No prometer detección universal de secretos arbitrarios en logs; si no se puede publicar un extracto con seguridad, omitirlo con motivo.
 
+Interfaz de 05: `DiagnosticSession::new(project, services, EvidencePolicy)` conserva el diagnóstico y la memoria de incidencias durante el run. `evaluate(observation, EvaluationPhase, observed_at)` usa observaciones tipadas Docker o error; `fail(reason, timestamp)` registra fallos de preparación. `diagnose(timeout)` observa Docker con un único deadline y `observe_until(timeout, interval, observer)` permite probar esa misma espera sin daemon. La parada/interrupción se comunica explícitamente; no se diagnostican como caídas los contenedores detenidos por KIDA. 07 mantiene la sesión por ejecución y recoge su `diagnosis` para persistir.
+
+`EvidencePolicy::default()` omite logs. `EvidencePolicy::new(known_values, allow_logs)` elimina valores conocidos antes de truncar; `capture_logs` solo adjunta extractos cuando el llamador autoriza su publicación. Máximo 16 KiB por extracto y 64 KiB por sesión, con 128 evidencias/anomalías visibles y descripciones de 2 KiB. Omitir logs de publicación incierta o UTF-8 inválido con motivo. La redacción no descubre secretos arbitrarios; la política y valores sensibles no forman parte del snapshot persistente.
+
 ## Persistencia y mantenimiento · propietarias 06 y 08
 
 06 guarda `<data_root>/executions/<run_id>.json` y `reports/<run_id>.md`, separados y con escrituras atómicas por archivo. Reutilizar `JsonStorage`; para Markdown, reutilizar o exponer mínimamente la escritura atómica técnica actual. No añadir políticas de dominio al `Storage<T>` genérico.

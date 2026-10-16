@@ -140,9 +140,16 @@ eliminación selectiva existente, sin parar por la fuerza ni borrar recursos
 externos o compartidos. El coordinador aún pendiente debe persistir la evidencia
 y comprobar los errores del informe de limpieza.
 
+El evaluador interno `health::diagnosis::DiagnosticSession` compara las réplicas
+esperadas con las observaciones Docker. Solo declara `HEALTHY` con healthchecks
+satisfactorios; conserva reinicios/OOM y distingue fallos, unhealthy y evidencia
+insuficiente. Observa hasta el timeout o un resultado concluyente. Los logs no
+influyen en el resultado: se omiten por defecto y su publicación autorizada
+filtra valores sensibles conocidos con límites de tamaño.
+
 Esta fase incorpora configuración, cargador, tipos compartidos, catálogo de copias,
-restauración segura y adaptación Compose. La ejecución,
-límites activos, diagnóstico, TTL y comandos
+restauración segura, adaptación Compose y diagnóstico. La ejecución,
+límites activos, TTL y comandos
 Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
 
 ### Catálogo de copias
