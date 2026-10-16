@@ -35,4 +35,4 @@ Devuelve ruta canónica y dispositivo/inodo del directorio. Los errores incluyen
 - `cargo fmt --all -- --check`, `CARGO_TARGET_DIR=/tmp/kida-health-target cargo clippy --workspace --all-targets --locked -- -D warnings` y comprobaciones de diff, incluidos archivos nuevos: correctos. Sin dependencias nuevas ni cambios en `Cargo.lock`.
 - Revisión independiente de `review_task03`: sin defectos accionables, OK explícito del código para commit. El revisor ejecutó las 12 pruebas de restauración (11 del extractor y 1 con el productor real), todas correctas.
 
-Estado: **Verificada**.
+Estado: **Completa**. Commit de implementación: `4d23978`.

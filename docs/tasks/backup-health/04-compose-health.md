@@ -38,4 +38,4 @@ Prueba con el fake Docker existente en un subproceso aislado: variables por proc
 - `CARGO_TARGET_DIR=/tmp/kida-health-target cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo fmt --all -- --check` y comprobaciones de diff: correctos. Sin dependencias nuevas ni cambios en `Cargo.lock`.
 - Revisión independiente de `review_task04`: sin defectos accionables de seguridad, compatibilidad o alcance; OK explícito del código para commit. El revisor confirmó la prueba fake Health y `git diff --check`.
 
-Estado: **Verificada**; pendiente del commit para marcarla **Completa**.
+Estado: **Completa**. Commit de implementación: `80c1307`.

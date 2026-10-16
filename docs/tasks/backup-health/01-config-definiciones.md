@@ -38,3 +38,5 @@ Con `CARGO_TARGET_DIR=/tmp/kida-health-target`:
 - `cargo fmt --all -- --check`, comprobación de diff, archivos nuevos y enlaces documentales: correctos.
 
 La prueba existente del singleton tenía un filtro de subproceso incorrecto y no ejecutaba su cuerpo. Se corrigió y se comprueba que ejecute exactamente un test. Ahora verifica también que Health usa la configuración publicada aunque se cambie o elimine el TOML global, sin recarga ni creación de recursos Health.
+
+Estado: **Completa**. Commit de implementación: `4b5b174`.

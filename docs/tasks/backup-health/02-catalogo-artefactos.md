@@ -40,3 +40,5 @@ Con `CARGO_TARGET_DIR=/tmp/kida-health-target`:
 - Casos cubiertos: misma marca temporal, colisiones concurrentes de catálogo, destinos existentes y symlinks preservados, tamaño/hash incorrectos, fallback entre réplicas, ausencia de fallback a otra versión, metadatos corruptos, ausencia de escrituras al consultar y fallos combinados de replicación/registro. Los tests de lifecycle y limpieza existentes se conservan.
 
 Revisión independiente: agente `review_task02`. Revisó el código y la documentación completos, confirmó las seis pruebas del catálogo y `git diff --check`, y no encontró defectos accionables ni desviaciones de alcance. Dio OK explícito para commit; los únicos cambios posteriores son esta constancia y el estado del índice.
+
+Estado: **Completa**. Commit de implementación: `530f465`.

@@ -8,10 +8,10 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 
 | ID | Tarea | Estado | Implementación | Validación |
 | --- | --- | --- | --- | --- |
-| 01 | [Configuración y definiciones](01-config-definiciones.md) | Verificada | [Configuración](../../../kida-core/src/infrastructure/conf/backup_health.rs), [cargador y tipos](../../../kida-core/src/features/backup/health/) | [Pruebas y resultados](01-config-definiciones.md#validación-realizada) |
-| 02 | [Catálogo de artefactos](02-catalogo-artefactos.md) | Verificada | [Catálogo](../../../kida-core/src/features/backup/artifacts.rs), [replicación](../../../kida-core/src/features/backup/service.rs) | [Pruebas y revisión](02-catalogo-artefactos.md#validación-y-revisión) |
-| 03 | [Restauración segura](03-restauracion-segura.md) | Verificada | [Extractor](../../../kida-core/src/features/backup/health/restore.rs) | [Pruebas y revisión](03-restauracion-segura.md#validación-y-revisión) |
-| 04 | [Compose para Health](04-compose-health.md) | Verificada | [Adaptador](../../../kida-core/src/features/backup/health/compose.rs) | [Pruebas y revisión](04-compose-health.md#validación-y-revisión) |
+| 01 | [Configuración y definiciones](01-config-definiciones.md) | Completa | [Configuración](../../../kida-core/src/infrastructure/conf/backup_health.rs), [cargador y tipos](../../../kida-core/src/features/backup/health/), commit `4b5b174` | [Pruebas y resultados](01-config-definiciones.md#validación-realizada) |
+| 02 | [Catálogo de artefactos](02-catalogo-artefactos.md) | Completa | [Catálogo](../../../kida-core/src/features/backup/artifacts.rs), [replicación](../../../kida-core/src/features/backup/service.rs), commit `530f465` | [Pruebas y revisión](02-catalogo-artefactos.md#validación-y-revisión) |
+| 03 | [Restauración segura](03-restauracion-segura.md) | Completa | [Extractor](../../../kida-core/src/features/backup/health/restore.rs), commit `4d23978` | [Pruebas y revisión](03-restauracion-segura.md#validación-y-revisión) |
+| 04 | [Compose para Health](04-compose-health.md) | Completa | [Adaptador](../../../kida-core/src/features/backup/health/compose.rs), commit `80c1307` | [Pruebas y revisión](04-compose-health.md#validación-y-revisión) |
 | 05 | [Diagnóstico](05-diagnostico.md) | Pendiente | — | — |
 | 06 | [Historial e informes](06-historial-informes.md) | Pendiente | — | — |
 | 07 | [Ciclo de vida](07-ciclo-vida.md) | Pendiente | — | — |
@@ -20,7 +20,7 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 | 10 | [CLI](10-cli.md) | Pendiente | — | — |
 | 11 | [Integración y E2E](11-integracion-e2e.md) | Pendiente | — | — |
 
-Estados: **Pendiente**, **En curso**, **Implementada**, **Verificada**, **Bloqueada**. Al implementar, enlazar commit o archivos; al verificar, registrar comando y resultado. Una tarea bloqueada debe identificar el impedimento. No marcar verificada solo porque compila ni confundir documentación terminada con funcionalidad terminada.
+Estados: **Pendiente**, **En curso**, **Implementada**, **Verificada**, **Completa**, **Bloqueada**. Al implementar, enlazar archivos; al verificar, registrar comandos, resultados y revisión. Después del commit de implementación, marcar **Completa** y registrar su hash en el índice y en la tarea. Una tarea bloqueada debe identificar el impedimento. No marcar verificada solo porque compila ni confundir documentación terminada con funcionalidad terminada.
 
 ## Forma de trabajo
 
