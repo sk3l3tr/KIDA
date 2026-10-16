@@ -1,0 +1,9 @@
+id = "nextcloud-health"
+name = "Nextcloud Backup Health"
+
+[backup]
+reference = "nextcloud-daily"
+version = "latest"
+
+[docker]
+compose = "./docker-compose.health.yml"

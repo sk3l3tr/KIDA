@@ -18,6 +18,10 @@ Definición TOML independiente de `BackupJob`: `id`, `name`, `backup.reference`,
 
 La carga devuelve definición validada y rutas absolutas. La ejecución conserva una instantánea estructurada de la definición y la identidad de su archivo; no persiste el Compose completo ni valores de entorno sensibles. El mismo `definition_id` identifica la exclusión aunque cambie el contenido de su TOML.
 
+Interfaces materializadas en la tarea 01: `features::backup::health::definition::load(path)` usa la configuración publicada y devuelve `ResolvedHealthDefinition` (definición, rutas canónicas del TOML/Compose y `BackupJob`). La carga resuelve Compose respecto al TOML canónico. Rechaza ambigüedad de ID/nombre solo en Health, conservando la búsqueda actual de backups.
+
+`health::model` proporciona `BackupHealthDefinition`, `BackupHealthMode/State/Result`, `ResolvedBackupArtifact`, `HealthService`, `HealthResource`, `HealthEvidence`, `HealthServiceDiagnosis`, `HealthDiagnosis`, `HealthCleanupState/Cleanup` y `BackupHealthExecution`. Los snapshots usan UUID y timestamps UTC RFC 3339 como cadenas, enums en mayúsculas y rutas `PathBuf`; la representación de almacenamiento sigue perteneciendo a 06. La identidad de propiedad reutiliza `ManagedProject` de Docker. `BackupHealthExecution.diagnosis` agrupa resultado, resumen, evaluación completa/pendiente, servicios, anomalías y evidencias; no implica implementar evaluación ni transiciones en 01.
+
 ## Artefacto y restauración · propietarias 02 y 03
 
 02 registra JSON en `<data_root>/artifacts/<backup-job-id>/<artifact-id>.json` mediante escritura atómica existente. Cada copia nueva tiene ID UUID, job de origen, nombre de archivo, fecha UTC, SHA-256, tamaño y destinos copiados/verificados. Publicar el registro al terminar la replicación con al menos un destino válido; un fallo requerido sigue produciendo el error actual de `backup.run`. Registrar las copias verificadas disponibles no convierte ese backup fallido en satisfactorio.

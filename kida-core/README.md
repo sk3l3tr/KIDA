@@ -41,6 +41,84 @@ max_concurrent_jobs = 2
 
 El valor predeterminado es 16 si se omite la sección o el campo. La capacidad debe ser mayor que cero; con cero, CORE devuelve un error al arrancar. El worker permite hasta `queue.max_concurrent_jobs` ejecuciones simultáneas (2 por defecto); este valor también debe ser positivo y respetar los límites de concurrencia y admisión. Los `backup.run` se ejecutan de uno en uno. Reinicia CORE para aplicar los cambios.
 
+## Configuración y definiciones de Backup Health
+
+En `/etc/kida/kida.toml`, los parámetros globales de Health son:
+
+```toml
+[backup_health]
+restore_root = "/tmp/kida/restored"
+data_root = "/var/lib/kida/backup-health"
+manual_ttl_hours = 4
+health_timeout_seconds = 180
+report_retention_days = 90
+max_active_runs = 2
+```
+
+Estos son los defaults, también si se omite la sección. Los tiempos y el cupo
+deben ser positivos y caber en sus límites. Las raíces deben ser absolutas,
+distintas y no contenerse entre sí; la validación resuelve los antecesores
+existentes y sus enlaces simbólicos, sin crear directorios. La configuración se
+publica una sola vez al arrancar; los cambios requieren reiniciar CORE.
+
+`max_active_runs` limita entornos Health, incluidos manuales que sigan activos;
+es independiente del límite de trabajos `queue.max_concurrent_jobs`. El TTL
+contará desde el arranque de la ejecución, sin renovarse al consultar.
+
+Cada prueba tiene su propio TOML, separado del `BackupJob`:
+
+```toml
+id = "nextcloud-health"
+name = "Nextcloud Backup Health"
+
+[backup]
+reference = "nextcloud-daily"
+version = "latest"
+
+[docker]
+compose = "./docker-compose.health.yml"
+```
+
+Todos los campos son obligatorios y no admiten valores vacíos. `reference`
+identifica un backup existente por ID o nombre, sin coincidencias ambiguas.
+`version` acepta `latest` o un UUID de artefacto; el catálogo y su comprobación
+de existencia corresponden a la tarea 02, todavía pendiente. No se incorporarán
+copias históricas sin registro. Cada definición debe tener un ID único y estable;
+no se crea un registro global de definiciones en esta fase.
+
+El cargador interno `features::backup::health::definition::load` lee un TOML
+local de CORE y devuelve la definición, la ruta absoluta del TOML y del Compose,
+y el `BackupJob` resuelto. Resuelve el Compose respecto al directorio del TOML
+canónico, nunca respecto al cliente. No ejecuta Compose ni crea recursos.
+
+El [ejemplo TOML](examples/backup-health/nextcloud-health.toml) y su
+[Compose](examples/backup-health/docker-compose.health.yml) ilustran el bind:
+
+```yaml
+services:
+  app:
+    image: example/app:stable
+    restart: "no"
+    volumes:
+      - type: bind
+        source: ${KIDA_RESTORE_DIR}/app-data
+        target: /app/data
+        bind:
+          create_host_path: false
+```
+
+Adapta imagen y healthcheck a la aplicación. La ruta `app-data` es ilustrativa:
+debe coincidir con la estructura relativa del tar, que el backup actual conserva
+desde sus sources sin el `/` inicial. Health inyectará `KIDA_RESTORE_DIR` con el
+directorio exclusivo del run; no añadas rutas de producción a esos binds. El
+Compose es configuración confiable del administrador, no un sandbox: un bind
+incorrecto puede afectar a datos reales. La validación funcional de los datos
+restaurados corresponde al administrador.
+
+Esta fase incorpora configuración, cargador y tipos compartidos. La ejecución,
+límites activos, comprobación de políticas Compose, diagnóstico, TTL y comandos
+Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
+
 ## Crear configuraciones de backup
 
 `backup.config.create` recibe la configuración directamente en `params`.

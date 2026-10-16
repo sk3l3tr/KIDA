@@ -33,6 +33,7 @@ impl ConfigManager {
         };
 
         config.queue.validate()?;
+        config.backup_health.validate()?;
         Ok(Self { storage, config })
     }
 
@@ -49,6 +50,7 @@ impl ConfigManager {
     )]
     pub fn update(&mut self, config: KidaConfig) -> Result<(), Box<dyn std::error::Error>> {
         config.queue.validate()?;
+        config.backup_health.validate()?;
         self.storage.save(&config)?;
         self.config = config;
 

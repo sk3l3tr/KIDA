@@ -19,10 +19,10 @@ pub(crate) fn init_test_config() -> &'static KidaConfig {
     })
 }
 
-struct TempDir(PathBuf);
+pub(super) struct TempDir(pub(super) PathBuf);
 
 impl TempDir {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let path = std::env::temp_dir().join(format!("kida-conf-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&path).unwrap();
         Self(path)
@@ -46,6 +46,30 @@ fn assert_defaults(config: &KidaConfig) {
     assert_eq!(
         config.queue.max_concurrent_jobs,
         DEFAULT_MAX_CONCURRENT_JOBS
+    );
+    assert_eq!(
+        config.backup_health.restore_root,
+        PathBuf::from(DEFAULT_HEALTH_RESTORE_ROOT)
+    );
+    assert_eq!(
+        config.backup_health.data_root,
+        PathBuf::from(DEFAULT_HEALTH_DATA_ROOT)
+    );
+    assert_eq!(
+        config.backup_health.manual_ttl_hours,
+        DEFAULT_HEALTH_MANUAL_TTL_HOURS
+    );
+    assert_eq!(
+        config.backup_health.health_timeout_seconds,
+        DEFAULT_HEALTH_TIMEOUT_SECONDS
+    );
+    assert_eq!(
+        config.backup_health.report_retention_days,
+        DEFAULT_HEALTH_REPORT_RETENTION_DAYS
+    );
+    assert_eq!(
+        config.backup_health.max_active_runs,
+        DEFAULT_HEALTH_MAX_ACTIVE_RUNS
     );
 }
 
@@ -186,7 +210,7 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "conf::tests::singleton_and_backup_service_use_the_published_snapshot",
+                "infrastructure::conf::tests::singleton_and_backup_service_use_the_published_snapshot",
                 "--nocapture",
             ])
             .env(CHILD_ENV, "1")
@@ -198,11 +222,18 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("running 1 test"));
         return;
     }
 
     let temp = TempDir::new();
     assert_eq!(get().unwrap_err(), "configuration not initialized");
+    assert!(
+        crate::features::backup::health::definition::load("missing.toml")
+            .unwrap_err()
+            .to_string()
+            .contains("configuration not initialized")
+    );
     for error in [
         BackupService::list().unwrap_err(),
         BackupService::create(
@@ -241,6 +272,8 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
     let path = temp.0.join("kida.toml");
     let mut config = KidaConfig::default();
     config.backup.backup_dir = backups.to_str().unwrap().into();
+    config.backup_health.restore_root = temp.0.join("restore");
+    config.backup_health.data_root = temp.0.join("health-data");
     fs::write(&path, toml::to_string(&config).unwrap()).unwrap();
     init(&path).unwrap();
     let published = get().unwrap();
@@ -268,9 +301,14 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
     let mut manager = ConfigManager::load_or_create(&path).unwrap();
     let mut changed = manager.get().clone();
     changed.backup.backup_dir = temp.0.join("other-jobs").to_str().unwrap().into();
+    changed.backup_health.max_active_runs = 7;
     manager.update(changed).unwrap();
     assert_ne!(manager.get().backup.backup_dir, published.backup.backup_dir);
     assert_eq!(get().unwrap().backup.backup_dir, backups.to_str().unwrap());
+    assert_eq!(
+        get().unwrap().backup_health.max_active_runs,
+        DEFAULT_HEALTH_MAX_ACTIVE_RUNS
+    );
     fs::remove_file(&path).unwrap();
     assert!(std::ptr::eq(published, get().unwrap()));
 
@@ -294,6 +332,19 @@ async fn singleton_and_backup_service_use_the_published_snapshot() {
             .unwrap();
     let stored_job = backups.join(format!("{}.toml", job.id));
     assert!(stored_job.is_file());
+    let health_path = temp.0.join("health.toml");
+    fs::write(
+        &health_path,
+        format!(
+            "id = 'health'\nname = 'Health'\n[backup]\nreference = '{}'\nversion = 'latest'\n[docker]\ncompose = './compose.yml'\n",
+            job.id
+        ),
+    ).unwrap();
+    fs::write(temp.0.join("compose.yml"), "services: {}\n").unwrap();
+    let definition = crate::features::backup::health::definition::load(&health_path).unwrap();
+    assert_eq!(definition.backup_job.id, job.id);
+    assert!(!published.backup_health.restore_root.exists());
+    assert!(!published.backup_health.data_root.exists());
     assert!(!temp.0.join("other-jobs").exists());
     let listed = BackupService::list().unwrap();
     assert_eq!(listed.len(), 1);

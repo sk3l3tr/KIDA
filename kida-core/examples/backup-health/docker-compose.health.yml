@@ -1,0 +1,11 @@
+# Adapt the image, healthcheck and restored relative path to your application.
+services:
+  app:
+    image: example/app:stable
+    restart: "no"
+    volumes:
+      - type: bind
+        source: ${KIDA_RESTORE_DIR}/app-data
+        target: /app/data
+        bind:
+          create_host_path: false

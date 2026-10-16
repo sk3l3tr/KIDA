@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::defaults::*;
+use super::{BackupHealthConfig, defaults::*};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -9,6 +9,7 @@ pub struct KidaConfig {
     pub unix: UnixConfig,
     pub http: HttpConfig,
     pub backup: BackupConfig,
+    pub backup_health: BackupHealthConfig,
     pub scheduler: SchedulerConfig,
     pub queue: QueueConfig,
 }

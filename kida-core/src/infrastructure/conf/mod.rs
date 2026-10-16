@@ -1,9 +1,11 @@
+mod backup_health;
 mod defaults;
 mod manager;
 mod model;
 
 use std::{path::PathBuf, sync::OnceLock};
 
+pub use backup_health::BackupHealthConfig;
 pub use defaults::*;
 pub use manager::ConfigManager;
 pub use model::KidaConfig;
@@ -30,3 +32,6 @@ pub fn get() -> Result<&'static KidaConfig, &'static str> {
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+#[cfg(test)]
+mod backup_health_tests;
