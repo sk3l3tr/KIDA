@@ -1,14 +1,8 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::{ErrorKind, Write},
-    marker::PhantomData,
-    path::PathBuf,
-};
+use std::{fs, io::ErrorKind, marker::PhantomData, path::PathBuf};
 
 use serde::{Serialize, de::DeserializeOwned};
-use uuid::Uuid;
 
-use super::{Storage, StorageError};
+use super::{Storage, StorageError, atomic_write};
 
 pub struct JsonStorage<T> {
     path: PathBuf,
@@ -46,7 +40,7 @@ where
     }
 
     fn save(&self, data: &T) -> Result<(), StorageError> {
-        // 1. Proteger ficheros existentes corruptos.
+        // Proteger ficheros existentes corruptos.
         match fs::read(&self.path) {
             Ok(content) => {
                 let _: T = serde_json::from_slice(&content).map_err(|source| {
@@ -60,39 +54,9 @@ where
             Err(error) => return Err(StorageError::Io(error)),
         }
 
-        // 2. Serializar antes de modificar el filesystem.
+        // Serializar antes de modificar el filesystem.
         let content = serde_json::to_vec_pretty(data).map_err(StorageError::JsonSerialize)?;
 
-        // 3. Crear directorio si es necesario.
-        if let Some(parent) = self.path.parent()
-            && !parent.as_os_str().is_empty()
-        {
-            fs::create_dir_all(parent)?;
-        }
-
-        // 4. Temporal único en el mismo filesystem.
-        let temp_path = self.path.with_extension(format!("{}.tmp", Uuid::new_v4()));
-
-        let result = (|| -> Result<(), StorageError> {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temp_path)?;
-
-            file.write_all(&content)?;
-            file.sync_all()?;
-
-            // 5. Reemplazo atómico.
-            fs::rename(&temp_path, &self.path)?;
-
-            Ok(())
-        })();
-
-        // 6. Limpiar temporal si falla la escritura.
-        if result.is_err() {
-            let _ = fs::remove_file(&temp_path);
-        }
-
-        result
+        atomic_write(&self.path, &content)
     }
 }

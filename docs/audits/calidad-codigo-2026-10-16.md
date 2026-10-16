@@ -21,7 +21,7 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 | Q03 | Alta | **Completada.** Hacer explícita la recuperación y sus errores en el lifecycle | Decisión de contrato + corrección |
 | Q04 | Media | **Completada.** Sacar operaciones bloqueantes de los handlers asíncronos | Refactorización |
 | Q05 | Alta | **Completada.** Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
-| Q06 | Media | Compartir la escritura atómica de JSON y TOML | Refactorización |
+| Q06 | Media | **Completada.** Compartir la escritura atómica de JSON y TOML | Refactorización |
 | Q07 | Media | Reducir la duplicación de handlers de acciones Docker | Refactorización |
 | Q08 | Media | Unificar búsqueda y construcción del repositorio de backups | Refactorización |
 | Q09 | Media | Reducir el acoplamiento de features al ejecutor del protocolo | Refactorización gradual |
@@ -110,6 +110,10 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 ---
 
 ## Q06. Algoritmo de escritura atómica duplicado
+
+**Estado: completada (2026-10-16).** JSON y TOML delegan la escritura en un helper privado `atomic_write` del módulo de almacenamiento, que recibe ruta y bytes ya serializados. Comparte creación de directorios, temporal con UUID junto al destino y apertura exclusiva, escritura, `sync_all`, reemplazo mediante `rename` y limpieza del temporal propio ante errores. La apertura exclusiva ocurre antes del bloque de limpieza para no borrar una entrada ajena si falla; el handle se cierra antes de limpiar y se conserva el error principal. Cada formato mantiene la validación previa del contenido existente, su serialización y sus errores específicos. No se modifica `Storage<T>`, no se añaden dependencias, migraciones ni gestión de archivos heredados; estos quedan a cargo del administrador. El reemplazo atómico no añade garantías de durabilidad ante cortes eléctricos.
+
+**Validación de la corrección.** 166 tests superados (58 unitarios y 2 de integración CLI, 106 CORE), 9 ignorados; suite completa ejecutada fuera del sandbox para permitir los transportes locales. Formato y Clippy estricto correctos; revisión independiente aprobada con repetición de los cinco tests específicos. Las pruebas de almacenamiento cubren ambos formatos: creación de directorios, lectura y actualización sin temporales sobrantes, protección de contenido corrupto con error y ruta específicos, lectura inexistente y fallos de serialización sin crear directorios ni modificar archivos existentes. El test del helper provoca un fallo de reemplazo contra un directorio y verifica su conservación, la limpieza del temporal propio y la preservación de un temporal ajeno. No se han inyectado fallos físicos de escritura o sincronización ni cortes eléctricos.
 
 **Evidencia.** [json.rs](../../kida-core/src/infrastructure/storage/json.rs) y [toml.rs](../../kida-core/src/infrastructure/storage/toml.rs), `save` (líneas 48–98 aproximadamente), repiten creación de directorio, temporal con UUID, apertura exclusiva, escritura, `sync_all`, `rename` y limpieza. La validación previa y la serialización sí dependen del formato. [storage/tests.rs](../../kida-core/src/infrastructure/storage/tests.rs) contiene únicamente un comentario; hay cobertura indirecta desde repositorios y configuración, pero no una suite dedicada en ese archivo.
 
