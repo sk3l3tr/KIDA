@@ -1,48 +1,8 @@
-use serde_json::json;
-
-use crate::features::docker::DockerService;
-use crate::infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus};
+use crate::{
+    features::docker::DockerService,
+    infrastructure::comm::protocol::{CommandRequest, CommandResponse},
+};
 
 pub async fn exec(request: CommandRequest) -> CommandResponse {
-    super::super::run_blocking(request, exec_blocking).await
-}
-
-fn exec_blocking(request: CommandRequest) -> CommandResponse {
-    let container = match request
-        .params
-        .get("container")
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        Some(container) => container,
-
-        None => {
-            return CommandResponse {
-                id: request.id,
-                status: CommandStatus::Error,
-                data: None,
-                error: Some("Missing required parameter: container".to_string()),
-            };
-        }
-    };
-
-    match DockerService::stop(container) {
-        Ok(()) => CommandResponse {
-            id: request.id,
-            status: CommandStatus::Ok,
-            data: Some(json!({
-                "container": container,
-                "status": "stopped"
-            })),
-            error: None,
-        },
-
-        Err(error) => CommandResponse {
-            id: request.id,
-            status: CommandStatus::Error,
-            data: None,
-            error: Some(error),
-        },
-    }
+    super::container_action(request, DockerService::stop, "stopped").await
 }

@@ -22,7 +22,7 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 | Q04 | Media | **Completada.** Sacar operaciones bloqueantes de los handlers asíncronos | Refactorización |
 | Q05 | Alta | **Completada.** Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
 | Q06 | Media | **Completada.** Compartir la escritura atómica de JSON y TOML | Refactorización |
-| Q07 | Media | Reducir la duplicación de handlers de acciones Docker | Refactorización |
+| Q07 | Media | **Completada.** Reducir la duplicación de handlers de acciones Docker | Refactorización |
 | Q08 | Media | Unificar búsqueda y construcción del repositorio de backups | Refactorización |
 | Q09 | Media | Reducir el acoplamiento de features al ejecutor del protocolo | Refactorización gradual |
 | Q10 | Media | Verificar el contrato duplicado entre CORE y CLI | Mantenimiento de contrato |
@@ -126,6 +126,10 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 ---
 
 ## Q07. Cuatro handlers Docker casi idénticos
+
+**Estado: completada (2026-10-16).** Un helper privado asíncrono del módulo de handlers Docker comparte extracción, recorte y validación de `container`, ejecución y construcción de respuestas. Recibe la operación como función y el estado de éxito; los cuatro wrappers conservan explícitos `start/running`, `stop/stopped`, `restart/restarted` y `delete/deleted` (el servicio ejecuta `rm`). El bloque completo continúa dentro de un único `run_blocking`, conservando Q04, las respuestas y los errores actuales. No se añaden macros ni dependencias, no se modifica el servicio Docker ni la allowlist del lifecycle y no se aborda la reorganización de pruebas de Q13.
+
+**Validación de la corrección.** 167 tests superados (58 unitarios y 2 de integración CLI, 107 CORE), 10 ignorados; la suite completa pasó fuera del sandbox para permitir los transportes locales. Formato y Clippy estricto correctos; revisión independiente aprobada con repetición de la prueba específica. La nueva prueba padre ejecuta expresamente el test hijo aislado con PATH cerrado y Docker simulado, sin modificar el entorno del proceso principal. Cubre los cuatro comandos mediante el ejecutor y compara respuestas JSON completas, ID, estados, recorte y conservación de espacios internos, argumentos exactos, `delete` traducido a `rm` y fallos con stderr. Los casos ausente, null, tipos incorrectos, vacío y espacios verifican el mensaje exacto y la ausencia de invocaciones a Docker. Se conservan las pruebas anteriores de ejecución bloqueante y lifecycle; no se ha utilizado un daemon Docker real.
 
 **Evidencia.** [docker_container_start.rs](../../kida-core/src/exec/commands/docker/docker_container_start.rs), [docker_container_stop.rs](../../kida-core/src/exec/commands/docker/docker_container_stop.rs), [docker_container_restart.rs](../../kida-core/src/exec/commands/docker/docker_container_restart.rs) y [docker_container_delete.rs](../../kida-core/src/exec/commands/docker/docker_container_delete.rs) repiten extracción de `container`, recorte, rechazo de vacío y construcción de `CommandResponse`. Cambian la operación y el estado de éxito. En el servicio ya se comparte `run_container_action`.
 
