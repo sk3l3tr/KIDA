@@ -1,0 +1,492 @@
+{
+  "now": "2030-01-01T00:00:00Z",
+  "cases": [
+    {
+      "name": "once",
+      "input": {
+        "command": "scheduler.list",
+        "params": null,
+        "schedule": {
+          "type": "once",
+          "at": "2030-01-01T00:02:00Z"
+        }
+      },
+      "normalized_input": {
+        "command": "scheduler.list",
+        "params": null,
+        "schedule": {
+          "type": "once",
+          "at": "2030-01-01T00:02:00Z"
+        }
+      },
+      "added": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": null,
+          "schedule": {
+            "type": "once",
+            "at": "2030-01-01T00:02:00Z"
+          }
+        }
+      },
+      "listed": {
+        "id": "request",
+        "status": "OK",
+        "data": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "origin": "USER",
+            "command": "scheduler.list",
+            "params": null,
+            "schedule": {
+              "type": "once",
+              "at": "2030-01-01T00:02:00Z"
+            },
+            "next_enqueue_at": "2030-01-01T00:02:00+00:00"
+          }
+        ]
+      },
+      "deleted": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": null,
+          "schedule": {
+            "type": "once",
+            "at": "2030-01-01T00:02:00Z"
+          }
+        }
+      },
+      "add_text": "Schedule added (ID: 00000000-0000-4000-8000-000000000001).",
+      "list_text": "ID: 00000000-0000-4000-8000-000000000001\nOrigin: USER\nCommand: scheduler.list\nParameters: null\nSchedule: once at 2030-01-01T00:02:00Z\nNext enqueue attempt: 2030-01-01T00:02:00+00:00",
+      "delete_text": "Schedule deleted (ID: 00000000-0000-4000-8000-000000000001)."
+    },
+    {
+      "name": "interval",
+      "input": {
+        "command": "scheduler.list",
+        "params": {
+          "items": [
+            null,
+            true,
+            {
+              "text": "a=b"
+            }
+          ]
+        },
+        "schedule": {
+          "type": "interval",
+          "seconds": 60
+        }
+      },
+      "normalized_input": {
+        "command": "scheduler.list",
+        "params": {
+          "items": [
+            null,
+            true,
+            {
+              "text": "a=b"
+            }
+          ]
+        },
+        "schedule": {
+          "type": "interval",
+          "seconds": 60
+        }
+      },
+      "added": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": {
+            "items": [
+              null,
+              true,
+              {
+                "text": "a=b"
+              }
+            ]
+          },
+          "schedule": {
+            "type": "interval",
+            "seconds": 60
+          }
+        }
+      },
+      "listed": {
+        "id": "request",
+        "status": "OK",
+        "data": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "origin": "USER",
+            "command": "scheduler.list",
+            "params": {
+              "items": [
+                null,
+                true,
+                {
+                  "text": "a=b"
+                }
+              ]
+            },
+            "schedule": {
+              "type": "interval",
+              "seconds": 60
+            },
+            "next_enqueue_at": "2030-01-01T00:01:00+00:00"
+          }
+        ]
+      },
+      "deleted": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": {
+            "items": [
+              null,
+              true,
+              {
+                "text": "a=b"
+              }
+            ]
+          },
+          "schedule": {
+            "type": "interval",
+            "seconds": 60
+          }
+        }
+      },
+      "add_text": "Schedule added (ID: 00000000-0000-4000-8000-000000000001).",
+      "list_text": "ID: 00000000-0000-4000-8000-000000000001\nOrigin: USER\nCommand: scheduler.list\nParameters: {\"items\":[null,true,{\"text\":\"a=b\"}]}\nSchedule: interval every 60 seconds\nNext enqueue attempt: 2030-01-01T00:01:00+00:00",
+      "delete_text": "Schedule deleted (ID: 00000000-0000-4000-8000-000000000001)."
+    },
+    {
+      "name": "cron_default",
+      "input": {
+        "command": "scheduler.list",
+        "params": null,
+        "schedule": {
+          "type": "cron",
+          "expression": "*/5 * * * *"
+        }
+      },
+      "normalized_input": {
+        "command": "scheduler.list",
+        "params": null,
+        "schedule": {
+          "type": "cron",
+          "expression": "*/5 * * * *",
+          "timezone": "UTC"
+        }
+      },
+      "added": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": null,
+          "schedule": {
+            "type": "cron",
+            "expression": "*/5 * * * *",
+            "timezone": "UTC"
+          }
+        }
+      },
+      "listed": {
+        "id": "request",
+        "status": "OK",
+        "data": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "origin": "USER",
+            "command": "scheduler.list",
+            "params": null,
+            "schedule": {
+              "type": "cron",
+              "expression": "*/5 * * * *",
+              "timezone": "UTC"
+            },
+            "next_enqueue_at": "2030-01-01T00:05:00+00:00"
+          }
+        ]
+      },
+      "deleted": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": null,
+          "schedule": {
+            "type": "cron",
+            "expression": "*/5 * * * *",
+            "timezone": "UTC"
+          }
+        }
+      },
+      "add_text": "Schedule added (ID: 00000000-0000-4000-8000-000000000001).",
+      "list_text": "ID: 00000000-0000-4000-8000-000000000001\nOrigin: USER\nCommand: scheduler.list\nParameters: null\nSchedule: cron */5 * * * * (UTC)\nNext enqueue attempt: 2030-01-01T00:05:00+00:00",
+      "delete_text": "Schedule deleted (ID: 00000000-0000-4000-8000-000000000001)."
+    },
+    {
+      "name": "cron_timezone",
+      "input": {
+        "command": "scheduler.list",
+        "params": null,
+        "schedule": {
+          "type": "cron",
+          "expression": "0 2 * * *",
+          "timezone": "Europe/Madrid"
+        }
+      },
+      "normalized_input": {
+        "command": "scheduler.list",
+        "params": null,
+        "schedule": {
+          "type": "cron",
+          "expression": "0 2 * * *",
+          "timezone": "Europe/Madrid"
+        }
+      },
+      "added": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": null,
+          "schedule": {
+            "type": "cron",
+            "expression": "0 2 * * *",
+            "timezone": "Europe/Madrid"
+          }
+        }
+      },
+      "listed": {
+        "id": "request",
+        "status": "OK",
+        "data": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "origin": "USER",
+            "command": "scheduler.list",
+            "params": null,
+            "schedule": {
+              "type": "cron",
+              "expression": "0 2 * * *",
+              "timezone": "Europe/Madrid"
+            },
+            "next_enqueue_at": "2030-01-01T01:00:00+00:00"
+          }
+        ]
+      },
+      "deleted": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "origin": "USER",
+          "command": "scheduler.list",
+          "params": null,
+          "schedule": {
+            "type": "cron",
+            "expression": "0 2 * * *",
+            "timezone": "Europe/Madrid"
+          }
+        }
+      },
+      "add_text": "Schedule added (ID: 00000000-0000-4000-8000-000000000001).",
+      "list_text": "ID: 00000000-0000-4000-8000-000000000001\nOrigin: USER\nCommand: scheduler.list\nParameters: null\nSchedule: cron 0 2 * * * (Europe/Madrid)\nNext enqueue attempt: 2030-01-01T01:00:00+00:00",
+      "delete_text": "Schedule deleted (ID: 00000000-0000-4000-8000-000000000001)."
+    }
+  ],
+  "invalid_inputs": [
+    null,
+    [],
+    {},
+    {
+      "command": "scheduler.list",
+      "schedule": {
+        "type": "interval",
+        "seconds": 60
+      }
+    },
+    {
+      "command": 3,
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": 60
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": 60
+      },
+      "origin": "INTERNAL"
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": 60
+      },
+      "unexpected": true
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "once"
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "once",
+        "at": 3
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval"
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": -1
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": "60"
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": 1.5
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": 60,
+        "extra": true
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "cron"
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "cron",
+        "expression": 3
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "cron",
+        "expression": "* * * * *",
+        "timezone": null
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "cron",
+        "expression": "* * * * *",
+        "timezone": 3
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "other"
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": null
+    }
+  ],
+  "semantic_inputs": [
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "interval",
+        "seconds": 0
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "once",
+        "at": "invalid"
+      }
+    },
+    {
+      "command": "scheduler.list",
+      "params": null,
+      "schedule": {
+        "type": "cron",
+        "expression": "invalid"
+      }
+    }
+  ],
+  "empty": {
+    "id": "request",
+    "status": "OK",
+    "data": []
+  },
+  "empty_text": "No schedules found."
+}

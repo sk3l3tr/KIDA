@@ -116,3 +116,6 @@ fn handle_response(command: &str, response: &CommandResponse) -> ResponseResult 
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+#[cfg(test)]
+mod contract_tests;

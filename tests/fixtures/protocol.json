@@ -1,0 +1,159 @@
+{
+  "requests": [
+    {
+      "name": "absent",
+      "wire": {
+        "id": "request",
+        "command": "scheduler.list"
+      },
+      "params": null
+    },
+    {
+      "name": "null",
+      "wire": {
+        "id": "request",
+        "command": "scheduler.list",
+        "params": null
+      },
+      "params": null
+    },
+    {
+      "name": "nested",
+      "wire": {
+        "id": "request",
+        "command": "scheduler.list",
+        "params": {
+          "items": [
+            null,
+            true,
+            3,
+            {
+              "text": "a=b"
+            }
+          ]
+        }
+      },
+      "params": {
+        "items": [
+          null,
+          true,
+          3,
+          {
+            "text": "a=b"
+          }
+        ]
+      }
+    }
+  ],
+  "responses": [
+    {
+      "wire": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "items": [
+            null,
+            true,
+            3
+          ]
+        }
+      },
+      "serialized": {
+        "id": "request",
+        "status": "OK",
+        "data": {
+          "items": [
+            null,
+            true,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "wire": {
+        "id": "request",
+        "status": "ERROR",
+        "error": "invalid schedule"
+      },
+      "serialized": {
+        "id": "request",
+        "status": "ERROR",
+        "error": "invalid schedule"
+      }
+    },
+    {
+      "wire": {
+        "id": "request",
+        "status": "OK",
+        "data": null,
+        "error": null
+      },
+      "serialized": {
+        "id": "request",
+        "status": "OK"
+      }
+    },
+    {
+      "wire": {
+        "id": "request",
+        "status": "ERROR"
+      },
+      "serialized": {
+        "id": "request",
+        "status": "ERROR"
+      }
+    }
+  ],
+  "invalid_requests": [
+    null,
+    [],
+    {},
+    {
+      "id": "request"
+    },
+    {
+      "command": "scheduler.list"
+    },
+    {
+      "id": 3,
+      "command": "scheduler.list"
+    },
+    {
+      "id": "request",
+      "command": null
+    }
+  ],
+  "invalid_responses": [
+    null,
+    [],
+    {},
+    {
+      "id": "request"
+    },
+    {
+      "status": "OK"
+    },
+    {
+      "id": 3,
+      "status": "OK"
+    },
+    {
+      "id": "request",
+      "status": "QUEUED"
+    },
+    {
+      "id": "request",
+      "status": "ok"
+    },
+    {
+      "id": "request",
+      "status": null
+    },
+    {
+      "id": "request",
+      "status": "ERROR",
+      "error": 3
+    }
+  ]
+}

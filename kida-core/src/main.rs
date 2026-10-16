@@ -56,3 +56,6 @@ fn print_banner() {
 
     println!("{}", KIDA_BANNER);
 }
+
+#[cfg(test)]
+mod contract_tests;

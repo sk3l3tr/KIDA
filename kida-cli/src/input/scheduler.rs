@@ -5,7 +5,10 @@ use super::{
     error::InputError,
     fields::{Kind, ask},
 };
-use crate::cli::AddParameters;
+use crate::{
+    cli::AddParameters,
+    protocol::scheduler::{ScheduleRule, utc},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,26 +22,6 @@ pub struct NewSchedule {
 // A custom deserializer also makes null-valued params mandatory.
 fn required_json<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Value, D::Error> {
     Value::deserialize(deserializer)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum ScheduleRule {
-    Once {
-        at: String,
-    },
-    Interval {
-        seconds: u64,
-    },
-    Cron {
-        expression: String,
-        #[serde(default = "utc")]
-        timezone: String,
-    },
-}
-
-fn utc() -> String {
-    "UTC".into()
 }
 
 #[derive(Deserialize)]

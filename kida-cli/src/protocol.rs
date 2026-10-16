@@ -1,3 +1,5 @@
+pub mod scheduler;
+
 use std::process::ExitCode;
 
 use serde::{Deserialize, Serialize};

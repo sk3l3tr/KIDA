@@ -1,12 +1,12 @@
 # Tareas pendientes de calidad de código de KIDA
 
-Revisión del listado: 2026-10-16, sobre el código de `44d9aac`.
+Revisión del listado: 2026-10-16. La depuración inicial parte de `44d9aac`; las tareas completadas posteriormente se retiran tras su validación y revisión independiente.
 
 ## Criterio y depuración
 
-Este documento contiene únicamente trabajo pendiente con un beneficio concreto. Las tareas implementadas y sus verificaciones se consultan en el historial Git. Esta revisión modifica solo documentación; no continúa la limpieza del código ni vuelve a ejecutar la suite.
+Este documento contiene únicamente trabajo pendiente con un beneficio concreto. Las tareas implementadas y sus verificaciones se consultan en el historial Git.
 
-Se han eliminado Q01–Q08 por estar completadas. Q10 y Q11 se agrupan en una sola tarea sobre el contrato de datos CORE/CLI. Q12 se actualiza porque la fábrica de almacenamiento sí tiene consumidores en pruebas desde Q06. Q13 se acota a separar grupos de pruebas existentes. Se mantienen los identificadores originales para conservar las referencias de las conversaciones y commits.
+Se han eliminado Q01–Q08 y la tarea conjunta Q10/Q11 por estar completadas. Q12 se actualiza porque la fábrica de almacenamiento sí tiene consumidores en pruebas desde Q06. Q13 se acota a separar grupos de pruebas existentes. Se mantienen los identificadores originales para conservar las referencias de las conversaciones y commits.
 
 Se retira Q09 como tarea independiente: el registro de comandos ya está centralizado en el catálogo de Q01 y la recuperación del lifecycle está cubierta por Q03. Persisten llamadas desde features al ejecutor, pero no se ha identificado un defecto adicional que justifique introducir otra operación compartida o mecanismo de inyección. La dirección de una dependencia, por sí sola, no justifica ampliar esta limpieza.
 
@@ -14,20 +14,9 @@ Se retira Q09 como tarea independiente: el registro de comandos ya está central
 
 | ID | Prioridad | Trabajo pendiente | Beneficio |
 | --- | --- | --- | --- |
-| Q10 | Media | Verificar el contrato CORE/CLI y ubicar el modelo compartido del scheduler | Detectar divergencias sin compartir servicios ni políticas de entrada |
 | Q12 | Baja | Retirar la fábrica de almacenamiento sin uso en producción y el accessor de socket sin llamadas | Reducir interfaces y supresiones innecesarias |
 | Q13 | Media | Separar los grupos existentes de pruebas Docker | Ejecutar y diagnosticar grupos sin depender de los anteriores |
 | Q14 | Baja | Explicitar el resolver actual del workspace | Eliminar el aviso sin cambiar la resolución de dependencias |
-
-## Q10. Contrato de datos CORE/CLI y modelo compartido del scheduler
-
-**Agrupa las anteriores Q10 y Q11.** Ambas tratan la propiedad y validación de los datos que cruzan la frontera CORE/CLI; no requieren proyectos separados de reorganización de tipos.
-
-**Evidencia actual.** [protocol.rs de CORE](../../kida-core/src/infrastructure/comm/protocol.rs) y [protocol.rs de CLI](../../kida-cli/src/protocol.rs) definen por separado los sobres y estados del protocolo. El [renderer del scheduler](../../kida-cli/src/renderer/scheduler.rs) deserializa `ScheduleRule` desde [input/scheduler.rs](../../kida-cli/src/input/scheduler.rs) y exige explícitamente `timezone` en respuestas cron, mientras la entrada admite el default UTC. Hay fixtures compartidos de backup, pero no una comprobación conjunta de estos sobres y reglas del scheduler. No se ha demostrado una incompatibilidad actual.
-
-**Cambio acotado.** Añadir fixtures compartidos y pruebas en ambos paquetes para los sobres y datos del scheduler; reutilizar los fixtures de backup existentes. Mover únicamente el tipo del scheduler utilizado por entrada y renderer a un módulo neutral dentro de CLI, conservando por separado el default de entrada y las comprobaciones de respuesta. No extraer una crate de protocolo, duplicar enums, reorganizar todos los DTO ni añadir una capa de servicios.
-
-**Aceptación.** Verificar `OK`/`ERROR`, omisión de campos opcionales, default de `params`, `null` explícito y payloads anidados. Cubrir once/interval/cron y respuestas malformadas, incluida la ausencia de `timezone` en cron. Conservar los textos y `RenderError` de la CLI, los modos de entrada, los adaptadores de persistencia y `ResponseResult` como responsabilidad de presentación. Las pruebas deben ejercitar los tipos reales de ambos paquetes.
 
 ## Q12. Interfaces sin uso en producción
 
