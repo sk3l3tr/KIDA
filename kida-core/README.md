@@ -59,8 +59,8 @@ curl -sS http://127.0.0.1:8989/command \
       ],
       "compression": "tar_zstd",
       "lifecycle": {
-        "pre_backup": [{"command": "system.health", "params": null}],
-        "post_backup": []
+        "pre_backup": [{"command": "docker.container.stop", "params": {"container": "backup-source"}}],
+        "post_backup": [{"command": "docker.container.start", "params": {"container": "backup-source"}}]
       },
       "schedule": {"custom": [null, 1]},
       "retention": {
@@ -77,6 +77,19 @@ curl -sS http://127.0.0.1:8989/command \
 actual es `tar_zstd` y se aplica si se omite. `lifecycle` es opcional y sus listas
 `pre_backup` y `post_backup` tienen default vacío. Cada comando exige `command`;
 `params` acepta JSON arbitrario y tiene default `null`.
+
+Al ejecutar el backup, el lifecycle permite exclusivamente `docker.container.stop`,
+`docker.container.start` y `docker.container.restart`. Pre se detiene al primer
+fallo; post intenta todos sus pasos secuencialmente y en orden, también si falla
+pre o la creación del artefacto. Los errores de post indican posición (desde 1),
+comando y causa. Si también hubo un fallo previo, este permanece como causa
+principal y el diagnóstico incluye todos los fallos de recuperación. Un fallo de
+post impide calcular el checksum y replicar el artefacto. Si post termina bien,
+un fallo previo conserva su error original.
+
+Esta recuperación cubre errores devueltos y errores de la tarea bloqueante de
+creación. Cancelar la tarea de backup o terminar el proceso no garantiza ejecutar
+post. El temporal sigue perteneciendo al trabajo bloqueante que lo esté utilizando.
 
 `schedule` y `retention` son opcionales. En retention, `max_age` es una cadena
 opcional, `keep_last` es un entero opcional de 0 a 4294967295 y

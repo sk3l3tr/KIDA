@@ -9,6 +9,16 @@ pub enum BackupError {
     #[error("backup I/O error: {0}")]
     Io(#[from] io::Error),
 
+    #[error("post_backup failed: {0}")]
+    PostBackup(String),
+
+    #[error("{primary}; {post}")]
+    Recovery {
+        #[source]
+        primary: Box<BackupError>,
+        post: Box<BackupError>,
+    },
+
     #[error(transparent)]
     Storage(#[from] StorageError),
 

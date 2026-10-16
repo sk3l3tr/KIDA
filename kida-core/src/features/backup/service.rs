@@ -133,8 +133,8 @@ impl BackupService {
         // 3. pre_backup
         if let Err(error) = run_lifecycle(&job.lifecycle.pre_backup).await {
             // Intentar recuperación aunque falle el pre_backup.
-            let _ = run_lifecycle(&job.lifecycle.post_backup).await;
-            return Err(error);
+            let post = run_post_backup(&job.lifecycle.post_backup).await;
+            return complete_with_post(Err(error), post);
         }
 
         let artifact_name = format!("{}-{}.tar.zst", job.name, chrono_timestamp());
@@ -156,15 +156,11 @@ impl BackupService {
             )))
         });
 
-        // 5/6/7. Attempt post_backup after creation has stopped accessing sources.
-        let post_result = run_lifecycle(&job.lifecycle.post_backup).await;
-
-        // Si crear artefacto falló, post_backup ya se ha ejecutado.
-        let (artifact, artifact_result) = creation?;
-        artifact_result?;
-
-        // post_backup también invalida globalmente la ejecución.
-        post_result?;
+        // Attempt every recovery step after creation has stopped accessing sources.
+        // Cancellation of this async task does not guarantee that post_backup runs.
+        let post = run_post_backup(&job.lifecycle.post_backup).await;
+        let creation = creation.and_then(|(artifact, result)| result.map(|()| artifact));
+        let artifact = complete_with_post(creation, post)?;
 
         // 8-11. Finalization owns and cleans the temporary, even on early return.
         tokio::task::spawn_blocking(move || finalize_backup(job, artifact_name, artifact))
@@ -254,25 +250,58 @@ fn finalize_backup(
     })
 }
 
+fn complete_with_post<T>(
+    primary: Result<T, BackupError>,
+    post: Result<(), BackupError>,
+) -> Result<T, BackupError> {
+    match (primary, post) {
+        (Ok(value), Ok(())) => Ok(value),
+        (Err(primary), Ok(())) => Err(primary),
+        (Ok(_), Err(post)) => Err(post),
+        (Err(primary), Err(post)) => Err(BackupError::Recovery {
+            primary: Box::new(primary),
+            post: Box::new(post),
+        }),
+    }
+}
+
 async fn run_lifecycle(commands: &[LifecycleCommand]) -> Result<(), BackupError> {
     for command in commands {
-        let response = executor::execute_lifecycle(CommandRequest {
-            id: Uuid::new_v4().to_string(),
-            command: command.command.clone(),
-            params: command.params.clone(),
-        })
-        .await;
+        execute_lifecycle_command(command).await?;
+    }
+    Ok(())
+}
 
-        if matches!(response.status, CommandStatus::Error) {
-            return Err(std::io::Error::other(
-                response
-                    .error
-                    .unwrap_or_else(|| format!("lifecycle command failed: {}", command.command)),
-            )
-            .into());
+async fn run_post_backup(commands: &[LifecycleCommand]) -> Result<(), BackupError> {
+    let mut errors = Vec::new();
+    for (index, command) in commands.iter().enumerate() {
+        if let Err(error) = execute_lifecycle_command(command).await {
+            errors.push(format!("step {} ({}): {error}", index + 1, command.command));
         }
     }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(BackupError::PostBackup(errors.join("; ")))
+    }
+}
 
+async fn execute_lifecycle_command(command: &LifecycleCommand) -> Result<(), BackupError> {
+    let response = executor::execute_lifecycle(CommandRequest {
+        id: Uuid::new_v4().to_string(),
+        command: command.command.clone(),
+        params: command.params.clone(),
+    })
+    .await;
+
+    if matches!(response.status, CommandStatus::Error) {
+        return Err(std::io::Error::other(
+            response
+                .error
+                .unwrap_or_else(|| format!("lifecycle command failed: {}", command.command)),
+        )
+        .into());
+    }
     Ok(())
 }
 

@@ -18,7 +18,7 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 | --- | --- | --- | --- |
 | Q01 | Alta | **Completada.** Sincronizar comandos registrados y ejecutables | Corrección + refactorización |
 | Q02 | Alta | **Completada.** Dar un único propietario a la limpieza del temporal de backup | Corrección |
-| Q03 | Alta | Hacer explícita la recuperación y sus errores en el lifecycle | Decisión de contrato + corrección |
+| Q03 | Alta | **Completada.** Hacer explícita la recuperación y sus errores en el lifecycle | Decisión de contrato + corrección |
 | Q04 | Media | Sacar operaciones bloqueantes de los handlers asíncronos | Refactorización |
 | Q05 | Alta | Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
 | Q06 | Media | Compartir la escritura atómica de JSON y TOML | Refactorización |
@@ -62,6 +62,10 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 ---
 
 ## Q03. Recuperación del lifecycle con errores secundarios ocultos
+
+**Estado: completada (2026-10-16).** Pre conserva la parada al primer fallo; post intenta todos los pasos en orden y reúne sus errores con posición y comando. Si hubo un error previo, permanece como causa principal, con el diagnóstico de recuperación añadido. El contrato cubre errores devueltos y errores de la tarea bloqueante de creación; cancelar la tarea o terminar el proceso no garantiza ejecutar post. Se mantienen las restricciones del lifecycle y la propiedad del temporal de Q02.
+
+**Validación de la corrección.** 147 tests superados (58 unitarios y 2 de integración CLI, 87 CORE), 8 ignorados; los escenarios aislados ejecutan expresamente el test hijo de backup. Formato y Clippy estricto correctos; revisión independiente aprobada. Las pruebas cubren post con fallos múltiples o seguido de éxito, pre/post, artefacto/post, error original con post correcto, ausencia de replicación tras fallos, restricciones del lifecycle y diagnóstico completo del handler. La prueba de `JoinError` usa un panic en trabajo bloqueante controlado y los helpers de recuperación, sin provocarlo dentro de `BackupService::run`. Suite completa fuera de la sandbox para permitir sockets; Docker simulado, sin aceptación contra un daemon real.
 
 **Evidencia.** [service.rs de backup](../../kida-core/src/features/backup/service.rs), líneas 115–118: si falla pre, se intenta post y se descarta su resultado. Líneas 142–148: si fallan artefacto y post, se devuelve únicamente el primero. `run_lifecycle` (líneas 238–257) devuelve error al primer comando fallido, tanto en pre como en post.
 

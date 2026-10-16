@@ -119,6 +119,42 @@ fn cleanup_failure_warns_without_changing_the_primary_result() {
 }
 
 #[cfg(unix)]
+#[test]
+fn post_attempts_remaining_steps_after_failure() {
+    scenario("post_continues");
+}
+
+#[cfg(unix)]
+#[test]
+fn post_reports_every_failure_in_order() {
+    scenario("post_multiple");
+}
+
+#[cfg(unix)]
+#[test]
+fn pre_failure_stops_pre_and_preserves_both_post_failures() {
+    scenario("pre_and_post");
+}
+
+#[cfg(unix)]
+#[test]
+fn pre_failure_with_successful_post_keeps_original_error() {
+    scenario("pre_only");
+}
+
+#[cfg(unix)]
+#[test]
+fn creation_failure_with_successful_post_keeps_original_error() {
+    scenario("partial_only");
+}
+
+#[cfg(unix)]
+#[test]
+fn handler_response_preserves_complete_recovery_diagnostic() {
+    scenario("handler_errors");
+}
+
+#[cfg(unix)]
 #[tokio::test]
 #[ignore = "child with isolated configuration, fake Docker and TMPDIR"]
 async fn backup_child() {
@@ -153,7 +189,12 @@ async fn backup_child() {
     conf::init(root.join("config.toml")).unwrap();
     let source = root.join("source.txt");
     let second = root.join("second.txt");
-    fs::write(&source, "backup payload").unwrap();
+    // Force zstd to write blocks before the missing second source fails creation.
+    if matches!(name.as_str(), "partial" | "partial_only") {
+        fs::write(&source, "backup payload".repeat(100_000)).unwrap();
+    } else {
+        fs::write(&source, "backup payload").unwrap();
+    }
     fs::write(&second, "second payload").unwrap();
     let target = root.join("target");
     fs::create_dir(&target).unwrap();
@@ -177,7 +218,7 @@ async fn backup_child() {
             },
         ]);
     }
-    let job = BackupService::create(NewBackupJob {
+    let mut input = NewBackupJob {
         name: "cleanup-test".into(),
         sources: vec![source.clone(), second],
         targets,
@@ -194,20 +235,128 @@ async fn backup_child() {
         },
         schedule: None,
         retention: None,
-    })
-    .unwrap();
+    };
+    let pre_failed = matches!(
+        name.as_str(),
+        "pre_only" | "pre_and_post" | "handler_errors"
+    );
+    let two_posts = matches!(
+        name.as_str(),
+        "post_continues" | "post_multiple" | "pre_only" | "pre_and_post" | "handler_errors"
+    );
+    if pre_failed {
+        input.lifecycle.pre_backup.push(LifecycleCommand {
+            command: "docker.container.stop".into(),
+            params: serde_json::json!({"container":"second"}),
+        });
+    }
+    if two_posts {
+        input.lifecycle.post_backup.push(LifecycleCommand {
+            command: "docker.container.start".into(),
+            params: serde_json::json!({"container":"second"}),
+        });
+    }
+    let job = BackupService::create(input).unwrap();
+    if name == "handler_errors" {
+        let response = crate::exec::commands::backup::backup_run::exec(CommandRequest {
+            id: "recovery-response".into(),
+            command: "backup.run".into(),
+            params: serde_json::json!({"id":job.id}),
+        })
+        .await;
+        assert_eq!(response.id, "recovery-response");
+        assert!(matches!(response.status, CommandStatus::Error));
+        assert!(response.data.is_none());
+        let error = response.error.unwrap();
+        assert!(
+            error.starts_with("backup I/O error: docker stop failed"),
+            "{error}"
+        );
+        assert!(error.contains("injected pre failure"), "{error}");
+        assert!(error.contains("step 1 (docker.container.start)"), "{error}");
+        assert!(error.contains("injected post failure"), "{error}");
+        assert!(error.contains("step 2 (docker.container.start)"), "{error}");
+        assert!(error.contains("injected second post failure"), "{error}");
+        assert_eq!(
+            fs::read_to_string(root.join("calls")).unwrap(),
+            "pre\npost\npost2\n"
+        );
+        assert_eq!(fs::read_dir(root.join("artifacts")).unwrap().count(), 0);
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 0);
+        return;
+    }
     let result = BackupService::run(&job.id).await;
     assert_eq!(
         fs::read_to_string(root.join("calls")).unwrap(),
-        "pre\npost\n"
+        if two_posts {
+            "pre\npost\npost2\n"
+        } else {
+            "pre\npost\n"
+        }
     );
     assert_eq!(fs::read_dir(root.join("artifacts")).unwrap().count(), 0);
+    if matches!(
+        name.as_str(),
+        "partial"
+            | "partial_only"
+            | "post_failure"
+            | "post_continues"
+            | "post_multiple"
+            | "pre_only"
+            | "pre_and_post"
+    ) {
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 0);
+    }
     match name.as_str() {
         "partial" => {
-            let error = result.unwrap_err().to_string();
-            assert!(error.contains("second.txt"), "{error}");
-            // The post error injected too must not replace the creation error (Q03 unchanged).
-            assert!(!error.contains("post failure"), "{error}");
+            let error = result.unwrap_err();
+            let primary = std::error::Error::source(&error).unwrap();
+            assert!(primary.to_string().contains("second.txt"), "{error}");
+            assert!(!primary.to_string().contains("post failure"), "{error}");
+            let diagnostic = error.to_string();
+            assert!(diagnostic.starts_with(&primary.to_string()), "{diagnostic}");
+            assert!(
+                diagnostic.contains("step 1 (docker.container.start)"),
+                "{diagnostic}"
+            );
+            assert!(diagnostic.contains("injected post failure"), "{diagnostic}");
+        }
+        "partial_only" => assert!(
+            matches!(result.unwrap_err(), BackupError::Io(error) if error.kind() == std::io::ErrorKind::NotFound && error.to_string().contains("second.txt"))
+        ),
+        "pre_only" => {
+            assert!(
+                matches!(result.unwrap_err(), BackupError::Io(error) if error.to_string() == "docker stop failed for 'test': injected pre failure")
+            );
+        }
+        "pre_and_post" | "post_multiple" | "post_continues" => {
+            let error = result.unwrap_err();
+            if pre_failed {
+                let primary = std::error::Error::source(&error).unwrap();
+                assert_eq!(
+                    primary.to_string(),
+                    "backup I/O error: docker stop failed for 'test': injected pre failure"
+                );
+                assert!(error.to_string().starts_with(&primary.to_string()));
+                assert!(matches!(error, BackupError::Recovery { .. }));
+            } else {
+                assert!(matches!(error, BackupError::PostBackup(_)));
+            }
+            let diagnostic = error.to_string();
+            assert!(
+                diagnostic.contains("step 1 (docker.container.start)"),
+                "{diagnostic}"
+            );
+            assert!(diagnostic.contains("injected post failure"), "{diagnostic}");
+            if name != "post_continues" {
+                assert!(
+                    diagnostic.contains("injected second post failure"),
+                    "{diagnostic}"
+                );
+                assert!(diagnostic.find("step 1").unwrap() < diagnostic.find("step 2").unwrap());
+            } else {
+                assert!(!diagnostic.contains("step 2"), "{diagnostic}");
+            }
         }
         "post_failure" => assert!(
             result
@@ -308,4 +457,46 @@ async fn cancellation_keeps_artifact_alive_until_blocking_work_finishes() {
         .await
         .unwrap();
     }
+}
+
+#[tokio::test]
+async fn post_preserves_lifecycle_restrictions_and_reports_each_rejected_step() {
+    let commands = ["system.shutdown", "backup.run"].map(|command| LifecycleCommand {
+        command: command.into(),
+        params: serde_json::json!({"secret":"must-not-be-logged"}),
+    });
+    let error = run_post_backup(&commands).await.unwrap_err().to_string();
+    assert!(error.contains("step 1 (system.shutdown): backup I/O error: Command not allowed in backup lifecycle: system.shutdown"));
+    assert!(error.contains(
+        "step 2 (backup.run): backup I/O error: Command not allowed in backup lifecycle: backup.run"
+    ));
+    assert!(!error.contains("must-not-be-logged"));
+}
+
+#[tokio::test]
+async fn blocking_task_failure_remains_the_source_when_post_fails() {
+    let task = tokio::task::spawn_blocking(|| -> Result<(), BackupError> {
+        panic!("injected artifact task failure");
+    })
+    .await;
+    assert!(task.as_ref().unwrap_err().is_panic());
+    let primary = task
+        .map_err(|error| {
+            BackupError::from(std::io::Error::other(format!(
+                "Backup artifact task failed: {error}"
+            )))
+        })
+        .and_then(|result| result);
+    let post = run_post_backup(&[LifecycleCommand {
+        command: "backup.run".into(),
+        params: serde_json::Value::Null,
+    }])
+    .await;
+    let error = complete_with_post(primary, post).unwrap_err();
+    let source = std::error::Error::source(&error).unwrap().to_string();
+    assert!(source.contains("Backup artifact task failed:"));
+    assert!(source.contains("injected artifact task failure"));
+    let diagnostic = error.to_string();
+    assert!(diagnostic.starts_with(&source));
+    assert!(diagnostic.contains("post_backup failed: step 1 (backup.run)"));
 }
