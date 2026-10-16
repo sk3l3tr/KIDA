@@ -12,7 +12,7 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 | 02 | [Catálogo de artefactos](02-catalogo-artefactos.md) | Completa | [Catálogo](../../../kida-core/src/features/backup/artifacts.rs), [replicación](../../../kida-core/src/features/backup/service.rs), commit `530f465` | [Pruebas y revisión](02-catalogo-artefactos.md#validación-y-revisión) |
 | 03 | [Restauración segura](03-restauracion-segura.md) | Completa | [Extractor](../../../kida-core/src/features/backup/health/restore.rs), commit `4d23978` | [Pruebas y revisión](03-restauracion-segura.md#validación-y-revisión) |
 | 04 | [Compose para Health](04-compose-health.md) | Completa | [Adaptador](../../../kida-core/src/features/backup/health/compose.rs), commit `80c1307` | [Pruebas y revisión](04-compose-health.md#validación-y-revisión) |
-| 05 | [Diagnóstico](05-diagnostico.md) | Verificada | [Evaluador](../../../kida-core/src/features/backup/health/diagnosis.rs), [evidencias](../../../kida-core/src/features/backup/health/evidence.rs) | [Pruebas y revisión](05-diagnostico.md#validación-y-revisión) |
+| 05 | [Diagnóstico](05-diagnostico.md) | Completa | [Evaluador](../../../kida-core/src/features/backup/health/diagnosis.rs), [evidencias](../../../kida-core/src/features/backup/health/evidence.rs), commit `3ad5cea` | [Pruebas y revisión](05-diagnostico.md#validación-y-revisión) |
 | 06 | [Historial e informes](06-historial-informes.md) | Pendiente | — | — |
 | 07 | [Ciclo de vida](07-ciclo-vida.md) | Pendiente | — | — |
 | 08 | [Mantenimiento](08-mantenimiento.md) | Pendiente | — | — |

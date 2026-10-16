@@ -36,4 +36,4 @@ Pruebas focalizadas: las 25 combinaciones de prioridad, cinco resultados, répli
 - Clippy estricto del workspace, formato y comprobación de diff: correctos. Sin dependencias nuevas.
 - Revisor independiente `review_task05`: sin defectos accionables; ocho pruebas focalizadas y diff comprobados. Se conserva también un diagnóstico ya concluido al solicitar parada/interrumpir; una evaluación inconclusa mantiene `UNKNOWN`.
 
-Estado: **Verificada**, pendiente de commit.
+Estado: **Completa**. Commit de implementación: `3ad5cea`.
