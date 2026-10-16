@@ -20,7 +20,7 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 | Q02 | Alta | **Completada.** Dar un único propietario a la limpieza del temporal de backup | Corrección |
 | Q03 | Alta | **Completada.** Hacer explícita la recuperación y sus errores en el lifecycle | Decisión de contrato + corrección |
 | Q04 | Media | **Completada.** Sacar operaciones bloqueantes de los handlers asíncronos | Refactorización |
-| Q05 | Alta | Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
+| Q05 | Alta | **Completada.** Evitar borrar indiscriminadamente la ruta del socket al arrancar | Corrección |
 | Q06 | Media | Compartir la escritura atómica de JSON y TOML | Refactorización |
 | Q07 | Media | Reducir la duplicación de handlers de acciones Docker | Refactorización |
 | Q08 | Media | Unificar búsqueda y construcción del repositorio de backups | Refactorización |
@@ -94,6 +94,10 @@ Las evidencias y la validación originales corresponden a la revisión indicada 
 ---
 
 ## Q05. Eliminación indiscriminada de la ruta del socket
+
+**Estado: completada (2026-10-16).** El arranque inspecciona la ruta sin seguir enlaces, rechaza entradas que no sean sockets y conserva sockets activos. Solo elimina un socket obsoleto cuando la conexión devuelve `ConnectionRefused`, después de comprobar que su dispositivo e inodo no han cambiado. Propaga errores de permisos, inspección, borrado y conexión; un límite de un segundo para comprobar actividad impide borrar ante una comprobación inconclusa. Una reserva exclusiva no bloqueante en `<ruta-del-socket>.lock` permanece durante la vida del listener y coordina arranques concurrentes de KIDA. El archivo de reserva no se elimina y su apertura rechaza enlaces y entradas no regulares. El directorio debe estar protegido frente a cambios ajenos: la reserva no coordina procesos externos que no la respeten ni elimina toda carrera frente a modificaciones hostiles de la ruta. El protocolo y el endpoint configurado se conservan; el requisito del archivo de reserva está documentado en el README de CORE.
+
+**Validación de la corrección.** 161 tests superados (58 unitarios y 2 de integración CLI, 101 CORE), 9 ignorados. Formato y Clippy estricto correctos; revisión independiente aprobada con repetición de los seis tests específicos. Las pruebas nuevas cubren ruta ausente, recuperación de socket obsoleto y liberación de la reserva, socket activo sin reserva, arranques concurrentes sobre un socket obsoleto, conservación de archivos/directorios/enlaces válidos y rotos, rechazo de enlaces en la reserva y errores reales de permisos de conexión y borrado. Verifican que el listener original siga intercambiando datos y que las entradas rechazadas conserven su inodo y contenido. El sandbox impidió crear sockets en cuatro pruebas específicas; la suite completa pasó fuera de él sin omitir pruebas. No se simularon modificaciones hostiles continuas del directorio.
 
 **Evidencia.** [unix.rs](../../kida-core/src/infrastructure/comm/transport/unix.rs), líneas 17–20: `start` llama a `remove_file` sobre la ruta configurada, descarta cualquier error y después hace `bind`.
 

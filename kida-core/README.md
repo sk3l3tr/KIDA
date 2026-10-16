@@ -17,6 +17,10 @@ KIDA CORE ejecuta las operaciones del servidor y permite programar comandos pers
 
 # Using KIDA CORE
 
+El servidor Unix conserva los sockets activos y rechaza archivos, directorios y enlaces en la ruta configurada. Solo recupera un socket obsoleto cuando la conexión devuelve `ConnectionRefused`; los errores de permisos y de comprobación impiden el arranque sin borrar esa entrada.
+
+Para excluir arranques simultáneos de KIDA, mantiene un bloqueo en `<ruta-del-socket>.lock` durante la vida del listener. Este archivo permanece tras detener el servidor; no debe borrarse mientras haya instancias activas. El directorio debe permitir crear el socket y su archivo de bloqueo y estar protegido frente a modificaciones ajenas. La reserva coordina instancias de KIDA que usan este mecanismo; no ofrece exclusión frente a procesos externos que cambien la ruta sin respetarlo.
+
 KIDA tiene 2 formas de comunicación: HTTP y Unix socket. En ambos casos, el formato de entrada es JSON. Algunos ejemplos son:
 
 ```bash
