@@ -273,7 +273,9 @@ impl ScheduleService {
                     params: definition.params.clone(),
                 };
 
-                match queue.enqueue(request) {
+                match queue
+                    .enqueue_scheduled(request, definition.origin == ScheduleOrigin::Internal)
+                {
                     Ok(_) => {
                         if let Some(next) = next {
                             entry.next_enqueue_at = next;

@@ -264,6 +264,21 @@ mod worker_tests {
         let persisted = crate::features::scheduler::repository::ScheduleRepository::new(path)
             .load()
             .unwrap();
+        assert_eq!(persisted.len(), 3);
+        assert_eq!(
+            persisted
+                .iter()
+                .filter(|schedule| schedule.origin
+                    == crate::features::scheduler::model::ScheduleOrigin::Internal)
+                .count(),
+            2
+        );
+        let persisted: Vec<_> = persisted
+            .into_iter()
+            .filter(|schedule| {
+                schedule.origin == crate::features::scheduler::model::ScheduleOrigin::User
+            })
+            .collect();
         assert_eq!(persisted.len(), 1);
         assert_eq!(persisted[0].id, created["id"].as_str().unwrap());
         assert_eq!(persisted[0].command, "scheduler.list");
@@ -334,6 +349,7 @@ mod concurrency_tests {
 
     fn job(id: &str, command: &str) -> QueuedCommand {
         QueuedCommand {
+            context: Default::default(),
             execution_id: format!("execution-{id}"),
             request: CommandRequest {
                 id: id.into(),
@@ -569,5 +585,389 @@ mod concurrency_tests {
             remaining += 1;
         }
         assert_eq!(remaining, 4);
+    }
+}
+
+#[cfg(test)]
+mod health_protocol_tests {
+    use serde_json::{Value, json};
+
+    use crate::{
+        exec::{catalog, executor},
+        infrastructure::comm::protocol::{CommandRequest, CommandStatus},
+    };
+
+    fn request(command: &str, params: Value) -> CommandRequest {
+        CommandRequest {
+            id: "health-request".into(),
+            command: command.into(),
+            params,
+        }
+    }
+
+    #[tokio::test]
+    async fn all_public_health_operations_validate_parameters_before_service_access() {
+        for (command, params) in [
+            (
+                "create",
+                json!({"definition_path":"/tmp/test", "mode":"INVALID"}),
+            ),
+            (
+                "create",
+                json!({"definition_path":"/tmp/test", "mode":"MANUAL", "extra":true}),
+            ),
+            ("run", json!({})),
+            (
+                "run",
+                json!({"definition_path":"/tmp/test", "origin":"INTERNAL"}),
+            ),
+            ("start", json!({"run_id":"invalid"})),
+            ("get", json!({"run_id":"invalid"})),
+            ("stop", json!({"run_id":"invalid"})),
+            ("delete", json!({"run_id":"invalid"})),
+            ("list", json!({"extra":true})),
+            ("report.list", json!({"extra":true})),
+            ("report.get", json!({"run_id":"invalid"})),
+            ("report.delete", json!({"run_id":"invalid"})),
+        ] {
+            let command = format!("backup.health.{command}");
+            assert!(catalog::resolve(&command).is_some());
+            let response = executor::execute(request(&command, params)).await;
+            assert!(matches!(response.status, CommandStatus::Error));
+            assert_eq!(response.id, "health-request");
+            assert!(response.data.is_none());
+            let error = response.error.unwrap();
+            assert!(
+                error.contains("parameters") || error.contains("UUID"),
+                "{command}: {error}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn maintenance_is_never_public_even_with_forged_origin() {
+        for command in ["backup.health.expire", "backup.health.retain"] {
+            assert!(!executor::is_registered(command));
+            assert!(!executor::is_schedulable(command, false));
+            assert!(executor::is_schedulable(command, true));
+            for params in [json!({}), json!({"origin":"INTERNAL"})] {
+                let response = executor::execute(request(command, params)).await;
+                assert!(matches!(response.status, CommandStatus::Error));
+                assert_eq!(response.error, Some(format!("Unknown command: {command}")));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn internal_dispatch_rejects_public_context_and_nonempty_parameters() {
+        use crate::exec::queue::ExecutionContext;
+        let response = executor::execute_queued(
+            request("backup.health.expire", json!({})),
+            ExecutionContext::Public,
+            "queue-id".into(),
+        )
+        .await;
+        assert_eq!(
+            response.error.as_deref(),
+            Some("Internal command is not public")
+        );
+        let response = executor::execute_queued(
+            request("backup.health.expire", json!({"ttl":0})),
+            ExecutionContext::InternalSchedule,
+            "queue-id".into(),
+        )
+        .await;
+        assert_eq!(
+            response.error.as_deref(),
+            Some("internal health operation requires empty parameters")
+        );
+    }
+
+    #[test]
+    fn queue_carries_trusted_context_separate_from_parameters() {
+        use crate::{
+            exec::queue::{CommandQueue, ExecutionContext},
+            infrastructure::conf,
+        };
+        conf::tests::init_test_config();
+        let (queue, mut receiver) = CommandQueue::new();
+        queue
+            .enqueue(request(
+                "backup.health.expire",
+                json!({"origin":"INTERNAL"}),
+            ))
+            .unwrap();
+        assert!(matches!(
+            receiver.try_recv().unwrap().context,
+            ExecutionContext::Public
+        ));
+        queue
+            .enqueue_scheduled(request("backup.health.expire", json!({})), true)
+            .unwrap();
+        assert!(matches!(
+            receiver.try_recv().unwrap().context,
+            ExecutionContext::InternalSchedule
+        ));
+        queue
+            .enqueue_health(request("backup.health.start", Value::Null), "reserved-run")
+            .unwrap();
+        assert!(
+            matches!(receiver.try_recv().unwrap().context, ExecutionContext::HealthRun(id) if id == "reserved-run")
+        );
+    }
+}
+
+#[cfg(test)]
+mod health_worker_tests {
+    use crate::{
+        exec::{
+            queue::{ExecutionContext, QueuedCommand},
+            worker,
+        },
+        infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
+    };
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    #[tokio::test]
+    async fn capacity_one_preserves_private_work_and_internal_origin_once() {
+        let (sender, receiver) = tokio::sync::mpsc::channel(3);
+        for context in [
+            ExecutionContext::InternalSchedule,
+            ExecutionContext::HealthRun("run".into()),
+        ] {
+            sender
+                .send(QueuedCommand {
+                    execution_id: uuid::Uuid::new_v4().to_string(),
+                    request: CommandRequest {
+                        id: "request".into(),
+                        command: "backup.health.run".into(),
+                        params: serde_json::json!({}),
+                    },
+                    context,
+                })
+                .await
+                .unwrap();
+        }
+        drop(sender);
+        let count = Arc::new(AtomicUsize::new(0));
+        let observed = count.clone();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            worker::run_with_context(
+                receiver,
+                move |request, context, execution_id| {
+                    assert_ne!(execution_id, request.id);
+                    uuid::Uuid::parse_str(&execution_id).unwrap();
+                    observed.fetch_add(
+                        match context {
+                            ExecutionContext::InternalSchedule => 1,
+                            ExecutionContext::HealthRun(id) if id == "run" => 10,
+                            _ => panic!("lost trusted context"),
+                        },
+                        Ordering::SeqCst,
+                    );
+                    async {
+                        CommandResponse {
+                            id: request.id,
+                            status: CommandStatus::Ok,
+                            data: None,
+                            error: None,
+                        }
+                    }
+                },
+                1,
+                2,
+            ),
+        )
+        .await
+        .expect("single worker must drain without another permit");
+        assert_eq!(count.load(Ordering::SeqCst), 11);
+    }
+}
+
+#[cfg(test)]
+mod health_protocol_integration {
+    use crate::{
+        conf,
+        exec::{executor, queue::ExecutionContext, worker},
+        infrastructure::comm::protocol::{CommandRequest, CommandStatus},
+    };
+    use serde_json::{Value, json};
+
+    fn request(operation: &str, params: Value) -> CommandRequest {
+        CommandRequest {
+            id: "protocol-request".into(),
+            command: format!("backup.health.{operation}"),
+            params,
+        }
+    }
+    async fn ok(operation: &str, params: Value) -> Value {
+        let response = executor::execute(request(operation, params)).await;
+        assert!(
+            matches!(response.status, CommandStatus::Ok),
+            "{operation}: {:?}",
+            response.error
+        );
+        response.data.unwrap()
+    }
+
+    #[test]
+    fn health_protocol_uses_real_service_in_isolated_process() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "exec::tests::health_protocol_integration::child",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("KIDA_HEALTH_PROTOCOL_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "fixture child; invoked by health_protocol_uses_real_service_in_isolated_process"]
+    async fn child() {
+        if std::env::var_os("KIDA_HEALTH_PROTOCOL_CHILD").is_none() {
+            return;
+        }
+        let root =
+            std::env::temp_dir().join(format!("kida-health-protocol-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let mut config = conf::KidaConfig::default();
+        config.queue.capacity = 1;
+        config.backup.backup_dir = root.join("jobs").to_string_lossy().into_owned();
+        config.backup_health.data_root = root.join("data");
+        config.backup_health.restore_root = root.join("restore");
+        let config_path = root.join("config.toml");
+        std::fs::write(&config_path, toml::to_string(&config).unwrap()).unwrap();
+        conf::init(config_path).unwrap();
+        let job = serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"name":"daily","sources":[],"targets":[],"compression":"tar_zstd"})).unwrap();
+        crate::features::backup::repository::BackupRepository::new(&config.backup.backup_dir)
+            .create(&job)
+            .unwrap();
+        std::fs::write(root.join("compose.yml"), "services: {}\n").unwrap();
+        let definition_path = root.join("health.toml");
+        std::fs::write(&definition_path, "id = 'check'\nname = 'Check'\n[backup]\nreference = 'daily'\nversion = 'latest'\n[docker]\ncompose = 'compose.yml'\n").unwrap();
+        let created = ok(
+            "create",
+            json!({"definition_path":definition_path,"mode":"MANUAL"}),
+        )
+        .await;
+        let run_id = created["run_id"].as_str().unwrap();
+        assert_eq!(created["state"], "CREATED");
+        let missing = executor::execute(request(
+            "get",
+            json!({"run_id":uuid::Uuid::new_v4().to_string()}),
+        ))
+        .await;
+        assert!(matches!(missing.status, CommandStatus::Error));
+        let mut receiver = executor::init_queue().unwrap();
+        let started = ok("start", json!({"run_id":run_id})).await;
+        assert_eq!(started["run_id"], run_id);
+        assert_eq!(started["state"], "STARTING");
+        assert_ne!(started["execution_id"], run_id);
+        let duplicate = executor::execute(request("start", json!({"run_id":run_id}))).await;
+        assert!(matches!(duplicate.status, CommandStatus::Error));
+        let task = receiver.try_recv().unwrap();
+        assert_eq!(started["execution_id"], task.execution_id);
+        executor::execute_queued(task.request, task.context, task.execution_id).await;
+        let fetched = ok("get", json!({"run_id":run_id})).await;
+        assert_eq!(fetched["state"], "ERROR");
+        assert_eq!(ok("list", json!({})).await.as_array().unwrap().len(), 1);
+        assert_eq!(ok("report.list", json!({})).await, json!([run_id]));
+        assert!(
+            !ok("report.get", json!({"run_id":run_id})).await["markdown"]
+                .as_str()
+                .unwrap()
+                .is_empty()
+        );
+        ok("stop", json!({"run_id":run_id})).await;
+        ok("delete", json!({"run_id":run_id})).await;
+        ok("report.delete", json!({"run_id":run_id})).await;
+        assert!(
+            ok("report.list", json!({}))
+                .await
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(ok("list", json!({})).await.as_array().unwrap().len(), 1);
+
+        let automatic = ok("run", json!({"definition_path":definition_path})).await;
+        assert_eq!(automatic["state"], "STARTING");
+        let task = receiver.try_recv().unwrap();
+        assert_eq!(automatic["execution_id"], task.execution_id);
+        executor::execute_queued(task.request, task.context, task.execution_id).await;
+
+        let queue = executor::command_queue().unwrap();
+        queue.enqueue(request("list", json!({}))).unwrap();
+        let retry = ok(
+            "create",
+            json!({"definition_path":definition_path,"mode":"MANUAL"}),
+        )
+        .await;
+        let retry_id = retry["run_id"].as_str().unwrap();
+        let full = executor::execute(request("start", json!({"run_id":retry_id}))).await;
+        assert_eq!(full.error.as_deref(), Some("Execution queue is full"));
+        assert_eq!(
+            ok("get", json!({"run_id":retry_id})).await["state"],
+            "CREATED"
+        );
+        drop(receiver);
+        let closed = executor::execute(request("start", json!({"run_id":retry_id}))).await;
+        assert_eq!(closed.error.as_deref(), Some("Execution queue is closed"));
+        let public_run =
+            executor::execute(request("run", json!({"definition_path":definition_path}))).await;
+        assert_eq!(
+            public_run.error.as_deref(),
+            Some("Execution queue is closed")
+        );
+
+        let (sender, receiver) = tokio::sync::mpsc::channel(1);
+        sender
+            .send(crate::exec::queue::QueuedCommand {
+                execution_id: "scheduled-queue-id".into(),
+                request: request("run", json!({"definition_path":definition_path})),
+                context: ExecutionContext::Public,
+            })
+            .await
+            .unwrap();
+        drop(sender);
+        let responses = std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        let captured = responses.clone();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            worker::run_with_context(
+                receiver,
+                move |request, context, execution_id| {
+                    let captured = captured.clone();
+                    async move {
+                        let response =
+                            executor::execute_queued(request, context, execution_id).await;
+                        captured.lock().await.push(response.data.clone());
+                        response
+                    }
+                },
+                1,
+                1,
+            ),
+        )
+        .await
+        .expect("scheduled execution must not enqueue behind itself");
+        let responses = responses.lock().await;
+        let data = responses[0].as_ref().expect("scheduled run succeeded");
+        assert_eq!(data["execution_id"], "scheduled-queue-id");
+        assert_ne!(data["run_id"], "scheduled-queue-id");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

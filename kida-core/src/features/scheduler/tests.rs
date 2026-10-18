@@ -76,6 +76,39 @@ mod service_tests {
         infrastructure::comm::protocol::CommandRequest,
     };
 
+    #[test]
+    fn health_maintenance_requires_internal_schedule_origin() {
+        let path = std::env::temp_dir().join(format!("kida-health-origin-{}.toml", Uuid::new_v4()));
+        let now = parse_once("2026-10-18T00:00:00Z").unwrap();
+        let mut service = ScheduleService::load(&path, now).unwrap();
+        for command in ["backup.health.expire", "backup.health.retain"] {
+            let input = NewSchedule {
+                command: command.into(),
+                params: json!({"origin":"INTERNAL"}),
+                schedule: ScheduleRule::Interval { seconds: 60 },
+            };
+            assert!(service.add(input.clone(), now).is_err());
+            let internal = NewSchedule {
+                params: json!({}),
+                ..input
+            };
+            service.add_internal(internal, now).unwrap();
+        }
+        crate::conf::tests::init_test_config();
+        let (queue, mut receiver) = CommandQueue::new();
+        service
+            .enqueue_due(now + chrono::Duration::seconds(60), &queue)
+            .unwrap();
+        for _ in 0..2 {
+            assert!(matches!(
+                receiver.try_recv().unwrap().context,
+                crate::exec::queue::ExecutionContext::InternalSchedule
+            ));
+        }
+        assert!(receiver.try_recv().is_err());
+        std::fs::remove_file(path).unwrap();
+    }
+
     // >< >< >< >< >< >< >< >< >< ><
     // >< >< manager.rs tests  >< ><
     // >< >< >< >< >< >< >< >< >< ><

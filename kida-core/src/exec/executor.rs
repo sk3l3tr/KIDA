@@ -18,7 +18,7 @@ use crate::{
                 system_wake_capabilities,
             },
         },
-        queue::{CommandQueue, QueueError, QueuedCommand},
+        queue::{CommandQueue, ExecutionContext, QueueError, QueuedCommand},
     },
     infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
 };
@@ -49,6 +49,37 @@ pub(crate) fn is_schedulable(command: &str, internal: bool) -> bool {
 
 fn is_health_maintenance(command: &str) -> bool {
     matches!(command, "backup.health.expire" | "backup.health.retain")
+}
+
+pub(crate) async fn execute_queued(
+    request: CommandRequest,
+    context: ExecutionContext,
+    execution_id: String,
+) -> CommandResponse {
+    if let ExecutionContext::HealthRun(run_id) = context {
+        let result = async {
+            crate::features::backup::health::service::get_service()
+                .await?
+                .execute(&run_id)
+                .await?;
+            Ok(serde_json::json!({"run_id": run_id}))
+        }
+        .await;
+        return commands::backup::health::response(request.id, result);
+    }
+    if is_health_maintenance(&request.command) {
+        if !matches!(context, ExecutionContext::InternalSchedule) {
+            return commands::backup::health::response(
+                request.id,
+                Err("Internal command is not public".into()),
+            );
+        }
+        return commands::backup::health::maintenance(request).await;
+    }
+    if request.command == "backup.health.run" {
+        return commands::backup::health::exec(request, Some(execution_id)).await;
+    }
+    execute_now(request).await
 }
 
 pub async fn execute(request: CommandRequest) -> CommandResponse {
@@ -92,6 +123,7 @@ pub async fn execute_now(request: CommandRequest) -> CommandResponse {
         CommandKind::BackupConfigCreate => backup_create::exec(request).await,
         CommandKind::BackupConfigDelete => backup_delete::exec(request).await,
         CommandKind::BackupRun => commands::backup::backup_run::exec(request).await,
+        CommandKind::BackupHealth => commands::backup::health::exec(request, None).await,
 
         CommandKind::Scheduler(command) => {
             let manager = match crate::features::scheduler::runtime::manager() {

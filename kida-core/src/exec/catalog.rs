@@ -19,6 +19,7 @@ pub(crate) enum CommandKind {
     BackupConfigCreate,
     BackupConfigDelete,
     BackupRun,
+    BackupHealth,
     Scheduler(SchedulerCommand),
 }
 
@@ -49,6 +50,16 @@ pub(crate) fn resolve(command: &str) -> Option<CommandKind> {
         "backup.config.create" => CommandKind::BackupConfigCreate,
         "backup.config.delete" => CommandKind::BackupConfigDelete,
         "backup.run" => CommandKind::BackupRun,
+        "backup.health.create"
+        | "backup.health.start"
+        | "backup.health.run"
+        | "backup.health.get"
+        | "backup.health.list"
+        | "backup.health.stop"
+        | "backup.health.delete"
+        | "backup.health.report.list"
+        | "backup.health.report.get"
+        | "backup.health.report.delete" => CommandKind::BackupHealth,
         "scheduler.add" => CommandKind::Scheduler(SchedulerCommand::Add),
         "scheduler.list" => CommandKind::Scheduler(SchedulerCommand::List),
         "scheduler.delete" => CommandKind::Scheduler(SchedulerCommand::Delete),

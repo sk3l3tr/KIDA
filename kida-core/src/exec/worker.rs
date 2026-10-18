@@ -6,14 +6,25 @@ use tokio::{
 
 use crate::{
     conf,
-    exec::{executor, queue::QueuedCommand},
+    exec::{
+        executor,
+        queue::{ExecutionContext, QueuedCommand},
+    },
     infrastructure::comm::protocol::{CommandRequest, CommandResponse, CommandStatus},
 };
 
 pub async fn run(receiver: mpsc::Receiver<QueuedCommand>) {
-    run_with_handler(receiver, executor::execute_now).await;
+    let queue = &conf::get().expect("configuration not initialized").queue;
+    run_with_context(
+        receiver,
+        executor::execute_queued,
+        queue.max_concurrent_jobs,
+        queue.capacity + queue.max_concurrent_jobs,
+    )
+    .await;
 }
 
+#[cfg(test)]
 pub async fn run_with_handler<F, Fut>(receiver: mpsc::Receiver<QueuedCommand>, handler: F)
 where
     F: Fn(CommandRequest) -> Fut + Send + Sync + 'static,
@@ -29,13 +40,32 @@ where
     .await;
 }
 
+#[cfg(test)]
 pub(super) async fn run_with_limits<F, Fut>(
-    mut receiver: mpsc::Receiver<QueuedCommand>,
+    receiver: mpsc::Receiver<QueuedCommand>,
     handler: F,
     max_concurrent_jobs: usize,
     max_admitted_jobs: usize,
 ) where
     F: Fn(CommandRequest) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = CommandResponse> + Send + 'static,
+{
+    run_with_context(
+        receiver,
+        move |request, _context, _execution_id| handler(request),
+        max_concurrent_jobs,
+        max_admitted_jobs,
+    )
+    .await;
+}
+
+pub(super) async fn run_with_context<F, Fut>(
+    mut receiver: mpsc::Receiver<QueuedCommand>,
+    handler: F,
+    max_concurrent_jobs: usize,
+    max_admitted_jobs: usize,
+) where
+    F: Fn(CommandRequest, ExecutionContext, String) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = CommandResponse> + Send + 'static,
 {
     let handler = Arc::new(handler);
@@ -48,7 +78,7 @@ pub(super) async fn run_with_limits<F, Fut>(
     while !closed || !tasks.is_empty() {
         tokio::select! {
             task = receiver.recv(), if !closed && tasks.len() < max_admitted_jobs => {
-                let Some(QueuedCommand { execution_id, request }) = task else {
+                let Some(QueuedCommand { execution_id, request, context }) = task else {
                     closed = true;
                     continue;
                 };
@@ -66,7 +96,7 @@ pub(super) async fn run_with_limits<F, Fut>(
                     };
                     let _permit = capacity.acquire().await.expect("worker semaphore closed");
                     println!("[QUEUE] Starting execution {} ({})", id, request.command);
-                    handler(request).await
+                    handler(request, context, id).await
                 });
                 executions.insert(task.id(), execution_id);
             }
