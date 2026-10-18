@@ -76,11 +76,13 @@ class Core:
         self.port = reservation.getsockname()[1]
         reservation.close()
         # All paths are absolute; JSON strings are valid TOML basic strings here.
+        # Fake Docker also starts many Python processes during ownership checks;
+        # use the real fixture's deadline to tolerate contention on CI runners.
         config = {
             "backup": {"backup_dir": str(root / "jobs")},
             "backup_health": {"data_root": str(root / "data"), "restore_root": str(root / "restore"),
                               "manual_ttl_hours": 1, "report_retention_days": 1,
-                              "health_timeout_seconds": 15 if real else 3, "max_active_runs": 2},
+                              "health_timeout_seconds": 15, "max_active_runs": 2},
             "docker": {"ownership_dir": str(root / "ownership")},
             "scheduler": {"path": str(root / "scheduler.toml")},
             "unix": {"socket_path": str(root / "core.sock")},

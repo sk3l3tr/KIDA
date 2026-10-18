@@ -24,7 +24,9 @@ fn lifecycle_with_isolated_fake_docker() {
     config.backup.backup_dir = root.join("backups").to_str().unwrap().into();
     config.backup_health.data_root = root.join("data");
     config.backup_health.restore_root = root.join("restore");
-    config.backup_health.health_timeout_seconds = 2;
+    // Cleanup starts many Python subprocesses under a shared deadline. Allow
+    // contention on CI runners; this fixture tests lifecycle, not timeouts.
+    config.backup_health.health_timeout_seconds = 30;
     config.backup_health.max_active_runs = 1;
     config.docker.ownership_dir = root.join("ownership").to_str().unwrap().into();
     fs::write(root.join("config.toml"), toml::to_string(&config).unwrap()).unwrap();
@@ -137,7 +139,12 @@ async fn lifecycle_child() {
     service.execute(&automatic.run_id).await.unwrap();
     let done = service.get(&automatic.run_id).await.unwrap();
     assert_eq!(done.diagnosis.result, BackupHealthResult::Healthy);
-    assert_eq!(done.cleanup.state, HealthCleanupState::Completed);
+    assert_eq!(
+        done.cleanup.state,
+        HealthCleanupState::Completed,
+        "{:?}",
+        done.cleanup.errors
+    );
     assert!(!done.restore_dir.exists());
     assert_eq!(state(&root)["container"], json!([]));
     assert_eq!(state(&root)["volume"][0]["Name"], "shared");
@@ -158,7 +165,13 @@ async fn lifecycle_child() {
     );
     service.stop(&manual.run_id).await.unwrap();
     assert!(manual.restore_dir.exists());
-    service.delete(&manual.run_id).await.unwrap();
+    let deleted = service.delete(&manual.run_id).await.unwrap();
+    assert_eq!(
+        deleted.cleanup.state,
+        HealthCleanupState::Completed,
+        "{:?}",
+        deleted.cleanup.errors
+    );
     assert!(!manual.restore_dir.exists());
 
     for scenario in ["start-error", "partial-create", "config-error"] {
