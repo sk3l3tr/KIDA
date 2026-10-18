@@ -61,7 +61,10 @@ impl ScheduleService {
                 continue;
             };
 
-            if !executor::is_registered(&definition.command) {
+            if !executor::is_schedulable(
+                &definition.command,
+                definition.origin == ScheduleOrigin::Internal,
+            ) {
                 return Err(format!(
                     "schedule {id}: unknown command: {}",
                     definition.command
@@ -154,7 +157,7 @@ impl ScheduleService {
         origin: ScheduleOrigin,
         now: DateTime<Utc>,
     ) -> Result<ScheduleEntry, String> {
-        if !executor::is_registered(&input.command) {
+        if !executor::is_schedulable(&input.command, origin == ScheduleOrigin::Internal) {
             return Err(format!("unknown command: {}", input.command));
         }
         let next_enqueue_at = next_enqueue_at(&input.schedule, now, now)?

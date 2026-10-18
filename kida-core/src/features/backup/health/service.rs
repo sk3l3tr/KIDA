@@ -34,7 +34,14 @@ static SERVICE: OnceCell<HealthService> = OnceCell::const_new();
 
 pub async fn get_service() -> Result<&'static HealthService, String> {
     SERVICE
-        .get_or_try_init(|| async { HealthService::new(conf::get()?.backup_health.clone()).await })
+        .get_or_try_init(|| async {
+            let service = HealthService::new(conf::get()?.backup_health.clone()).await?;
+            let recovery = super::maintenance::startup(&service, Utc::now()).await?;
+            for error in recovery.errors {
+                eprintln!("[HEALTH] {error}");
+            }
+            Ok::<_, String>(service)
+        })
         .await
 }
 
@@ -63,20 +70,22 @@ pub struct HealthService {
     config: BackupHealthConfig,
     repository: Arc<ExecutionRepository>,
     registry: StdMutex<Registry>,
+    admission_errors: Vec<String>,
 }
 
 impl HealthService {
     pub async fn new(config: BackupHealthConfig) -> Result<Self, String> {
         let repository = Arc::new(ExecutionRepository::new(&config.data_root));
-        let records = blocking({
+        let (records, admission_errors) = blocking({
             let repository = repository.clone();
-            move || repository.list().map_err(|e| e.to_string())
+            move || repository.list_available().map_err(|e| e.to_string())
         })
         .await?;
         let service = Self {
             config,
             repository,
             registry: StdMutex::new(Registry::default()),
+            admission_errors,
         };
         for record in records {
             let execution = record.execution;
@@ -371,6 +380,17 @@ impl HealthService {
         Ok(data.execution.clone())
     }
 
+    pub async fn records(&self) -> Result<Vec<HealthHistoryRecord>, String> {
+        let repository = self.repository.clone();
+        blocking(move || {
+            repository
+                .list_available()
+                .map(|(records, _)| records)
+                .map_err(|e| e.to_string())
+        })
+        .await
+    }
+
     pub async fn list(&self) -> Result<Vec<HealthHistoryRecord>, String> {
         let repository = self.repository.clone();
         blocking(move || repository.list().map_err(|e| e.to_string())).await
@@ -567,6 +587,23 @@ impl HealthService {
         blocking(move || repository.report_delete(&id).map_err(|e| e.to_string())).await
     }
 
+    pub async fn forget(&self, run_id: &str, cutoff: DateTime<Utc>) -> Result<bool, String> {
+        let run = self.find(run_id)?;
+        let _data = run.data.lock().await;
+        let repository = self.repository.clone();
+        let id = run_id.to_owned();
+        let removed = blocking(move || {
+            repository
+                .prune(&id, cutoff.fixed_offset())
+                .map_err(|e| e.to_string())
+        })
+        .await?;
+        if removed {
+            self.registry.lock().unwrap().runs.remove(run_id);
+        }
+        Ok(removed)
+    }
+
     async fn persist(&self, data: &RunData) -> Result<(), String> {
         if let Ok(run) = self.find(&data.execution.run_id) {
             *run.view.lock().unwrap() = data.execution.clone();
@@ -597,6 +634,9 @@ impl HealthService {
             .ok_or_else(|| "Health run not found".into())
     }
     fn reserve(&self, execution: &BackupHealthExecution) -> Result<(), String> {
+        if !self.admission_errors.is_empty() {
+            return Err("Health admission blocked by unreadable execution history".into());
+        }
         let mut registry = self.registry.lock().unwrap();
         if registry
             .reservations

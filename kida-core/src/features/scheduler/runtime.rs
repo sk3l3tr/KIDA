@@ -14,7 +14,9 @@ pub fn init(queue: CommandQueue) -> Result<(), String> {
     }
 
     let config = conf::get()?;
-    let service = ScheduleService::load(&config.scheduler.path, Utc::now())?;
+    let now = Utc::now();
+    let mut service = ScheduleService::load(&config.scheduler.path, now)?;
+    crate::features::backup::health::maintenance::register_jobs(&mut service, now)?;
 
     MANAGER
         .set(SchedulerManager::new(service, queue))

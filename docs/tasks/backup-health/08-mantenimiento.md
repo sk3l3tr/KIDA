@@ -19,3 +19,15 @@ Posee políticas temporales, registro de jobs e integración de arranque. Consum
 Probar borde exacto del TTL/retención, consultas sin renovación, informe ya borrado, ejecuciones interrumpidas, Docker caído y segundo arranque idempotente. Verificar dos jobs, parámetros de conf y rechazo administrativo real en el servicio, además de reintentos sin eliminar registros de propiedad pendientes.
 
 Cierra cuando una ejecución anterior no se reanuda y todas las limpiezas fallidas quedan trazables y reintentables. Actualizar el índice.
+
+## Implementación y revisión
+
+Estado: **Verificada**. Políticas en [maintenance.rs](../../../kida-core/src/features/backup/health/maintenance.rs), retención/lectura tolerante en [history.rs](../../../kida-core/src/features/backup/health/history.rs) y registro de dos jobs mediante el runtime Scheduler existente. La inicialización Health concilia y cierra ejecuciones anteriores antes de publicar el servicio; los demás servicios arrancan sin esperar a Docker.
+
+Las consultas no renuevan el TTL. Una parada manual voluntaria conserva datos hasta el TTL; los intentos de limpieza fallidos se reintentan. La retención usa `finished_at` y conserva registros con recursos pendientes. Un historial corrupto no impide limpiar los registros válidos; bloquea nuevas admisiones para no perder reservas desconocidas. Repararlo requiere reiniciar para volver a cargar el historial.
+
+Validación en [maintenance_tests.rs](../../../kida-core/src/features/backup/health/maintenance_tests.rs) y pruebas de retención del repositorio: bordes exactos, informe borrado, dos jobs idempotentes y protegidos, arranque repetido, registro corrupto y conservación de datos detenidos. La prueba del servicio con Docker simulado cubre parada fallida y reintento.
+
+Revisor independiente: agente `reviewer`. Corregidos sus hallazgos sobre historial corrupto y eliminación prematura de datos conservados por `stop`.
+
+Validación integrada del 18/10/2026: `CARGO_TARGET_DIR=/tmp/kida-target cargo test --workspace --locked` (262 tests aprobados; 16 fixtures hijos ignorados e invocados por sus pruebas padre), `cargo fmt --all -- --check`, `CARGO_TARGET_DIR=/tmp/kida-target cargo clippy --workspace --all-targets --locked -- -D warnings` y `git diff --check`. Suite ejecutada fuera del sandbox para permitir los sockets Unix temporales de las pruebas existentes; `Cargo.lock` sin cambios.

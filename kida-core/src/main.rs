@@ -20,6 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     features::scheduler::runtime::init(executor::command_queue().map_err(std::io::Error::other)?)
         .map_err(std::io::Error::other)?;
 
+    tokio::spawn(async {
+        if let Err(error) = features::backup::health::service::get_service().await {
+            eprintln!("WARN: Backup Health initialization failed: {error}");
+        }
+    });
+
     // Iniciar worker único
     tokio::spawn(worker::run(receiver));
 

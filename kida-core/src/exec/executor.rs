@@ -43,6 +43,14 @@ pub fn is_registered(command: &str) -> bool {
     catalog::resolve(command).is_some()
 }
 
+pub(crate) fn is_schedulable(command: &str, internal: bool) -> bool {
+    is_registered(command) || (internal && is_health_maintenance(command))
+}
+
+fn is_health_maintenance(command: &str) -> bool {
+    matches!(command, "backup.health.expire" | "backup.health.retain")
+}
+
 pub async fn execute(request: CommandRequest) -> CommandResponse {
     match request.command.as_str() {
         "backup.run" => enqueue(request),

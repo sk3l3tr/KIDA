@@ -355,3 +355,36 @@ fn cannot_replace_creation_identity_or_follow_history_symlinks() {
     assert!(fixture.repo.save(&run, None).is_err());
     assert_eq!(fs::read(&external).unwrap(), original);
 }
+
+#[test]
+fn retention_uses_exact_finish_boundary_and_preserves_pending_ownership() {
+    let fixture = Fixture::new();
+    let mut run = fixture.closed();
+    let finished = timestamp(run.finished_at.as_ref().unwrap()).unwrap();
+    run.cleanup.state = HealthCleanupState::Error;
+    fixture
+        .repo
+        .finish(&run, Some(&fixture.provenance()))
+        .unwrap();
+    assert!(!fixture.repo.prune(&run.run_id, finished).unwrap());
+    assert!(
+        fixture
+            .repo
+            .get(&run.run_id)
+            .unwrap()
+            .restore_provenance
+            .is_some()
+    );
+    run.cleanup.state = HealthCleanupState::Completed;
+    fixture.repo.finish(&run, None).unwrap();
+    assert!(
+        !fixture
+            .repo
+            .prune(&run.run_id, finished - chrono::Duration::seconds(1))
+            .unwrap()
+    );
+    fixture.repo.report_delete(&run.run_id).unwrap();
+    assert!(fixture.repo.prune(&run.run_id, finished).unwrap());
+    assert!(fixture.repo.get(&run.run_id).is_err());
+    assert!(fixture.repo.report_list().unwrap().is_empty());
+}

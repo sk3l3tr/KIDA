@@ -136,6 +136,23 @@ impl ExecutionRepository {
         Ok(result.into_iter().map(|(_, record)| record).collect())
     }
 
+    /// Maintenance must still close valid executions when another record is corrupt.
+    pub fn list_available(&self) -> Result<(Vec<HealthHistoryRecord>, Vec<String>), StorageError> {
+        let mut records = Vec::new();
+        let mut errors = Vec::new();
+        for id in self.ids()? {
+            match self.get(&id) {
+                Ok(record) => records.push((timestamp(&record.execution.created_at)?, record)),
+                Err(error) => errors.push(format!("{id}: {error}")),
+            }
+        }
+        records.sort_by(|a, b| (&b.0, &b.1.execution.run_id).cmp(&(&a.0, &a.1.execution.run_id)));
+        Ok((
+            records.into_iter().map(|(_, record)| record).collect(),
+            errors,
+        ))
+    }
+
     pub fn report_list(&self) -> Result<Vec<String>, StorageError> {
         let mut result = Vec::new();
         for record in self.list()? {
@@ -170,6 +187,35 @@ impl ExecutionRepository {
         record.report_status = ReportStatus::Deleted;
         JsonStorage::new(self.execution_path(run_id)?).save(&record)?;
         self.write_report(&record).map(|_| ())
+    }
+
+    /// Caller serializes this with other operations on the execution.
+    /// Remove Markdown first; a failed unlink retains the ownership record.
+    pub fn prune(&self, run_id: &str, cutoff: DateTime<FixedOffset>) -> Result<bool, StorageError> {
+        let record = self.get(run_id)?;
+        let run = &record.execution;
+        if run.cleanup.state != HealthCleanupState::Completed
+            || !matches!(
+                run.state,
+                BackupHealthState::Stopped | BackupHealthState::Error
+            )
+            || run
+                .finished_at
+                .as_deref()
+                .map(timestamp)
+                .transpose()?
+                .is_none_or(|date| date > cutoff)
+        {
+            return Ok(false);
+        }
+        let report = self.report_path(run_id)?;
+        match fs::remove_file(report) {
+            Ok(()) => (),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+            Err(error) => return Err(error.into()),
+        }
+        fs::remove_file(self.execution_path(run_id)?)?;
+        Ok(true)
     }
 
     /// One corrupt record does not prevent repair of the other executions.
