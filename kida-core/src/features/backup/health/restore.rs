@@ -165,3 +165,93 @@ fn invalid(message: &str) -> io::Error {
 #[cfg(test)]
 #[path = "restore_tests.rs"]
 mod tests;
+
+/// Remove only the directory created by this run. Walk via descriptors so a
+/// replaced child or symlink cannot redirect cleanup outside the owned tree.
+pub fn remove_owned(
+    root: &Path,
+    run_id: &str,
+    provenance: &RestoredDirectory,
+) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::os::fd::{AsRawFd, FromRawFd};
+    let root = fs::canonicalize(root).map_err(|e| e.to_string())?;
+    let expected = root.join(run_id);
+    if provenance.path != expected || uuid::Uuid::parse_str(run_id).is_err() {
+        return Err("restore cleanup path does not match run".into());
+    }
+    let identity = provenance
+        .identity
+        .as_ref()
+        .ok_or("restore creation identity missing")?;
+    let parent = File::open(&root).map_err(|e| e.to_string())?;
+    let name = CString::new(run_id).map_err(|e| e.to_string())?;
+    let fd = unsafe {
+        libc::openat(
+            parent.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        let error = io::Error::last_os_error();
+        return if error.kind() == io::ErrorKind::NotFound {
+            Ok(())
+        } else {
+            Err(error.to_string())
+        };
+    }
+    let directory = unsafe { File::from_raw_fd(fd) };
+    let metadata = directory.metadata().map_err(|e| e.to_string())?;
+    if metadata.dev() != identity.device || metadata.ino() != identity.inode {
+        return Err("restore creation identity changed".into());
+    }
+    remove_children(&directory).map_err(|e| e.to_string())?;
+    // Check the directory name still refers to the opened object before unlink.
+    let current = fs::symlink_metadata(&expected).map_err(|e| e.to_string())?;
+    if current.dev() != identity.device || current.ino() != identity.inode {
+        return Err("restore directory changed during cleanup".into());
+    }
+    if unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR) } != 0 {
+        return Err(io::Error::last_os_error().to_string());
+    }
+    Ok(())
+}
+
+fn remove_children(directory: &File) -> io::Result<()> {
+    use std::{
+        ffi::CString,
+        os::{
+            fd::{AsRawFd, FromRawFd},
+            unix::ffi::OsStrExt,
+        },
+    };
+    let descriptor = PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd()));
+    fs::set_permissions(&descriptor, Permissions::from_mode(0o700))?;
+    for entry in fs::read_dir(&descriptor)? {
+        let entry = entry?;
+        let name = CString::new(entry.file_name().as_bytes())?;
+        let fd = unsafe {
+            libc::openat(
+                directory.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        let flags = if fd >= 0 {
+            let child = unsafe { File::from_raw_fd(fd) };
+            remove_children(&child)?;
+            libc::AT_REMOVEDIR
+        } else {
+            let error = io::Error::last_os_error();
+            if !matches!(error.raw_os_error(), Some(libc::ENOTDIR | libc::ELOOP)) {
+                return Err(error);
+            }
+            0
+        };
+        if unsafe { libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), flags) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok(())
+}

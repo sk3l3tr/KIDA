@@ -7,5 +7,6 @@ pub mod model;
 mod report;
 pub mod restore;
 
+pub mod service;
 #[cfg(test)]
 mod tests;

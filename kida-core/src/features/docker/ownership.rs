@@ -20,6 +20,9 @@ pub struct ManagedProject {
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct RemovalReport {
+    /// All recorded resources are confirmed absent; external resources may remain.
+    #[serde(default)]
+    pub completed: bool,
     pub removed: Vec<ResourceOutcome>,
     pub absent: Vec<ResourceOutcome>,
     pub preserved: Vec<ResourceOutcome>,
@@ -464,6 +467,7 @@ impl DockerService {
         .await?;
         let mut report = RemovalReport::default();
         if record.completed {
+            report.completed = true;
             for resource in &record.resources {
                 report
                     .absent
@@ -632,6 +636,7 @@ impl DockerService {
         {
             report.errors.push(error);
         }
+        report.completed = record.completed && report.errors.is_empty();
         Ok(report)
     }
 }
