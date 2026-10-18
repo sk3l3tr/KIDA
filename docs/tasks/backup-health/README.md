@@ -18,7 +18,7 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 | 08 | [Mantenimiento](08-mantenimiento.md) | Completa | [Mantenimiento](../../../kida-core/src/features/backup/health/maintenance.rs), commit `75ed0e9` | [Pruebas y revisión](08-mantenimiento.md#implementación-y-revisión) |
 | 09 | [Protocolo y cola](09-protocolo.md) | Completa | [Handlers](../../../kida-core/src/exec/commands/backup/health.rs), commit `df6c64e` | [Pruebas y revisión](09-protocolo.md#implementación-y-revisión) |
 | 10 | [CLI](10-cli.md) | Completa | [Comandos](../../../kida-cli/src/cli/backup.rs), [input](../../../kida-cli/src/input/health.rs), [renderers](../../../kida-cli/src/renderer/backup/health.rs), commit `ccb720b` | [Pruebas y revisión](10-cli.md#validación-realizada) |
-| 11 | [Integración y E2E](11-integracion-e2e.md) | Pendiente | — | — |
+| 11 | [Integración y E2E](11-integracion-e2e.md) | Implementada | [Driver y guía](../../../tests/backup-health/README.md), commit `84c5119` | [Matriz 1–10 y pruebas](11-integracion-e2e.md#matriz-de-criterios); aceptación Docker real pendiente: falta `newuidmap` |
 
 Estados: **Pendiente**, **En curso**, **Implementada**, **Verificada**, **Completa**, **Bloqueada**. Al implementar, enlazar archivos; al verificar, registrar comandos, resultados y revisión. Después del commit de implementación, marcar **Completa** y registrar su hash en el índice y en la tarea. Una tarea bloqueada debe identificar el impedimento. No marcar verificada solo porque compila ni confundir documentación terminada con funcionalidad terminada.
 
