@@ -23,7 +23,7 @@ Cierra cuando handlers y rutas pueden conectar los componentes reales sin lógic
 
 ## Implementación y revisión
 
-Estado: **Verificada**. [Handlers](../../../kida-core/src/exec/commands/backup/health.rs) finos para las diez operaciones públicas; [cola](../../../kida-core/src/exec/queue.rs), [worker](../../../kida-core/src/exec/worker.rs) y [executor](../../../kida-core/src/exec/executor.rs) conservan el contexto privado de trabajo admitido y del Scheduler interno. No cambia el sobre público ni los transportes.
+Estado: **Completa**. Commit de implementación: `df6c64e`. [Handlers](../../../kida-core/src/exec/commands/backup/health.rs) finos para las diez operaciones públicas; [cola](../../../kida-core/src/exec/queue.rs), [worker](../../../kida-core/src/exec/worker.rs) y [executor](../../../kida-core/src/exec/executor.rs) conservan el contexto privado de trabajo admitido y del Scheduler interno. No cambia el sobre público ni los transportes.
 
 El consumidor ejecuta el run reservado; `backup.health.run` programado crea/admite y ejecuta directamente con el permiso del worker que ya posee. El identificador de cola corresponde a la entrada real y se distingue de `run_id` y del ID de petición. Expiración/retención no son operaciones públicas ni schedules de usuario.
 

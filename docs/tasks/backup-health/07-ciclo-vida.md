@@ -22,7 +22,7 @@ Cierra cuando la máquina de estados y los límites se sostienen bajo concurrenc
 
 ## Implementación y revisión
 
-Estado: **Verificada**. Implementación en [service.rs](../../../kida-core/src/features/backup/health/service.rs) y limpieza de restauraciones con procedencia en [restore.rs](../../../kida-core/src/features/backup/health/restore.rs). La reserva se libera solo tras parada confirmada o eliminación Docker completada. Las operaciones se serializan por run; las consultas ofrecen el último snapshot parcial sin esperar al trabajo en curso.
+Estado: **Completa**. Commit de implementación: `2a93f35`. Implementación en [service.rs](../../../kida-core/src/features/backup/health/service.rs) y limpieza de restauraciones con procedencia en [restore.rs](../../../kida-core/src/features/backup/health/restore.rs). La reserva se libera solo tras parada confirmada o eliminación Docker completada. Las operaciones se serializan por run; las consultas ofrecen el último snapshot parcial sin esperar al trabajo en curso.
 
 `stop` conserva los datos y deja el informe pendiente del intento de eliminación; `delete` conserva el historial y cierra el informe. Un manual detenido conserva sus datos hasta eliminación explícita, TTL o el siguiente arranque. La limpieza distingue recursos Docker propios de bind mounts y recursos externos preservados.
 

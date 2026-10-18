@@ -14,9 +14,9 @@ Cada tarea corresponde a un agente y entrega un resultado acotado con pruebas pr
 | 04 | [Compose para Health](04-compose-health.md) | Completa | [Adaptador](../../../kida-core/src/features/backup/health/compose.rs), commit `80c1307` | [Pruebas y revisión](04-compose-health.md#validación-y-revisión) |
 | 05 | [Diagnóstico](05-diagnostico.md) | Completa | [Evaluador](../../../kida-core/src/features/backup/health/diagnosis.rs), [evidencias](../../../kida-core/src/features/backup/health/evidence.rs), commit `3ad5cea` | [Pruebas y revisión](05-diagnostico.md#validación-y-revisión) |
 | 06 | [Historial e informes](06-historial-informes.md) | Completa | [Repositorio](../../../kida-core/src/features/backup/health/history.rs), [informe](../../../kida-core/src/features/backup/health/report.rs), commit `e6269a2` | [Pruebas y revisión](06-historial-informes.md#validación-y-revisión) |
-| 07 | [Ciclo de vida](07-ciclo-vida.md) | Pendiente | — | — |
-| 08 | [Mantenimiento](08-mantenimiento.md) | Pendiente | — | — |
-| 09 | [Protocolo y cola](09-protocolo.md) | Pendiente | — | — |
+| 07 | [Ciclo de vida](07-ciclo-vida.md) | Completa | [Servicio](../../../kida-core/src/features/backup/health/service.rs), commit `2a93f35` | [Pruebas y revisión](07-ciclo-vida.md#implementación-y-revisión) |
+| 08 | [Mantenimiento](08-mantenimiento.md) | Completa | [Mantenimiento](../../../kida-core/src/features/backup/health/maintenance.rs), commit `75ed0e9` | [Pruebas y revisión](08-mantenimiento.md#implementación-y-revisión) |
+| 09 | [Protocolo y cola](09-protocolo.md) | Completa | [Handlers](../../../kida-core/src/exec/commands/backup/health.rs), commit `df6c64e` | [Pruebas y revisión](09-protocolo.md#implementación-y-revisión) |
 | 10 | [CLI](10-cli.md) | Pendiente | — | — |
 | 11 | [Integración y E2E](11-integracion-e2e.md) | Pendiente | — | — |
 

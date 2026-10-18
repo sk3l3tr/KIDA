@@ -22,7 +22,7 @@ Cierra cuando una ejecución anterior no se reanuda y todas las limpiezas fallid
 
 ## Implementación y revisión
 
-Estado: **Verificada**. Políticas en [maintenance.rs](../../../kida-core/src/features/backup/health/maintenance.rs), retención/lectura tolerante en [history.rs](../../../kida-core/src/features/backup/health/history.rs) y registro de dos jobs mediante el runtime Scheduler existente. La inicialización Health concilia y cierra ejecuciones anteriores antes de publicar el servicio; los demás servicios arrancan sin esperar a Docker.
+Estado: **Completa**. Commit de implementación: `75ed0e9`. Políticas en [maintenance.rs](../../../kida-core/src/features/backup/health/maintenance.rs), retención/lectura tolerante en [history.rs](../../../kida-core/src/features/backup/health/history.rs) y registro de dos jobs mediante el runtime Scheduler existente. La inicialización Health concilia y cierra ejecuciones anteriores antes de publicar el servicio; los demás servicios arrancan sin esperar a Docker.
 
 Las consultas no renuevan el TTL. Una parada manual voluntaria conserva datos hasta el TTL; los intentos de limpieza fallidos se reintentan. La retención usa `finished_at` y conserva registros con recursos pendientes. Un historial corrupto no impide limpiar los registros válidos; bloquea nuevas admisiones para no perder reservas desconocidas. Repararlo requiere reiniciar para volver a cargar el historial.
 
