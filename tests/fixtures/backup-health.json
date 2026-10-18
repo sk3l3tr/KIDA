@@ -1,0 +1,196 @@
+{
+  "created": {
+    "run_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+    "definition": {
+      "id": "app-health",
+      "name": "App Health",
+      "backup": {
+        "reference": "daily",
+        "version": "latest"
+      },
+      "docker": {
+        "compose": "compose.yml"
+      }
+    },
+    "definition_path": "/srv/health/app.toml",
+    "mode": "MANUAL",
+    "state": "CREATED",
+    "diagnosis": {
+      "result": "UNKNOWN",
+      "summary": "Not started",
+      "complete": false,
+      "services": [],
+      "anomalies": [],
+      "evidence": []
+    },
+    "created_at": "2026-10-18T12:00:00Z",
+    "started_at": null,
+    "finished_at": null,
+    "artifact": null,
+    "compose_path": "/srv/health/compose.yml",
+    "compose_checksum": null,
+    "restore_dir": "/tmp/kida/restored/aabbccdd-1234-4567-89ab-0123456789ab",
+    "project": null,
+    "services": [],
+    "resources": [],
+    "cleanup": {
+      "state": "PENDING",
+      "errors": []
+    },
+    "report_path": null
+  },
+  "closed": {
+    "run_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+    "definition": {
+      "id": "app-health",
+      "name": "App Health",
+      "backup": {
+        "reference": "daily",
+        "version": "latest"
+      },
+      "docker": {
+        "compose": "compose.yml"
+      }
+    },
+    "definition_path": "/srv/health/app.toml",
+    "mode": "MANUAL",
+    "state": "STOPPED",
+    "diagnosis": {
+      "result": "DEGRADED",
+      "summary": "Restart recovered",
+      "complete": true,
+      "services": [
+        {
+          "service": "app",
+          "result": "DEGRADED",
+          "reasons": [
+            "Restart recovered"
+          ]
+        }
+      ],
+      "anomalies": [
+        "Restart recovered"
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-10-18T12:00:15Z",
+          "service": "app",
+          "container_id": "container-id",
+          "description": "Recovered",
+          "logs": "Safe log excerpt"
+        }
+      ]
+    },
+    "created_at": "2026-10-18T12:00:00Z",
+    "started_at": "2026-10-18T12:00:01Z",
+    "finished_at": "2026-10-18T12:00:21Z",
+    "artifact": {
+      "artifact_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+      "job_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+      "artifact_name": "copy.tar.zst",
+      "created_at": "2026-10-18T11:00:00Z",
+      "path": "/srv/backups/copy.tar.zst",
+      "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 100
+    },
+    "compose_path": "/srv/health/compose.yml",
+    "compose_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "restore_dir": "/tmp/kida/restored/aabbccdd-1234-4567-89ab-0123456789ab",
+    "project": null,
+    "services": [],
+    "resources": [],
+    "cleanup": {
+      "state": "ERROR",
+      "errors": [
+        "Docker unavailable"
+      ]
+    },
+    "report_path": "/var/lib/kida/backup-health/reports/aabbccdd-1234-4567-89ab-0123456789ab.md"
+  },
+  "queued": {
+    "run_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+    "state": "STARTING",
+    "execution_id": "queue-id"
+  },
+  "report": {
+    "run_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+    "markdown": "# Backup Health\n\nAdministrator validation required.\n"
+  },
+  "deleted": {
+    "run_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+    "deleted": true
+  },
+  "listed": [
+    {
+      "run_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+      "definition": {
+        "id": "app-health",
+        "name": "App Health",
+        "backup": {
+          "reference": "daily",
+          "version": "latest"
+        },
+        "docker": {
+          "compose": "compose.yml"
+        }
+      },
+      "definition_path": "/srv/health/app.toml",
+      "mode": "MANUAL",
+      "state": "STOPPED",
+      "diagnosis": {
+        "result": "DEGRADED",
+        "summary": "Restart recovered",
+        "complete": true,
+        "services": [
+          {
+            "service": "app",
+            "result": "DEGRADED",
+            "reasons": [
+              "Restart recovered"
+            ]
+          }
+        ],
+        "anomalies": [
+          "Restart recovered"
+        ],
+        "evidence": [
+          {
+            "observed_at": "2026-10-18T12:00:15Z",
+            "service": "app",
+            "container_id": "container-id",
+            "description": "Recovered",
+            "logs": "Safe log excerpt"
+          }
+        ]
+      },
+      "created_at": "2026-10-18T12:00:00Z",
+      "started_at": "2026-10-18T12:00:01Z",
+      "finished_at": "2026-10-18T12:00:21Z",
+      "artifact": {
+        "artifact_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+        "job_id": "aabbccdd-1234-4567-89ab-0123456789ab",
+        "artifact_name": "copy.tar.zst",
+        "created_at": "2026-10-18T11:00:00Z",
+        "path": "/srv/backups/copy.tar.zst",
+        "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 100
+      },
+      "compose_path": "/srv/health/compose.yml",
+      "compose_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "restore_dir": "/tmp/kida/restored/aabbccdd-1234-4567-89ab-0123456789ab",
+      "project": null,
+      "services": [],
+      "resources": [],
+      "cleanup": {
+        "state": "ERROR",
+        "errors": [
+          "Docker unavailable"
+        ]
+      },
+      "report_path": "/var/lib/kida/backup-health/reports/aabbccdd-1234-4567-89ab-0123456789ab.md",
+      "record_version": 1,
+      "restore_provenance": null,
+      "report_status": "READY"
+    }
+  ]
+}

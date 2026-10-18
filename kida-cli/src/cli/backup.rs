@@ -2,6 +2,11 @@ use clap::{ArgGroup, Args, Subcommand};
 
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum BackupCommand {
+    Health {
+        #[command(subcommand)]
+        command: HealthCommand,
+    },
+
     Config {
         #[command(subcommand)]
         command: BackupConfigCommand,
@@ -113,4 +118,55 @@ pub struct CreateParameters {
     /// Protected restore point; repeat to add entries.
     #[arg(long = "retention-protected-restore-point", value_name = "STRING")]
     pub retention_protected_restore_points: Vec<String>,
+}
+
+#[derive(Debug, Subcommand, PartialEq, Eq)]
+pub enum HealthCommand {
+    Create {
+        /// Definition path on CORE; never read by the client.
+        #[arg(long)]
+        file: String,
+        /// Execution mode: automatic or manual.
+        #[arg(long)]
+        mode: String,
+    },
+    Run {
+        /// Definition path on CORE; never read by the client.
+        #[arg(long)]
+        file: String,
+    },
+    Start {
+        #[arg(long)]
+        run_id: String,
+    },
+    Get {
+        #[arg(long)]
+        run_id: String,
+    },
+    Stop {
+        #[arg(long)]
+        run_id: String,
+    },
+    Delete {
+        #[arg(long)]
+        run_id: String,
+    },
+    List,
+    Report {
+        #[command(subcommand)]
+        command: HealthReportCommand,
+    },
+}
+
+#[derive(Debug, Subcommand, PartialEq, Eq)]
+pub enum HealthReportCommand {
+    List,
+    Get {
+        #[arg(long)]
+        run_id: String,
+    },
+    Delete {
+        #[arg(long)]
+        run_id: String,
+    },
 }

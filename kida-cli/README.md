@@ -380,4 +380,79 @@ returns a non-zero exit status.
 Commands use spaces between each level. Dotted forms such as `system.info` or
 `docker.containers.list` are not accepted.
 
+## Backup Health
+
+Health commands return human-readable text, with no `--json` option or wizard.
+Every required flag must be supplied. UUIDs and modes are validated before
+connecting to CORE. `--file` is the definition path on the CORE server: the CLI
+passes it unchanged, including relative paths, without reading or resolving it
+locally. CORE resolves the Compose path relative to that definition.
+
+Create and start a manual environment:
+
+```bash
+kida backup health create --file /srv/health/app.toml --mode manual
+kida backup health start --run-id <UUID>
+kida backup health get --run-id <UUID>
+kida backup health stop --run-id <UUID>
+kida backup health delete --run-id <UUID>
+```
+
+`create` returns a run in `CREATED`. `start` admits it asynchronously and prints
+both the Health Run ID and the separate Queue execution ID. A manual environment
+remains available after diagnosis until stopped or expired. Its TTL defaults to
+four hours (`backup_health.manual_ttl_hours` in `/etc/kida/kida.toml`), measured
+from `started_at`. Maintenance checks expiration periodically; expiration is not an
+exact deadline. Capacity, queue saturation or an active run of the same definition
+can prevent admission.
+
+For an automatic run that diagnoses and then stops and cleans its environment:
+
+```bash
+kida backup health run --file /srv/health/app.toml
+# Alternatively, create first and start the returned UUID:
+kida backup health create --file /srv/health/app.toml --mode automatic
+kida backup health start --run-id <UUID>
+kida backup health list
+```
+
+Schedule a new automatic run on each occurrence using the existing Scheduler:
+
+```bash
+kida scheduler add --command backup.health.run \
+  --params '{"definition_path":"/srv/health/app.toml"}' \
+  --cron '30 2 * * *' --timezone Europe/Madrid
+```
+
+`get`, `stop` and `delete` display the operational state separately from the
+technical result (`FAILED`, `UNHEALTHY`, `UNKNOWN`, `DEGRADED`, `HEALTHY`), plus
+partial or complete diagnosis, timestamps, selected artifact, anomalies, cleanup
+errors and the report path recorded by CORE. Use `report list` to check which
+reports remain available; a recorded path can outlive a deleted report. A technical failure or incomplete cleanup
+can be returned in a successful protocol response; inspect these fields. Protocol
+and transport errors keep their existing error messages and exit statuses.
+
+`stop` stops the environment; `delete` also requests removal of its owned Docker
+resources and restored directory, preserving history and reports. Cleanup errors
+remain visible for later retry. Stopped executions cannot be restarted: create a
+new run. CORE restart closes interrupted runs and attempts cleanup; it does not
+resume manual environments.
+
+```bash
+kida backup health report list
+kida backup health report get --run-id <UUID>
+kida backup health report delete --run-id <UUID>
+```
+
+`report get` prints the Markdown received from CORE. Deleting a report preserves
+history and prevents automatic reconstruction of that voluntarily deleted report.
+Reports default to 90 days of retention (`backup_health.report_retention_days`);
+records needed for pending cleanup are preserved. Runtime configuration changes
+require a CORE restart.
+
+Use an administrator-reviewed Compose definition for isolated restoration paths.
+Compose is trusted configuration: bind mounts can affect production. Health
+checks provide a technical diagnosis; the administrator must validate functional
+integrity. End-to-end Docker acceptance is tracked separately in task 11.
+
 # License and trademarks

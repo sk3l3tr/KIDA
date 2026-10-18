@@ -15,6 +15,16 @@ use error::RenderError;
 type Renderer = fn(&CommandResponse) -> Result<String, RenderError>;
 
 const RENDERERS: &[(&str, Renderer)] = &[
+    ("backup.health.create", backup::health::create),
+    ("backup.health.start", backup::health::queued),
+    ("backup.health.run", backup::health::queued),
+    ("backup.health.list", backup::health::list),
+    ("backup.health.get", backup::health::detail),
+    ("backup.health.stop", backup::health::detail),
+    ("backup.health.delete", backup::health::detail),
+    ("backup.health.report.list", backup::health::report_list),
+    ("backup.health.report.get", backup::health::report_get),
+    ("backup.health.report.delete", backup::health::report_delete),
     ("system.power_cycle", system::power_cycle),
     ("system.wake_capabilities", system::wake_capabilities),
     ("scheduler.add", scheduler::add),

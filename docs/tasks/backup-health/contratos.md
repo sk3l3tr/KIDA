@@ -114,7 +114,7 @@ Las acciones de mantenimiento no son nuevas operaciones administrativas pública
 
 Actualmente la cola no transporta el origen del schedule. 09 añadirá el contexto fiable mínimo al sobre privado de trabajo: el servicio Scheduler lo establece únicamente para una entrada `INTERNAL` admitida; el worker lo conserva para autorizar el mantenimiento. No aceptar ese contexto desde `CommandRequest`, JSON/params, HTTP o socket. Mantener protegidas las operaciones administrativas actuales sin rediseñar Scheduler ni cola.
 
-CLI: `kida backup health create --file <ruta-CORE> --mode <automatic|manual>`; `run --file <ruta-CORE>`; `start/get/stop/delete --run-id <UUID>`; `list`; `report list/get/delete`, con `--run-id` donde corresponda. `--file` identifica un archivo del servidor: el cliente no lo lee ni convierte la ruta a su propio entorno. No añadir wizard ni flags que reproduzcan el TOML. Mantener la presentación JSON y los renderers que devuelven salida sin imprimir.
+CLI: `kida backup health create --file <ruta-CORE> --mode <automatic|manual>`; `run --file <ruta-CORE>`; `start/get/stop/delete --run-id <UUID>`; `list`; `report list/get/delete`, con `--run-id` donde corresponda. `--file` identifica un archivo del servidor: el cliente no lo lee ni convierte la ruta a su propio entorno. No añadir wizard ni flags que reproduzcan el TOML. Presentación humana sin opción `--json`; los renderers devuelven texto sin imprimir. Los informes muestran el Markdown recibido de CORE.
 
 ## Validación común
 

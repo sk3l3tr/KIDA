@@ -119,3 +119,6 @@ pub(crate) mod tests;
 
 #[cfg(test)]
 mod contract_tests;
+
+#[cfg(test)]
+mod health_tests;

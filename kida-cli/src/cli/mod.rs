@@ -5,7 +5,9 @@ mod system;
 
 use clap::{Parser, Subcommand};
 
-pub use backup::{BackupCommand, BackupConfigCommand, CreateParameters};
+pub use backup::{
+    BackupCommand, BackupConfigCommand, CreateParameters, HealthCommand, HealthReportCommand,
+};
 pub use docker::{ContainerCommand, ContainersCommand, DockerCommand};
 pub use scheduler::{AddParameters, SchedulerCommand};
 pub use system::SystemCommand;

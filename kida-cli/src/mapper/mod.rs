@@ -39,6 +39,10 @@ pub(crate) fn create(job: crate::input::backup::NewBackupJob) -> CommandRequest 
     )
 }
 
+pub(crate) fn health(input: crate::input::health::PreparedHealth) -> CommandRequest {
+    backup::health(input)
+}
+
 fn request(command: impl Into<String>, params: Value) -> CommandRequest {
     CommandRequest {
         id: generate_request_id(),

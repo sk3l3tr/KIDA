@@ -4,6 +4,7 @@ pub mod backup;
 pub mod error;
 pub mod fields;
 pub mod file;
+pub mod health;
 pub mod indexed;
 pub mod scheduler;
 pub mod system;
@@ -35,6 +36,7 @@ enum PreparedKind {
     PowerCycle(system::PowerCycle),
     Schedule(scheduler::NewSchedule),
     Create(Box<backup::NewBackupJob>),
+    Health(health::PreparedHealth),
     Other(crate::protocol::CommandRequest),
 }
 
@@ -44,6 +46,7 @@ impl PreparedCommand {
             PreparedKind::PowerCycle(params) => crate::mapper::power_cycle(params),
             PreparedKind::Schedule(schedule) => crate::mapper::schedule(schedule),
             PreparedKind::Create(job) => crate::mapper::create(*job),
+            PreparedKind::Health(params) => crate::mapper::health(params),
             PreparedKind::Other(request) => request,
         }
     }
@@ -131,6 +134,9 @@ pub fn prepare(
             )?;
             PreparedKind::Create(Box::new(job))
         }
+        Command::Backup {
+            command: BackupCommand::Health { command },
+        } => PreparedKind::Health(health::prepare(command)?),
         other => PreparedKind::Other(crate::mapper::direct(other)?),
     };
     Ok(PreparedCommand { command })
