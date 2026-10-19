@@ -107,6 +107,42 @@ mod power_tests {
                 "physical power-on is not guaranteed",
             ),
             (
+                5,
+                vec![
+                    "powercicle",
+                    "--shutdown-time",
+                    "23:30",
+                    "--wake-time",
+                    "06:00",
+                ],
+                "",
+                json!({"wake_time":"06:00","shutdown_time":"23:30"}),
+                json!({"wake_at":"2030-01-02T06:00:00+02:00","shutdown_at":"2030-01-01T23:30:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "Shutdown scheduled for 2030-01-01T23:30:00+02:00.",
+            ),
+            (
+                6,
+                vec![
+                    "powercicle",
+                    "--shutdown-time",
+                    "23:30",
+                    "--wake-after-seconds",
+                    "28800",
+                ],
+                "",
+                json!({"wake_after_seconds":28800,"shutdown_time":"23:30"}),
+                json!({"wake_at":"2030-01-02T06:00:00+02:00","shutdown_at":"2030-01-01T23:30:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "Shutdown scheduled for 2030-01-01T23:30:00+02:00.",
+            ),
+            (
+                7,
+                vec!["powercicle", "--shutdown-time", "23:30"],
+                "time\n06:00\n",
+                json!({"wake_time":"06:00","shutdown_time":"23:30"}),
+                json!({"wake_at":"2030-01-02T06:00:00+02:00","shutdown_at":"2030-01-01T23:30:00+02:00","shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+                "Shutdown scheduled for 2030-01-01T23:30:00+02:00.",
+            ),
+            (
                 4,
                 vec!["wake-capabilities"],
                 "",
@@ -174,6 +210,49 @@ mod power_tests {
             vec!["powercicle", "--wake-time", "é:00"],
             vec!["powercicle", "--wake-after-seconds", "119"],
             vec!["powercicle", "--wake-after-seconds", "0"],
+            vec![
+                "powercicle",
+                "--shutdown-time",
+                "now",
+                "--wake-time",
+                "06:00",
+            ],
+            vec![
+                "powercicle",
+                "--shutdown-time",
+                "+15",
+                "--wake-time",
+                "06:00",
+            ],
+            vec![
+                "powercicle",
+                "--shutdown-time",
+                "6:30",
+                "--wake-time",
+                "06:00",
+            ],
+            vec![
+                "powercicle",
+                "--shutdown-time",
+                "24:00",
+                "--wake-time",
+                "06:00",
+            ],
+            vec![
+                "powercicle",
+                "--shutdown-time",
+                "06:60",
+                "--wake-time",
+                "06:00",
+            ],
+            vec![
+                "powercicle",
+                "--shutdown-time",
+                "é:00",
+                "--wake-time",
+                "06:00",
+            ],
+            vec!["powercicle", "--shutdown-time", "23:30"],
         ] {
             let mut prompts = Vec::new();
             let error = send_command(
@@ -294,6 +373,14 @@ mod power_tests {
             (
                 "system.power_cycle",
                 json!({"wake_at":"future","shutdown_scheduled":false,"s5_wake_status":"unverified"}),
+            ),
+            (
+                "system.power_cycle",
+                json!({"wake_at":"future","shutdown_at":null,"shutdown_scheduled":true,"s5_wake_status":"unverified"}),
+            ),
+            (
+                "system.power_cycle",
+                json!({"wake_at":"future","shutdown_at":42,"shutdown_scheduled":true,"s5_wake_status":"unverified"}),
             ),
             (
                 "system.wake_capabilities",

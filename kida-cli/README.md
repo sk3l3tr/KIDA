@@ -79,20 +79,37 @@ kida system shutdown 23:30
 ```bash
 kida system powercicle --wake-time 06:00
 kida system powercicle --wake-after-seconds 28800
+kida system powercicle --shutdown-time 23:30 --wake-time 06:00
 kida system powercicle
 ```
 
-Choose exactly one flag. `--wake-time` uses the next occurrence of a 24-hour
+Choose exactly one wake flag. `--wake-time` uses the next occurrence of a 24-hour
 `HH:MM` time in the server's local timezone. `--wake-after-seconds` counts from
 execution and requires at least 120 seconds. CORE also checks that the calculated
 wake time is at least 120 seconds away.
 
-Without flags, the interactive assistant asks for the wake mode and its value.
-An interactive terminal is required only in this case. With a flag, no questions
-are asked.
+Without a wake flag, the interactive assistant asks for the wake mode and its
+value, including when only `--shutdown-time` is supplied. An interactive terminal
+is required in this case. With a wake flag, no questions are asked.
 
-This command programs the RTC alarm and requests shutdown in one minute. The
-response shows the resulting wake time and timezone. Success does not guarantee
+This command programs and verifies the RTC alarm before requesting shutdown.
+Without `--shutdown-time`, it requests shutdown in one minute, preserving the
+default behavior. With `--shutdown-time HH:MM`, it requests shutdown at that
+24-hour time today in the server's local timezone. Past times, nonexistent or
+ambiguous times during clock changes, and times less than 60 seconds ahead are
+rejected. The calculated wake must be at least 60 seconds after shutdown and
+at least 120 seconds after execution. Incompatible times are rejected, not
+moved to another day. `--wake-after-seconds` still counts from execution, not
+from shutdown.
+
+CORE checks these conditions before programming the alarm and rechecks the
+shutdown time immediately before requesting shutdown. If the time is no longer
+safe after alarm programming, shutdown is not requested and an error warns that
+the RTC alarm may remain active. The margins validate the requested schedule;
+they do not guarantee how long hardware takes to shut down.
+
+The response shows the resulting wake time and timezone, and the shutdown date
+and timezone when `--shutdown-time` is supplied. Success does not guarantee
 physical power-on from S5; that requires a test on the target hardware.
 
 Check RTC availability without changing alarms:

@@ -8,33 +8,64 @@ use super::{
 };
 
 #[derive(Debug, Serialize)]
+pub struct PowerCycle {
+    #[serde(flatten)]
+    wake: WakeMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shutdown_time: Option<String>,
+}
+
+fn validate_time(time: &str, field: &str) -> Result<(), InputError> {
+    let bytes = time.as_bytes();
+    if bytes.len() != 5
+        || bytes[2] != b':'
+        || ![bytes[0], bytes[1], bytes[3], bytes[4]]
+            .iter()
+            .all(u8::is_ascii_digit)
+        || &time[..2] > "23"
+        || &time[3..] > "59"
+    {
+        return Err(InputError::new(
+            field,
+            "expected a valid 24-hour HH:MM time",
+        ));
+    }
+    Ok(())
+}
+
+pub fn prepare(
+    time: Option<String>,
+    seconds: Option<u64>,
+    shutdown_time: Option<String>,
+    interactive: bool,
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+) -> Result<PowerCycle, InputError> {
+    if let Some(time) = &shutdown_time {
+        validate_time(time, "shutdown_time")?;
+    }
+    let wake = prepare_wake(time, seconds, interactive, reader, writer)?;
+    Ok(PowerCycle {
+        wake,
+        shutdown_time,
+    })
+}
+
+#[derive(Debug, Serialize)]
 #[serde(untagged)]
-pub enum PowerCycle {
+enum WakeMode {
     Time { wake_time: String },
     After { wake_after_seconds: u64 },
 }
 
-fn validate(time: Option<String>, seconds: Option<u64>) -> Result<PowerCycle, InputError> {
+fn validate(time: Option<String>, seconds: Option<u64>) -> Result<WakeMode, InputError> {
     match (time, seconds) {
         (Some(wake_time), None) => {
-            let bytes = wake_time.as_bytes();
-            if bytes.len() != 5
-                || bytes[2] != b':'
-                || ![bytes[0], bytes[1], bytes[3], bytes[4]]
-                    .iter()
-                    .all(u8::is_ascii_digit)
-                || &wake_time[..2] > "23"
-                || &wake_time[3..] > "59"
-            {
-                return Err(InputError::new(
-                    "wake_time",
-                    "expected a valid 24-hour HH:MM time",
-                ));
-            }
-            Ok(PowerCycle::Time { wake_time })
+            validate_time(&wake_time, "wake_time")?;
+            Ok(WakeMode::Time { wake_time })
         }
         (None, Some(wake_after_seconds)) if wake_after_seconds >= 120 => {
-            Ok(PowerCycle::After { wake_after_seconds })
+            Ok(WakeMode::After { wake_after_seconds })
         }
         (None, Some(_)) => Err(InputError::new(
             "wake_after_seconds",
@@ -47,13 +78,13 @@ fn validate(time: Option<String>, seconds: Option<u64>) -> Result<PowerCycle, In
     }
 }
 
-pub fn prepare(
+fn prepare_wake(
     time: Option<String>,
     seconds: Option<u64>,
     interactive: bool,
     reader: &mut impl BufRead,
     writer: &mut impl Write,
-) -> Result<PowerCycle, InputError> {
+) -> Result<WakeMode, InputError> {
     if time.is_some() || seconds.is_some() {
         return validate(time, seconds);
     }

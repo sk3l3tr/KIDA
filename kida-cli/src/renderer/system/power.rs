@@ -20,8 +20,16 @@ pub(in crate::renderer) fn power_cycle(response: &CommandResponse) -> Result<Str
     }
     let wake_at = string(data, "wake_at", "data.wake_at")?;
     s5_status(data)?;
+    let shutdown = if data.contains_key("shutdown_at") {
+        format!(
+            "Shutdown scheduled for {}.",
+            string(data, "shutdown_at", "data.shutdown_at")?
+        )
+    } else {
+        "Shutdown scheduled in one minute.".to_string()
+    };
     Ok(format!(
-        "Shutdown scheduled in one minute.\nRTC wake scheduled for {wake_at}.\nWarning: Wake from S5 is unverified; physical power-on is not guaranteed."
+        "{shutdown}\nRTC wake scheduled for {wake_at}.\nWarning: Wake from S5 is unverified; physical power-on is not guaranteed."
     ))
 }
 

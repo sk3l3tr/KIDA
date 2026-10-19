@@ -1,18 +1,24 @@
 // Must implement tests cases here! Do not implement tests inside source files!
-use super::model::PowerCycleRequest;
+use super::model::{PowerCycleRequest, WakeRequest};
 use serde_json::json;
 
 #[test]
 fn power_cycle_accepts_valid_parameters() {
     assert_eq!(
         PowerCycleRequest::try_from(json!({"wake_time": "06:00"})).unwrap(),
-        PowerCycleRequest::WakeTime(chrono::NaiveTime::from_hms_opt(6, 0, 0).unwrap()),
+        PowerCycleRequest {
+            wake: WakeRequest::WakeTime(chrono::NaiveTime::from_hms_opt(6, 0, 0).unwrap()),
+            shutdown_time: None
+        },
     );
 
     for seconds in [120_u64, 28800] {
         assert_eq!(
             PowerCycleRequest::try_from(json!({"wake_after_seconds": seconds})).unwrap(),
-            PowerCycleRequest::WakeAfterSeconds(seconds),
+            PowerCycleRequest {
+                wake: WakeRequest::WakeAfterSeconds(seconds),
+                shutdown_time: None
+            },
         );
     }
 }
@@ -160,8 +166,13 @@ fn power_cycle_rounds_relative_wake_up_to_whole_seconds() {
 fn power_cycle_rejects_rounding_beyond_supported_date() {
     let now = chrono::DateTime::<chrono::Utc>::MAX_UTC - chrono::TimeDelta::milliseconds(120_500);
 
-    let result =
-        super::SystemPower::calculate_wake_at(&PowerCycleRequest::WakeAfterSeconds(120), &now);
+    let result = super::SystemPower::calculate_wake_at(
+        &PowerCycleRequest {
+            wake: WakeRequest::WakeAfterSeconds(120),
+            shutdown_time: None,
+        },
+        &now,
+    );
 
     assert!(result.is_err());
 }
@@ -237,7 +248,10 @@ fn power_cycle_requests_shutdown_only_after_verified_alarm() {
     let operations = std::cell::RefCell::new(Vec::new());
 
     let result = super::SystemPower::power_cycle_with(
-        &PowerCycleRequest::WakeAfterSeconds(120),
+        &PowerCycleRequest {
+            wake: WakeRequest::WakeAfterSeconds(120),
+            shutdown_time: None,
+        },
         &now,
         |_| {
             operations.borrow_mut().push("rtc");
@@ -265,7 +279,10 @@ fn power_cycle_rtc_failure_prevents_shutdown() {
     let now = chrono::DateTime::parse_from_rfc3339("2026-10-14T00:00:00+02:00").unwrap();
 
     let error = super::SystemPower::power_cycle_with(
-        &PowerCycleRequest::WakeAfterSeconds(120),
+        &PowerCycleRequest {
+            wake: WakeRequest::WakeAfterSeconds(120),
+            shutdown_time: None,
+        },
         &now,
         |_| Err("RTC verification failed".to_string()),
         |_| panic!("Shutdown must not be requested after RTC failure"),
@@ -287,7 +304,10 @@ fn power_cycle_shutdown_failure_warns_about_active_alarm() {
         }),
     ] {
         let error = super::SystemPower::power_cycle_with(
-            &PowerCycleRequest::WakeAfterSeconds(120),
+            &PowerCycleRequest {
+                wake: WakeRequest::WakeAfterSeconds(120),
+                shutdown_time: None,
+            },
             &now,
             |_| Ok(()),
             |when| {
@@ -413,4 +433,230 @@ fn power_cycle_existing_scheduler_preserves_params_and_execution_time() {
 
         std::fs::remove_file(&path).unwrap();
     }
+}
+
+#[test]
+fn power_cycle_shutdown_time_contract() {
+    for wake in [
+        json!({"wake_time":"06:00"}),
+        json!({"wake_after_seconds":28800}),
+    ] {
+        let mut params = wake;
+        params["shutdown_time"] = json!("23:30");
+        let request = PowerCycleRequest::try_from(params.clone()).unwrap();
+        assert_eq!(request.shutdown_time.unwrap().to_string(), "23:30:00");
+        for value in [
+            json!(null),
+            json!(42),
+            json!("6:30"),
+            json!("24:00"),
+            json!("06:60"),
+            json!("now"),
+            json!("+15"),
+            json!("06:30:00"),
+            json!("é:00"),
+        ] {
+            params["shutdown_time"] = value;
+            assert!(
+                PowerCycleRequest::try_from(params.clone()).is_err(),
+                "{params}"
+            );
+        }
+    }
+    assert!(PowerCycleRequest::try_from(json!({"shutdown_time":"23:30"})).is_err());
+    assert!(
+        PowerCycleRequest::try_from(
+            json!({"shutdown_time":"23:30","wake_time":"06:00","extra":true})
+        )
+        .is_err()
+    );
+    assert!(
+        PowerCycleRequest::try_from(
+            json!({"shutdown_time":"23:30","wake_time":"06:00","wake_after_seconds":120})
+        )
+        .is_err()
+    );
+}
+
+fn madrid_time(value: &str) -> chrono::DateTime<chrono_tz::Tz> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .unwrap()
+        .with_timezone(&chrono_tz::Europe::Madrid)
+}
+
+#[test]
+fn power_cycle_explicit_shutdown_accepts_exact_margins_and_midnight_wake() {
+    for (now, params, expected_wake) in [
+        (
+            "2026-10-19T06:29:00+02:00",
+            json!({"shutdown_time":"06:30","wake_after_seconds":120}),
+            "2026-10-19T06:31:00+02:00",
+        ),
+        (
+            "2026-10-19T23:28:00+02:00",
+            json!({"shutdown_time":"23:30","wake_time":"00:30"}),
+            "2026-10-20T00:30:00+02:00",
+        ),
+    ] {
+        let now = madrid_time(now);
+        let request = PowerCycleRequest::try_from(params).unwrap();
+        let operations = std::cell::RefCell::new(Vec::new());
+        let result = super::SystemPower::power_cycle_with(
+            &request,
+            &now,
+            |wake| {
+                assert_eq!(
+                    *wake,
+                    madrid_time(expected_wake).with_timezone(&chrono::Utc)
+                );
+                operations.borrow_mut().push("rtc");
+                Ok(())
+            },
+            |when| {
+                assert_eq!(
+                    when,
+                    request.shutdown_time.unwrap().format("%H:%M").to_string()
+                );
+                operations.borrow_mut().push("shutdown");
+                Ok(super::power::PowerResult {
+                    scheduled: true,
+                    when: when.into(),
+                })
+            },
+        )
+        .unwrap();
+        assert_eq!(operations.into_inner(), vec!["rtc", "shutdown"]);
+        assert_eq!(
+            result.shutdown_at.unwrap(),
+            now.date_naive()
+                .and_time(request.shutdown_time.unwrap())
+                .and_local_timezone(chrono_tz::Europe::Madrid)
+                .unwrap()
+                .to_rfc3339()
+        );
+        assert_eq!(result.wake_at, expected_wake);
+    }
+}
+
+#[test]
+fn power_cycle_unsafe_shutdown_prevents_all_operations() {
+    for (now, shutdown, wake_seconds) in [
+        ("2026-10-19T06:30:00+02:00", "06:29", 3600), // past
+        ("2026-10-19T06:30:00+02:00", "06:30", 3600), // present
+        ("2026-10-19T06:29:01+02:00", "06:30", 3600), // 59 seconds
+        ("2026-10-19T06:29:00.001+02:00", "06:30", 3600),
+        ("2026-10-19T06:00:00+02:00", "06:30", 1800), // wake equals shutdown
+        ("2026-10-19T06:00:00+02:00", "06:30", 1859), // wake gap 59 seconds
+        ("2026-10-19T06:00:00+02:00", "06:30", 120),  // wake before shutdown
+        ("2026-10-19T23:59:00+02:00", "00:01", 3600), // no rollover
+        ("2026-03-29T01:00:00+01:00", "02:30", 14400), // nonexistent
+        ("2026-10-25T01:00:00+02:00", "02:30", 14400), // ambiguous
+    ] {
+        let request = PowerCycleRequest::try_from(
+            json!({"shutdown_time":shutdown,"wake_after_seconds":wake_seconds}),
+        )
+        .unwrap();
+        let error = super::SystemPower::power_cycle_with(
+            &request,
+            &madrid_time(now),
+            |_| panic!("Unsafe request must not program RTC"),
+            |_| panic!("Unsafe request must not request shutdown"),
+        )
+        .unwrap_err();
+        assert!(!error.is_empty());
+    }
+}
+
+#[test]
+fn power_cycle_rechecks_shutdown_after_rtc_programming() {
+    for (now, shutdown, after_rtc) in [
+        (
+            "2026-10-19T06:29:00+02:00",
+            "06:30",
+            "2026-10-19T06:29:01+02:00",
+        ),
+        (
+            "2026-10-19T06:29:00+02:00",
+            "06:30",
+            "2026-10-19T06:31:00+02:00",
+        ),
+        (
+            "2026-10-19T23:57:00+02:00",
+            "23:59",
+            "2026-10-20T00:00:00+02:00",
+        ),
+    ] {
+        let request = PowerCycleRequest::try_from(
+            json!({"shutdown_time":shutdown,"wake_after_seconds":172800}),
+        )
+        .unwrap();
+        let programmed = std::cell::Cell::new(false);
+        let error = super::SystemPower::power_cycle_with_clock(
+            &request,
+            &madrid_time(now),
+            |_| {
+                programmed.set(true);
+                Ok(())
+            },
+            |_| panic!("Expired shutdown must not be requested"),
+            || {
+                assert!(programmed.get());
+                madrid_time(after_rtc)
+            },
+        )
+        .unwrap_err();
+        assert!(programmed.get());
+        assert!(error.contains("RTC alarm may remain active"));
+    }
+}
+
+#[test]
+fn power_cycle_default_response_omits_shutdown_at() {
+    let request = PowerCycleRequest::try_from(json!({"wake_after_seconds":120})).unwrap();
+    let result = super::SystemPower::power_cycle_with(
+        &request,
+        &madrid_time("2026-10-19T06:00:00+02:00"),
+        |_| Ok(()),
+        |when| {
+            assert_eq!(when, "+1");
+            Ok(super::power::PowerResult {
+                scheduled: true,
+                when: when.into(),
+            })
+        },
+    )
+    .unwrap();
+    assert!(
+        serde_json::to_value(result)
+            .unwrap()
+            .get("shutdown_at")
+            .is_none()
+    );
+}
+
+#[test]
+fn power_cycle_recheck_keeps_original_shutdown_and_wake_instants() {
+    let now = madrid_time("2026-10-19T06:28:00+02:00");
+    let request =
+        PowerCycleRequest::try_from(json!({"shutdown_time":"06:30","wake_after_seconds":3600}))
+            .unwrap();
+    let result = super::SystemPower::power_cycle_with_clock(
+        &request,
+        &now,
+        |_| Ok(()),
+        |when| {
+            assert_eq!(when, "06:30");
+            Ok(super::power::PowerResult {
+                scheduled: true,
+                when: when.into(),
+            })
+        },
+        || madrid_time("2026-10-19T06:29:00+02:00"),
+    )
+    .unwrap();
+    assert_eq!(
+        result.shutdown_at.as_deref(),
+        Some("2026-10-19T06:30:00+02:00")
+    );
+    assert_eq!(result.wake_at, "2026-10-19T07:28:00+02:00");
 }

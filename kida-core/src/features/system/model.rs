@@ -58,7 +58,13 @@ pub struct DiskInfo {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum PowerCycleRequest {
+pub struct PowerCycleRequest {
+    pub wake: WakeRequest,
+    pub shutdown_time: Option<chrono::NaiveTime>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum WakeRequest {
     WakeTime(chrono::NaiveTime),
     WakeAfterSeconds(u64),
 }
@@ -71,29 +77,28 @@ impl TryFrom<serde_json::Value> for PowerCycleRequest {
             .as_object()
             .ok_or_else(|| "power_cycle params must be an object".to_string())?;
 
-        if params.len() != 1 {
+        if params.keys().any(|key| {
+            !matches!(
+                key.as_str(),
+                "wake_time" | "wake_after_seconds" | "shutdown_time"
+            )
+        }) {
+            return Err("Unknown power_cycle parameter".to_string());
+        }
+        if params.contains_key("wake_time") == params.contains_key("wake_after_seconds") {
             return Err("Specify exactly one of wake_time or wake_after_seconds".to_string());
         }
 
+        let shutdown_time = params
+            .get("shutdown_time")
+            .map(|value| parse_power_time(value, "shutdown_time"))
+            .transpose()?;
+
         if let Some(value) = params.get("wake_time") {
-            let value = value
-                .as_str()
-                .ok_or_else(|| "wake_time must be a string in HH:MM format".to_string())?;
-
-            let bytes = value.as_bytes();
-            if bytes.len() != 5
-                || bytes[2] != b':'
-                || ![bytes[0], bytes[1], bytes[3], bytes[4]]
-                    .iter()
-                    .all(u8::is_ascii_digit)
-            {
-                return Err("wake_time must use HH:MM format".to_string());
-            }
-
-            let time = chrono::NaiveTime::parse_from_str(value, "%H:%M")
-                .map_err(|_| "wake_time must be a valid 24-hour time".to_string())?;
-
-            return Ok(Self::WakeTime(time));
+            return Ok(Self {
+                wake: WakeRequest::WakeTime(parse_power_time(value, "wake_time")?),
+                shutdown_time,
+            });
         }
 
         if let Some(value) = params.get("wake_after_seconds") {
@@ -105,11 +110,31 @@ impl TryFrom<serde_json::Value> for PowerCycleRequest {
                 return Err("Wake must be at least 120 seconds after execution".to_string());
             }
 
-            return Ok(Self::WakeAfterSeconds(seconds));
+            return Ok(Self {
+                wake: WakeRequest::WakeAfterSeconds(seconds),
+                shutdown_time,
+            });
         }
 
         Err("Unknown power_cycle parameter".to_string())
     }
+}
+
+fn parse_power_time(value: &serde_json::Value, name: &str) -> Result<chrono::NaiveTime, String> {
+    let value = value
+        .as_str()
+        .ok_or_else(|| format!("{name} must be a string in HH:MM format"))?;
+    let bytes = value.as_bytes();
+    if bytes.len() != 5
+        || bytes[2] != b':'
+        || ![bytes[0], bytes[1], bytes[3], bytes[4]]
+            .iter()
+            .all(u8::is_ascii_digit)
+    {
+        return Err(format!("{name} must use HH:MM format"));
+    }
+    chrono::NaiveTime::parse_from_str(value, "%H:%M")
+        .map_err(|_| format!("{name} must be a valid 24-hour time"))
 }
 
 #[derive(Debug, Serialize)]
@@ -123,6 +148,8 @@ pub struct WakeCapabilities {
 
 #[derive(Debug, Serialize)]
 pub struct PowerCycleResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shutdown_at: Option<String>,
     pub wake_at: String,
     pub shutdown_scheduled: bool,
     pub s5_wake_status: &'static str,

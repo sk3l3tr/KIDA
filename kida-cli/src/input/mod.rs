@@ -88,10 +88,12 @@ pub fn prepare(
                 crate::cli::SystemCommand::PowerCycle {
                     wake_time,
                     wake_after_seconds,
+                    shutdown_time,
                 },
         } => PreparedKind::PowerCycle(system::prepare(
             wake_time,
             wake_after_seconds,
+            shutdown_time,
             interactive,
             reader,
             writer,

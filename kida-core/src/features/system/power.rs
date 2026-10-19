@@ -1,4 +1,4 @@
-use super::model::{PowerCycleRequest, PowerCycleResult, WakeCapabilities};
+use super::model::{PowerCycleRequest, PowerCycleResult, WakeCapabilities, WakeRequest};
 use chrono::{DateTime, LocalResult, TimeDelta, TimeZone, Timelike, Utc};
 use std::{fs, io::ErrorKind, process::Command};
 
@@ -23,7 +23,13 @@ impl SystemPower {
         let now = chrono::Local::now();
 
         let result = PowerCycleRequest::try_from(params).and_then(|request| {
-            Self::power_cycle_with(&request, &now, Self::program_rtc_alarm, Self::shutdown)
+            Self::power_cycle_with_clock(
+                &request,
+                &now,
+                Self::program_rtc_alarm,
+                Self::shutdown,
+                chrono::Local::now,
+            )
         });
 
         if let Err(error) = &result {
@@ -33,18 +39,50 @@ impl SystemPower {
         result
     }
 
+    #[cfg(test)]
     pub(crate) fn power_cycle_with<Tz: TimeZone>(
         request: &PowerCycleRequest,
         now: &DateTime<Tz>,
         program_alarm: impl FnOnce(&DateTime<Utc>) -> Result<(), String>,
         request_shutdown: impl FnOnce(&str) -> Result<PowerResult, String>,
     ) -> Result<PowerCycleResult, String> {
+        Self::power_cycle_with_clock(request, now, program_alarm, request_shutdown, || {
+            now.clone()
+        })
+    }
+
+    pub(crate) fn power_cycle_with_clock<Tz: TimeZone>(
+        request: &PowerCycleRequest,
+        now: &DateTime<Tz>,
+        program_alarm: impl FnOnce(&DateTime<Utc>) -> Result<(), String>,
+        request_shutdown: impl FnOnce(&str) -> Result<PowerResult, String>,
+        current_time: impl FnOnce() -> DateTime<Tz>,
+    ) -> Result<PowerCycleResult, String> {
         let wake_at = Self::calculate_wake_at(request, now)?;
         let local_wake_at = wake_at.with_timezone(&now.timezone()).to_rfc3339();
 
+        let shutdown_at = request
+            .shutdown_time
+            .map(|time| calculate_shutdown_at(time, now, &wake_at))
+            .transpose()?;
+
         program_alarm(&wake_at)?;
 
-        let shutdown = request_shutdown("+1")
+        if let Some(expected) = &shutdown_at {
+            let checked = calculate_shutdown_at(expected.time(), &current_time(), &wake_at)
+                .map_err(|error| {
+                    format!("{error}. An RTC alarm may remain active; shutdown was not requested")
+                })?;
+            if checked != *expected {
+                return Err("Shutdown date changed; an RTC alarm may remain active; shutdown was not requested".to_string());
+            }
+        }
+        let when = request
+            .shutdown_time
+            .map(|time| time.format("%H:%M").to_string())
+            .unwrap_or_else(|| "+1".to_string());
+
+        let shutdown = request_shutdown(&when)
             .map_err(|error| format!("Shutdown failed: {error}. An RTC alarm may remain active"))?;
 
         if !shutdown.scheduled {
@@ -52,6 +90,7 @@ impl SystemPower {
         }
 
         Ok(PowerCycleResult {
+            shutdown_at: shutdown_at.map(|date| date.to_rfc3339()),
             wake_at: local_wake_at,
             shutdown_scheduled: true,
             s5_wake_status: "unverified",
@@ -133,8 +172,8 @@ impl SystemPower {
     ) -> Result<DateTime<Utc>, String> {
         let now_utc = now.with_timezone(&Utc);
 
-        let wake_at = match request {
-            PowerCycleRequest::WakeAfterSeconds(seconds) => {
+        let wake_at = match &request.wake {
+            WakeRequest::WakeAfterSeconds(seconds) => {
                 let duration = i64::try_from(*seconds)
                     .ok()
                     .and_then(TimeDelta::try_seconds)
@@ -145,7 +184,7 @@ impl SystemPower {
                     .ok_or_else(|| "Wake date is out of range".to_string())?
             }
 
-            PowerCycleRequest::WakeTime(time) => {
+            WakeRequest::WakeTime(time) => {
                 let timezone = now.timezone();
                 let mut date = now.date_naive();
 
@@ -265,6 +304,31 @@ impl SystemPower {
             warnings,
         }
     }
+}
+
+fn calculate_shutdown_at<Tz: TimeZone>(
+    time: chrono::NaiveTime,
+    now: &DateTime<Tz>,
+    wake_at: &DateTime<Utc>,
+) -> Result<DateTime<Tz>, String> {
+    let shutdown_at = match now
+        .timezone()
+        .from_local_datetime(&now.date_naive().and_time(time))
+    {
+        LocalResult::Single(date) => date,
+        _ => {
+            return Err(
+                "Shutdown time is ambiguous or does not exist in the server timezone".to_string(),
+            );
+        }
+    };
+    if shutdown_at.with_timezone(&Utc).signed_duration_since(now) < TimeDelta::seconds(60) {
+        return Err("Shutdown must be today and at least 60 seconds after execution".to_string());
+    }
+    if wake_at.signed_duration_since(&shutdown_at) < TimeDelta::seconds(60) {
+        return Err("Wake must be at least 60 seconds after shutdown".to_string());
+    }
+    Ok(shutdown_at)
 }
 
 pub(crate) fn verify_rtc_alarm(rtcwake_stdout: &str, wakealarm: &str) -> Result<(), String> {
