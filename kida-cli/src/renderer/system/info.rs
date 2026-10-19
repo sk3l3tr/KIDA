@@ -1,4 +1,4 @@
-use crate::protocol::CommandResponse;
+use crate::protocol::command::CommandResponse;
 use crate::renderer::{
     RenderError,
     format::{format_bytes, unknown},

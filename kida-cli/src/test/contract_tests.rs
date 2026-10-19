@@ -1,17 +1,11 @@
 use crate::{
     input::scheduler::NewSchedule,
-    protocol::{CommandRequest, CommandResponse, CommandStatus},
+    protocol::command::{CommandRequest, CommandResponse, CommandStatus},
 };
 
 use serde_json::{Value, json};
 
-fn protocol_fixture() -> Value {
-    serde_json::from_str(include_str!("../../tests/fixtures/protocol.json")).unwrap()
-}
-
-fn scheduler_fixture() -> Value {
-    serde_json::from_str(include_str!("../../tests/fixtures/scheduler.json")).unwrap()
-}
+use super::handlers::{protocol_fixture, scheduler_fixture};
 
 #[test]
 fn shared_protocol_contract() {

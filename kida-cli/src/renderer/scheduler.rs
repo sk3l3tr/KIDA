@@ -4,7 +4,7 @@ use super::{
     error::RenderError,
     json::{data, field, string, value_object},
 };
-use crate::protocol::{CommandResponse, scheduler::ScheduleRule};
+use crate::protocol::{command::CommandResponse, scheduler::ScheduleRule};
 
 pub fn add(response: &CommandResponse) -> Result<String, RenderError> {
     confirmation(response, "added")

@@ -3,7 +3,7 @@
 mod run_tests {
     use serde_json::json;
 
-    use crate::protocol::{CommandResponse, CommandStatus};
+    use crate::protocol::command::{CommandResponse, CommandStatus};
     use crate::renderer::backup::run::run;
     use crate::renderer::{RenderError, render};
 

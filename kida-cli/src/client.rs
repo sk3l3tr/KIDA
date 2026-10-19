@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::protocol::{CommandRequest, CommandResponse};
+use crate::protocol::command::{CommandRequest, CommandResponse};
 
 pub enum ClientError {
     AgentUnavailable,

@@ -2,7 +2,7 @@ use serde_json::json;
 
 use crate::{
     cli::{ContainerCommand, ContainersCommand, DockerCommand},
-    protocol::CommandRequest,
+    protocol::command::CommandRequest,
 };
 
 use super::{empty_params, request};

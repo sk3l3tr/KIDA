@@ -10,11 +10,11 @@ use crate::{
     cli::Cli,
     client::KidaClient,
     handle_response, input,
-    protocol::{CommandRequest, CommandResponse},
+    protocol::command::{CommandRequest, CommandResponse},
     renderer, send_command,
 };
 
-const ID: &str = "aabbccdd-1234-4567-89ab-0123456789ab";
+use super::handlers::{RUN_ID, backup_health_fixture};
 
 fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
     Cli::try_parse_from(
@@ -22,11 +22,6 @@ fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
             .into_iter()
             .chain(args.iter().copied()),
     )
-}
-
-fn fixture() -> Value {
-    // Shapes serialized by health.rs handlers from BackupHealthExecution and HealthHistoryRecord.
-    serde_json::from_str(include_str!("../../tests/fixtures/backup-health.json")).unwrap()
 }
 
 fn response(value: Value) -> CommandResponse {
@@ -62,25 +57,37 @@ fn cases() -> Vec<(Vec<&'static str>, &'static str, Value)> {
             "run",
             json!({"definition_path":"../missing/app.toml"}),
         ),
-        (vec!["start", "--run-id", ID], "start", json!({"run_id":ID})),
-        (vec!["get", "--run-id", ID], "get", json!({"run_id":ID})),
-        (vec!["stop", "--run-id", ID], "stop", json!({"run_id":ID})),
         (
-            vec!["delete", "--run-id", ID],
+            vec!["start", "--run-id", RUN_ID],
+            "start",
+            json!({"run_id":RUN_ID}),
+        ),
+        (
+            vec!["get", "--run-id", RUN_ID],
+            "get",
+            json!({"run_id":RUN_ID}),
+        ),
+        (
+            vec!["stop", "--run-id", RUN_ID],
+            "stop",
+            json!({"run_id":RUN_ID}),
+        ),
+        (
+            vec!["delete", "--run-id", RUN_ID],
             "delete",
-            json!({"run_id":ID}),
+            json!({"run_id":RUN_ID}),
         ),
         (vec!["list"], "list", json!({})),
         (vec!["report", "list"], "report.list", json!({})),
         (
-            vec!["report", "get", "--run-id", ID],
+            vec!["report", "get", "--run-id", RUN_ID],
             "report.get",
-            json!({"run_id":ID}),
+            json!({"run_id":RUN_ID}),
         ),
         (
-            vec!["report", "delete", "--run-id", ID],
+            vec!["report", "delete", "--run-id", RUN_ID],
             "report.delete",
-            json!({"run_id":ID}),
+            json!({"run_id":RUN_ID}),
         ),
     ]
 }
@@ -115,7 +122,10 @@ fn all_commands_map_exactly_without_prompts_and_direct_mapping_is_blocked() {
             &mut Vec::new(),
         )
         .unwrap();
-        assert_eq!(CommandRequest::from(prepared).params, json!({"run_id":ID}));
+        assert_eq!(
+            CommandRequest::from(prepared).params,
+            json!({"run_id":RUN_ID})
+        );
     }
 }
 
@@ -208,7 +218,7 @@ fn server_paths_are_transmitted_intact_over_socket() {
             std::process::id()
         ));
         let listener = UnixListener::bind(&path).unwrap();
-        let value = fixture()[if index == 0 { "created" } else { "queued" }].clone();
+        let value = backup_health_fixture()[if index == 0 { "created" } else { "queued" }].clone();
         let server = std::thread::spawn(move || {
             let (stream, _) = listener.accept().unwrap();
             stream
@@ -247,7 +257,7 @@ fn server_paths_are_transmitted_intact_over_socket() {
 
 #[test]
 fn render_all_operations_partial_snapshots_and_technical_results() {
-    let fixtures = fixture();
+    let fixtures = backup_health_fixture();
     for (suffix, value, expected) in [
         ("create", fixtures["created"].clone(), "state: CREATED"),
         (
@@ -269,7 +279,7 @@ fn render_all_operations_partial_snapshots_and_technical_results() {
         ),
         ("list", fixtures["listed"].clone(), "TECHNICAL RESULT"),
         ("list", json!([]), "No Backup Health executions found."),
-        ("report.list", json!([ID]), ID),
+        ("report.list", json!([RUN_ID]), RUN_ID),
         ("report.list", json!([]), "No Backup Health reports found."),
         ("report.get", fixtures["report"].clone(), "# Backup Health"),
         (
@@ -311,7 +321,7 @@ fn render_all_operations_partial_snapshots_and_technical_results() {
 
 #[test]
 fn malformed_health_responses_never_fall_back_to_json() {
-    let fixtures = fixture();
+    let fixtures = backup_health_fixture();
     for (_, suffix, _) in cases() {
         let command = format!("backup.health.{suffix}");
         for value in [Value::Null, json!({}), json!(42), json!("bad")] {
@@ -331,7 +341,7 @@ fn malformed_health_responses_never_fall_back_to_json() {
     for value in [
         json!([{}]),
         json!([null]),
-        json!([{"run_id":ID,"state":"STOPPED"}]),
+        json!([{"run_id":RUN_ID,"state":"STOPPED"}]),
     ] {
         assert!(renderer::render("backup.health.list", &response(value)).is_err());
     }
@@ -382,11 +392,11 @@ fn malformed_health_responses_never_fall_back_to_json() {
     for (suffix, value) in [
         (
             "start",
-            json!({"run_id":ID,"state":"CREATED","execution_id":"q"}),
+            json!({"run_id":RUN_ID,"state":"CREATED","execution_id":"q"}),
         ),
-        ("run", json!({"run_id":ID,"state":"STARTING"})),
-        ("report.get", json!({"run_id":ID})),
-        ("report.delete", json!({"run_id":ID,"deleted":false})),
+        ("run", json!({"run_id":RUN_ID,"state":"STARTING"})),
+        ("report.get", json!({"run_id":RUN_ID})),
+        ("report.delete", json!({"run_id":RUN_ID,"deleted":false})),
         ("report.list", json!(["invalid"])),
     ] {
         assert!(renderer::render(&format!("backup.health.{suffix}"), &response(value)).is_err());

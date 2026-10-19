@@ -603,7 +603,7 @@ mod scheduler_tests {
             prepare,
             scheduler::{FileSchedule, NewSchedule, wizard},
         },
-        protocol::CommandRequest,
+        protocol::command::CommandRequest,
     };
     use clap::Parser;
     use serde_json::{Value, json};

@@ -1,6 +1,6 @@
 use serde_json::{Map, Value};
 
-use crate::{protocol::CommandResponse, renderer::error::RenderError};
+use crate::{protocol::command::CommandResponse, renderer::error::RenderError};
 
 pub fn data(response: &CommandResponse) -> Result<&Map<String, Value>, RenderError> {
     response

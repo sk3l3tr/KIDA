@@ -5,7 +5,7 @@ mod power;
 pub(super) use power::{power_cycle, wake_capabilities};
 
 use crate::{
-    protocol::CommandResponse,
+    protocol::command::CommandResponse,
     renderer::{
         error::RenderError,
         json::{boolean, data, string},

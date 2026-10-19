@@ -1,6 +1,6 @@
 use serde_json::{Map, Value};
 
-use crate::protocol::CommandResponse;
+use crate::protocol::command::CommandResponse;
 use crate::renderer::{
     RenderError,
     format::{table, unknown},

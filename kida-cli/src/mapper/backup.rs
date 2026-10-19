@@ -2,7 +2,7 @@ use serde_json::json;
 
 use crate::{
     cli::{BackupCommand, BackupConfigCommand},
-    protocol::CommandRequest,
+    protocol::command::CommandRequest,
 };
 
 use super::{empty_params, request};

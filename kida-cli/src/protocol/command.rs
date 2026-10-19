@@ -1,5 +1,3 @@
-pub mod scheduler;
-
 use std::process::ExitCode;
 
 use serde::{Deserialize, Serialize};
@@ -31,10 +29,4 @@ pub struct CommandResponse {
 pub enum CommandStatus {
     Ok,
     Error,
-}
-
-pub struct ResponseResult {
-    pub stdout: Option<String>,
-    pub stderr: Option<String>,
-    pub exit_code: ExitCode,
 }

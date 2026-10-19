@@ -1,5 +1,5 @@
 use super::request;
-use crate::{cli::SchedulerCommand, protocol::CommandRequest};
+use crate::{cli::SchedulerCommand, protocol::command::CommandRequest};
 
 pub(super) fn map(
     command: SchedulerCommand,

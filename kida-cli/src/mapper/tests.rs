@@ -5,7 +5,7 @@ mod backup_tests {
     use clap::Parser;
     use serde_json::json;
 
-    use crate::{cli::Cli, protocol::CommandRequest};
+    use crate::{cli::Cli, protocol::command::CommandRequest};
 
     #[test]
     fn backup_run_by_id_maps_to_core_contract() {
@@ -48,7 +48,7 @@ mod backup_tests {
 
 #[cfg(test)]
 mod scheduler_tests {
-    use crate::{cli::Cli, protocol::CommandRequest};
+    use crate::{cli::Cli, protocol::command::CommandRequest};
     use clap::Parser;
 
     #[test]
@@ -128,7 +128,7 @@ fn direct_mapping_rejects_commands_requiring_preparation() {
 
 #[test]
 fn prepared_commands_preserve_direct_domain_contracts() {
-    use crate::{cli::Cli, input::prepare, protocol::CommandRequest};
+    use crate::{cli::Cli, input::prepare, protocol::command::CommandRequest};
     use clap::Parser;
     use serde_json::json;
 

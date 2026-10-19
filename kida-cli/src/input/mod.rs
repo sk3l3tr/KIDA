@@ -37,11 +37,11 @@ enum PreparedKind {
     Schedule(scheduler::NewSchedule),
     Create(Box<backup::NewBackupJob>),
     Health(health::PreparedHealth),
-    Other(crate::protocol::CommandRequest),
+    Other(crate::protocol::command::CommandRequest),
 }
 
 impl PreparedCommand {
-    pub(crate) fn into_request(self) -> crate::protocol::CommandRequest {
+    pub(crate) fn into_request(self) -> crate::protocol::command::CommandRequest {
         match self.command {
             PreparedKind::PowerCycle(params) => crate::mapper::power_cycle(params),
             PreparedKind::Schedule(schedule) => crate::mapper::schedule(schedule),

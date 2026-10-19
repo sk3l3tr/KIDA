@@ -9,7 +9,7 @@ mod json;
 
 use serde_json::Value;
 
-use crate::protocol::CommandResponse;
+use crate::protocol::command::CommandResponse;
 use error::RenderError;
 
 type Renderer = fn(&CommandResponse) -> Result<String, RenderError>;

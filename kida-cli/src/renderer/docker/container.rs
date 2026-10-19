@@ -1,4 +1,4 @@
-use crate::protocol::CommandResponse;
+use crate::protocol::command::CommandResponse;
 use crate::renderer::docker::validator::{render_ports, validate_networks};
 use crate::renderer::format::table;
 use crate::renderer::{

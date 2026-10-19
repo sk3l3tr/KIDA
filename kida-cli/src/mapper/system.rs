@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::{cli::SystemCommand, protocol::CommandRequest};
+use crate::{cli::SystemCommand, protocol::command::CommandRequest};
 
 use super::{empty_params, request};
 

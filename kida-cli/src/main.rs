@@ -13,9 +13,10 @@ use std::{
 use clap::Parser;
 use cli::Cli;
 use client::{ClientError, KidaClient};
-use protocol::{CommandRequest, CommandResponse, CommandStatus};
-
-use crate::protocol::ResponseResult;
+use protocol::{
+    comm::ResponseResult,
+    command::{CommandRequest, CommandResponse, CommandStatus},
+};
 
 pub const DEFAULT_SOCKET_PATH: &str = "/tmp/kida.sock";
 
@@ -115,13 +116,4 @@ fn handle_response(command: &str, response: &CommandResponse) -> ResponseResult 
 }
 
 #[cfg(test)]
-pub(crate) mod tests;
-
-#[cfg(test)]
-mod contract_tests;
-
-#[cfg(test)]
-mod health_tests;
-
-#[cfg(test)]
-mod health_e2e_tests;
+pub(crate) mod test;

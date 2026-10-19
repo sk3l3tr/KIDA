@@ -45,7 +45,7 @@ mod power_tests {
         cli::Cli,
         client::KidaClient,
         handle_response, input,
-        protocol::{CommandRequest, CommandResponse, CommandStatus},
+        protocol::command::{CommandRequest, CommandResponse, CommandStatus},
         send_command,
     };
     use clap::Parser;
@@ -410,8 +410,9 @@ mod acceptance_tests {
         cli::{self, Cli},
         client::KidaClient,
         handle_response,
-        protocol::{CommandRequest, CommandResponse, CommandStatus},
+        protocol::command::{CommandRequest, CommandResponse, CommandStatus},
         send_command,
+        test::handlers::backup_fixture,
     };
 
     fn command(args: &[&str]) -> cli::Command {
@@ -666,13 +667,7 @@ mod acceptance_tests {
             assert!(request.params.get("file").is_none());
             assert_eq!(request.params["compression"], "tar_zstd");
             if args.first() == Some(&"--file") {
-                assert_eq!(
-                    request.params,
-                    serde_json::from_str::<serde_json::Value>(include_str!(
-                        "../../tests/fixtures/backup.json"
-                    ))
-                    .unwrap()
-                );
+                assert_eq!(request.params, backup_fixture());
             } else {
                 assert_eq!(request.params["sources"][0], "./missing-source");
                 assert_eq!(request.params["targets"][0]["path"], "../missing-target");

@@ -1,5 +1,5 @@
 use crate::{
-    protocol::CommandResponse,
+    protocol::command::CommandResponse,
     renderer::{
         error::RenderError,
         json::{array, boolean, data, field, nullable_string, string},

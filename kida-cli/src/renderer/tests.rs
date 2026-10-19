@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod scheduler_tests {
     use crate::{
-        protocol::{CommandResponse, CommandStatus},
+        protocol::command::{CommandResponse, CommandStatus},
         renderer::scheduler::{add, delete, list},
     };
     use serde_json::{Value, json};

@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use crate::{cli::Command, protocol::CommandRequest};
+use crate::{cli::Command, protocol::command::CommandRequest};
 
 pub(crate) fn direct(command: Command) -> Result<CommandRequest, crate::input::error::InputError> {
     match command {
