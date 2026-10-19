@@ -17,6 +17,7 @@ use crate::{
 };
 use backup::model::NewBackupJob;
 use error::InputError;
+use scheduler::model::{FileSchedule, NewSchedule};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
@@ -43,7 +44,7 @@ pub struct PreparedCommand {
 
 enum PreparedKind {
     PowerCycle(system::PowerCycle),
-    Schedule(scheduler::NewSchedule),
+    Schedule(NewSchedule),
     Create(Box<NewBackupJob>),
     Health(health::PreparedHealth),
     Other(CommandRequest),
@@ -117,8 +118,8 @@ pub fn prepare(
                 mode,
                 interactive,
                 (reader, writer),
-                || file::read_toml::<scheduler::FileSchedule>(&args.file.unwrap())?.prepare(),
-                || scheduler::from_parameters(args.parameters),
+                || file::read_toml::<FileSchedule>(&args.file.unwrap())?.prepare(),
+                || scheduler::map(args.parameters),
                 scheduler::wizard,
             )?;
             PreparedKind::Schedule(schedule)

@@ -11,7 +11,7 @@ use crate::{
     cli::Command,
     input::{
         PreparedCommand, backup::model::NewBackupJob, error::InputError, health::PreparedHealth,
-        scheduler::NewSchedule, system::PowerCycle,
+        scheduler::model::NewSchedule, system::PowerCycle,
     },
     protocol::command::CommandRequest,
 };

@@ -1,5 +1,5 @@
 use crate::{
-    input::scheduler::NewSchedule,
+    input::scheduler::model::NewSchedule,
     protocol::command::{CommandRequest, CommandResponse, CommandStatus},
 };
 

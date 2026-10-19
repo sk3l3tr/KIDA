@@ -600,7 +600,10 @@ mod scheduler_tests {
         cli::Cli,
         input::{
             prepare,
-            scheduler::{FileSchedule, NewSchedule, wizard},
+            scheduler::{
+                model::{FileSchedule, NewSchedule},
+                wizard,
+            },
         },
         protocol::command::CommandRequest,
     };
