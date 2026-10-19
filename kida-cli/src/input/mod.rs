@@ -18,6 +18,7 @@ use crate::{
 use backup::model::NewBackupJob;
 use error::InputError;
 use scheduler::model::{FileSchedule, NewSchedule};
+use system::model::PowerCycle;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
@@ -43,7 +44,7 @@ pub struct PreparedCommand {
 }
 
 enum PreparedKind {
-    PowerCycle(system::PowerCycle),
+    PowerCycle(PowerCycle),
     Schedule(NewSchedule),
     Create(Box<NewBackupJob>),
     Health(health::PreparedHealth),
