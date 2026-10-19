@@ -1,8 +1,10 @@
+use super::texts;
+
 use clap::{Args, Subcommand};
 
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum SchedulerCommand {
-    /// Add from a local TOML file, flags, or an interactive assistant.
+    #[command(about = texts::SCHEDULER_ADD)]
     Add(AddArgs),
     List {
         #[arg(long, value_enum, default_value = "user")]
@@ -28,8 +30,7 @@ pub struct AddArgs {
 pub struct AddParameters {
     #[arg(long)]
     pub command: Option<String>,
-    /// Required JSON, including null.
-    #[arg(long, value_name = "JSON")]
+    #[arg(help = texts::SCHEDULER_PARAMS, long, value_name = "JSON")]
     pub params: Option<String>,
     #[arg(long, value_name = "RFC3339")]
     pub at: Option<String>,
@@ -37,8 +38,7 @@ pub struct AddParameters {
     pub seconds: Option<u64>,
     #[arg(long, value_name = "EXPRESSION")]
     pub cron: Option<String>,
-    /// IANA timezone for cron (default: UTC).
-    #[arg(long, value_name = "IANA")]
+    #[arg(help = texts::SCHEDULER_TIMEZONE, long, value_name = "IANA")]
     pub timezone: Option<String>,
 }
 

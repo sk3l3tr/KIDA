@@ -1,3 +1,5 @@
+use super::texts;
+
 use clap::{ArgGroup, Args, Subcommand};
 
 #[derive(Debug, Subcommand, PartialEq, Eq)]
@@ -31,7 +33,7 @@ pub enum BackupCommand {
 pub enum BackupConfigCommand {
     List,
 
-    /// Create from a local TOML file, configuration flags, or an interactive assistant.
+    #[command(about = texts::BACKUP_CREATE)]
     Create(Box<CreateArgs>),
 
     #[command(group(
@@ -52,8 +54,7 @@ pub enum BackupConfigCommand {
 #[derive(Debug, Default, Args, PartialEq, Eq)]
 #[group(multiple = true)]
 pub struct CreateArgs {
-    /// Read configuration locally; cannot be combined with configuration flags.
-    #[arg(short = 'f', long, value_name = "PATH")]
+    #[arg(help = texts::BACKUP_FILE, short = 'f', long, value_name = "PATH")]
     pub file: Option<std::path::PathBuf>,
 
     #[command(flatten)]
@@ -63,76 +64,59 @@ pub struct CreateArgs {
 #[derive(Debug, Default, Args, PartialEq, Eq)]
 #[group(multiple = true)]
 pub struct CreateParameters {
-    /// Backup job name (required in parameter mode).
-    #[arg(long)]
+    #[arg(help = texts::BACKUP_NAME, long)]
     pub name: Option<String>,
 
-    /// Compression format (default: tar_zstd).
-    #[arg(long, value_name = "COMPRESSION")]
+    #[arg(help = texts::COMPRESSION, long, value_name = "COMPRESSION")]
     pub compression: Option<String>,
 
-    /// Source path; repeat to add sources.
-    #[arg(long = "source", value_name = "PATH")]
+    #[arg(help = texts::SOURCES, long = "source", value_name = "PATH")]
     pub sources: Vec<String>,
 
-    /// Target path; repeat to add targets.
-    #[arg(long = "target", value_name = "PATH")]
+    #[arg(help = texts::TARGETS, long = "target", value_name = "PATH")]
     pub targets: Vec<String>,
 
-    /// Set required for a zero-based target index (default: true).
-    #[arg(long, value_name = "INDEX=BOOL")]
+    #[arg(help = texts::TARGET_REQUIRED, long, value_name = "INDEX=BOOL")]
     pub target_required: Vec<String>,
 
-    /// Set filesystem UUID for a zero-based target index.
-    #[arg(long, value_name = "INDEX=STRING")]
+    #[arg(help = texts::TARGET_FILESYSTEM_UUID, long, value_name = "INDEX=STRING")]
     pub target_filesystem_uuid: Vec<String>,
 
-    /// Command to run before backup; repeat to add commands.
-    #[arg(long, value_name = "COMMAND")]
+    #[arg(help = texts::PRE_BACKUP, long, value_name = "COMMAND")]
     pub pre_backup: Vec<String>,
 
-    /// Command to run after backup; repeat to add commands.
-    #[arg(long, value_name = "COMMAND")]
+    #[arg(help = texts::POST_BACKUP, long, value_name = "COMMAND")]
     pub post_backup: Vec<String>,
 
-    /// JSON params for a zero-based pre-backup command index (default: null).
-    #[arg(long, value_name = "INDEX=JSON")]
+    #[arg(help = texts::PRE_BACKUP_PARAMS, long, value_name = "INDEX=JSON")]
     pub pre_backup_params: Vec<String>,
 
-    /// JSON params for a zero-based post-backup command index (default: null).
-    #[arg(long, value_name = "INDEX=JSON")]
+    #[arg(help = texts::POST_BACKUP_PARAMS, long, value_name = "INDEX=JSON")]
     pub post_backup_params: Vec<String>,
 
-    /// JSON metadata; does not create a scheduled execution.
-    #[arg(long, value_name = "JSON")]
+    #[arg(help = texts::SCHEDULE, long, value_name = "JSON")]
     pub schedule: Option<String>,
 
-    /// Retention maximum age.
-    #[arg(long, value_name = "STRING")]
+    #[arg(help = texts::RETENTION_MAX_AGE, long, value_name = "STRING")]
     pub retention_max_age: Option<String>,
 
-    /// Number of restore points to retain (unsigned 32-bit integer).
-    #[arg(long, value_name = "U32")]
+    #[arg(help = texts::RETENTION_KEEP_LAST, long, value_name = "U32")]
     pub retention_keep_last: Option<String>,
 
-    /// Protected restore point; repeat to add entries.
-    #[arg(long = "retention-protected-restore-point", value_name = "STRING")]
+    #[arg(help = texts::RETENTION_PROTECTED_RESTORE_POINTS, long = "retention-protected-restore-point", value_name = "STRING")]
     pub retention_protected_restore_points: Vec<String>,
 }
 
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 pub enum HealthCommand {
     Create {
-        /// Definition path on CORE; never read by the client.
-        #[arg(long)]
+        #[arg(help = texts::HEALTH_FILE, long)]
         file: String,
-        /// Execution mode: automatic or manual.
-        #[arg(long)]
+        #[arg(help = texts::HEALTH_MODE, long)]
         mode: String,
     },
     Run {
-        /// Definition path on CORE; never read by the client.
-        #[arg(long)]
+        #[arg(help = texts::HEALTH_FILE, long)]
         file: String,
     },
     Start {

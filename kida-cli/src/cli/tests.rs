@@ -96,3 +96,25 @@ mod backup_tests {
         assert_ne!(parsed.args.parameters, CreateParameters::default());
     }
 }
+
+#[cfg(test)]
+mod help_tests {
+    use clap::CommandFactory;
+
+    use crate::cli::{Cli, texts, with_banner};
+
+    #[test]
+    fn every_command_renders_banner_before_short_and_long_help() {
+        fn check(mut command: clap::Command) {
+            for help in [command.render_help(), command.render_long_help()] {
+                let text = help.to_string();
+                assert!(text.starts_with(texts::BANNER), "{text}");
+                assert_eq!(text.matches(texts::BANNER).count(), 1, "{text}");
+            }
+            for subcommand in command.get_subcommands() {
+                check(subcommand.clone());
+            }
+        }
+        check(with_banner(Cli::command()));
+    }
+}

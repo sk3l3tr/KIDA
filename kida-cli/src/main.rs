@@ -10,7 +10,6 @@ use std::{
     process::ExitCode,
 };
 
-use clap::Parser;
 use cli::Cli;
 use client::{ClientError, KidaClient};
 use protocol::{
@@ -21,7 +20,7 @@ use protocol::{
 pub const DEFAULT_SOCKET_PATH: &str = "/tmp/kida.sock";
 
 fn main() -> ExitCode {
-    let command = Cli::parse().command;
+    let command = Cli::parse_with_help().command;
     let stdin = io::stdin();
     let stderr = io::stderr();
     let client = KidaClient::new(DEFAULT_SOCKET_PATH);
