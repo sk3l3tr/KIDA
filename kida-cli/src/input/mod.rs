@@ -1,5 +1,3 @@
-use error::InputError;
-
 pub mod backup;
 pub mod error;
 pub mod fields;
@@ -8,6 +6,17 @@ pub mod health;
 pub mod indexed;
 pub mod scheduler;
 pub mod system;
+
+use crate::{
+    cli::{
+        AddParameters, BackupCommand, BackupConfigCommand, Command, CreateParameters,
+        SchedulerCommand, SystemCommand,
+    },
+    mapper,
+    protocol::command::CommandRequest,
+};
+use backup::model::NewBackupJob;
+use error::InputError;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
@@ -35,18 +44,18 @@ pub struct PreparedCommand {
 enum PreparedKind {
     PowerCycle(system::PowerCycle),
     Schedule(scheduler::NewSchedule),
-    Create(Box<backup::NewBackupJob>),
+    Create(Box<NewBackupJob>),
     Health(health::PreparedHealth),
-    Other(crate::protocol::command::CommandRequest),
+    Other(CommandRequest),
 }
 
 impl PreparedCommand {
-    pub(crate) fn into_request(self) -> crate::protocol::command::CommandRequest {
+    pub(crate) fn into_request(self) -> CommandRequest {
         match self.command {
-            PreparedKind::PowerCycle(params) => crate::mapper::power_cycle(params),
-            PreparedKind::Schedule(schedule) => crate::mapper::schedule(schedule),
-            PreparedKind::Create(job) => crate::mapper::create(*job),
-            PreparedKind::Health(params) => crate::mapper::health(params),
+            PreparedKind::PowerCycle(params) => mapper::power_cycle(params),
+            PreparedKind::Schedule(schedule) => mapper::schedule(schedule),
+            PreparedKind::Create(job) => mapper::create(*job),
+            PreparedKind::Health(params) => mapper::health(params),
             PreparedKind::Other(request) => request,
         }
     }
@@ -76,16 +85,15 @@ fn prepare_mode<T, R: std::io::BufRead, W: std::io::Write>(
 }
 
 pub fn prepare(
-    command: crate::cli::Command,
+    command: Command,
     interactive: bool,
     reader: &mut impl std::io::BufRead,
     writer: &mut impl std::io::Write,
 ) -> Result<PreparedCommand, InputError> {
-    use crate::cli::{BackupCommand, BackupConfigCommand, Command, CreateParameters};
     let command = match command {
         Command::System {
             command:
-                crate::cli::SystemCommand::PowerCycle {
+                SystemCommand::PowerCycle {
                     wake_time,
                     wake_after_seconds,
                     shutdown_time,
@@ -99,11 +107,11 @@ pub fn prepare(
             writer,
         )?),
         Command::Scheduler {
-            command: crate::cli::SchedulerCommand::Add(args),
+            command: SchedulerCommand::Add(args),
         } => {
             let mode = resolve_mode(
                 args.file.is_some(),
-                args.parameters != crate::cli::AddParameters::default(),
+                args.parameters != AddParameters::default(),
             )?;
             let schedule = prepare_mode(
                 mode,
@@ -131,7 +139,7 @@ pub fn prepare(
                 interactive,
                 (reader, writer),
                 || file::read_toml(&args.file.unwrap()),
-                || backup::from_parameters(args.parameters),
+                || backup::map(args.parameters),
                 backup::wizard,
             )?;
             PreparedKind::Create(Box::new(job))
@@ -139,7 +147,7 @@ pub fn prepare(
         Command::Backup {
             command: BackupCommand::Health { command },
         } => PreparedKind::Health(health::prepare(command)?),
-        other => PreparedKind::Other(crate::mapper::direct(other)?),
+        other => PreparedKind::Other(mapper::direct(other)?),
     };
     Ok(PreparedCommand { command })
 }

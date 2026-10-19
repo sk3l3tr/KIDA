@@ -14,7 +14,7 @@ mod mod_tests {
 
 #[cfg(test)]
 mod backup_tests {
-    use crate::input::backup::NewBackupJob;
+    use crate::input::backup::model::NewBackupJob;
     use serde_json::json;
 
     #[test]
@@ -72,7 +72,7 @@ mod backup_parameter_tests {
 
     use crate::{
         cli::CreateParameters,
-        input::backup::{NewBackupJob, from_parameters},
+        input::backup::{map, model::NewBackupJob},
     };
 
     fn minimal() -> CreateParameters {
@@ -89,7 +89,7 @@ mod backup_parameter_tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("kida-backup-test.toml");
 
         let file: NewBackupJob = crate::input::file::read_toml(&path).unwrap();
-        let parameters = from_parameters(minimal()).unwrap();
+        let parameters = map(minimal()).unwrap();
 
         assert_eq!(
             serde_json::to_value(file).unwrap(),
@@ -114,7 +114,7 @@ mod backup_parameter_tests {
             ..minimal()
         };
 
-        let configuration = serde_json::to_value(from_parameters(parameters).unwrap()).unwrap();
+        let configuration = serde_json::to_value(map(parameters).unwrap()).unwrap();
 
         assert_eq!(
             configuration,
@@ -204,14 +204,14 @@ mod backup_parameter_tests {
         ];
 
         for (parameters, field) in cases {
-            let error = from_parameters(parameters).unwrap_err().to_string();
+            let error = map(parameters).unwrap_err().to_string();
             assert!(error.contains(field), "{error}");
         }
     }
 
     #[test]
     fn explicit_null_matches_deserialized_defaults() {
-        let parameters = from_parameters(CreateParameters {
+        let parameters = map(CreateParameters {
             compression: Some("tar_zstd".into()),
             pre_backup: vec!["health".into()],
             pre_backup_params: vec!["0=null".into()],
@@ -240,8 +240,7 @@ mod backup_parameter_tests {
             ..minimal()
         };
 
-        let configuration: Value =
-            serde_json::to_value(from_parameters(parameters).unwrap()).unwrap();
+        let configuration: Value = serde_json::to_value(map(parameters).unwrap()).unwrap();
 
         assert_eq!(
             configuration["retention"],
@@ -254,7 +253,7 @@ mod backup_parameter_tests {
 mod backup_wizard_tests {
     use crate::{
         cli::CreateParameters,
-        input::backup::{NewBackupJob, from_parameters, wizard},
+        input::backup::{map, model::NewBackupJob, wizard},
     };
     use serde_json::{Value, json};
 
@@ -266,7 +265,7 @@ mod backup_wizard_tests {
             serde_json::from_str(include_str!("../../../tests/fixtures/backup.json")).unwrap();
         let file: NewBackupJob =
             toml::from_str(include_str!("../../../tests/fixtures/backup.toml")).unwrap();
-        let parameters = from_parameters(CreateParameters {
+        let parameters = map(CreateParameters {
             name: Some(" daily ".into()),
             sources: vec!["./etc/../hosts".into(), " source with spaces ".into()],
             targets: vec!["../main".into(), "./secondary".into()],

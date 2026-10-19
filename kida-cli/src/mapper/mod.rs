@@ -7,9 +7,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use crate::{cli::Command, protocol::command::CommandRequest};
+use crate::{
+    cli::Command,
+    input::{
+        PreparedCommand, backup::model::NewBackupJob, error::InputError, health::PreparedHealth,
+        scheduler::NewSchedule, system::PowerCycle,
+    },
+    protocol::command::CommandRequest,
+};
 
-pub(crate) fn direct(command: Command) -> Result<CommandRequest, crate::input::error::InputError> {
+pub(crate) fn direct(command: Command) -> Result<CommandRequest, InputError> {
     match command {
         Command::Scheduler { command } => scheduler::map(command),
         Command::System { command } => system::map(command),
@@ -18,28 +25,28 @@ pub(crate) fn direct(command: Command) -> Result<CommandRequest, crate::input::e
     }
 }
 
-pub(crate) fn power_cycle(params: crate::input::system::PowerCycle) -> CommandRequest {
+pub(crate) fn power_cycle(params: PowerCycle) -> CommandRequest {
     request(
         "system.power_cycle",
         serde_json::to_value(params).expect("power cycle input is JSON serializable"),
     )
 }
 
-pub(crate) fn schedule(schedule: crate::input::scheduler::NewSchedule) -> CommandRequest {
+pub(crate) fn schedule(schedule: NewSchedule) -> CommandRequest {
     request(
         "scheduler.add",
         serde_json::to_value(schedule).expect("scheduler DTO is JSON serializable"),
     )
 }
 
-pub(crate) fn create(job: crate::input::backup::NewBackupJob) -> CommandRequest {
+pub(crate) fn create(job: NewBackupJob) -> CommandRequest {
     request(
         "backup.config.create",
         serde_json::to_value(job).expect("backup DTO is JSON serializable"),
     )
 }
 
-pub(crate) fn health(input: crate::input::health::PreparedHealth) -> CommandRequest {
+pub(crate) fn health(input: PreparedHealth) -> CommandRequest {
     backup::health(input)
 }
 
@@ -63,8 +70,8 @@ fn generate_request_id() -> String {
         .to_string()
 }
 
-impl From<crate::input::PreparedCommand> for CommandRequest {
-    fn from(command: crate::input::PreparedCommand) -> Self {
+impl From<PreparedCommand> for CommandRequest {
+    fn from(command: PreparedCommand) -> Self {
         command.into_request()
     }
 }
