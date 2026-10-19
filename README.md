@@ -24,7 +24,7 @@ Manage Docker, backups, scheduled tasks and system operations from a single tool
 
 ---
 
-## Why KIDA
+## 🤔 Why KIDA
 
 Managing servers shouldn't mean juggling scripts, cron jobs, and endless commands.**KIDA brings Docker, backups, scheduled tasks, and system operations together in one self-hosted agent.** Control your infrastructure from the terminal or integrate it with your own tools.
 
