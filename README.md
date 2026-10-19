@@ -26,6 +26,31 @@ Manage Docker, backups, scheduled tasks and system operations from a single tool
 
 ## Why KIDA
 
-## Samples
+Managing servers shouldn't mean juggling scripts, cron jobs, and endless commands.**KIDA brings Docker, backups, scheduled tasks, and system operations together in one self-hosted agent.** Control your infrastructure from the terminal or integrate it with your own tools.
 
-## Docs & License
+> Less manual work. More control. Your infrastructure, your rules.
+
+## ⚡ Capabilities
+
+**One agent. Everything you need to manage your servers.**
+
+| | Capability | What it does |
+|---|---|---|
+| 🐳 | **Docker Management** | List, start, stop, restart, and remove containers. |
+| 💾 | **Backup Management** | Configure, manage, and execute backup jobs. |
+| 🕒 | **Task Scheduling** | Automate recurring operations with scheduled jobs. |
+| 🖥️ | **System Control** | Monitor system health, inspect hardware, reboot, and shut down. |
+| 🔌 | **CLI & HTTP** | Manage your servers from the terminal or integrate KIDA with your own tools. |
+| 🏠 | **Self-Hosted & Lightweight** | A native Rust agent running on your infrastructure, under your control. |
+
+## 📚 Documentation
+
+Everything you need to get the most out of KIDA.
+
+- 📖 **[Documentation](./docs/)** — Installation, configuration, and usage guides.
+- 💻 **[CLI Reference](./docs/cli.md)** — Commands, parameters, and examples.
+- 🔌 **[API Reference](./docs/api.md)** — Protocols and integrations.
+
+## 📄 License
+
+See the [LICENSE](./LICENSE) file for licensing terms.
