@@ -81,6 +81,27 @@ fn run_isolated_fake_docker(child: &str, missing: bool) {
 }
 
 #[cfg(unix)]
+async fn assert_descendant_dead(pid: i32) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let state = match fs::read_to_string(format!("/proc/{pid}/stat")) {
+            Ok(state) => state,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(error) => panic!("cannot inspect descendant {pid}: {error}"),
+        };
+        // A killed orphan may remain as a zombie until its system reaper runs.
+        if state.split_whitespace().nth(2) == Some("Z") {
+            return;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "descendant {pid} still running after 5 seconds: {state}"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[cfg(unix)]
 fn isolated_options() -> (PathBuf, ComposeOptions) {
     let dir = PathBuf::from(std::env::var_os("KIDA_LIFECYCLE_DIR").unwrap());
     fs::write(
@@ -322,8 +343,7 @@ async fn lifecycle_child() {
     assert!(!PathBuf::from(format!("/proc/{}", pid.trim())).exists());
     fs::remove_file(dir.join("parent-pid")).unwrap();
     let pid = fs::read_to_string(dir.join("pid")).unwrap();
-    let state = fs::read_to_string(format!("/proc/{}/stat", pid.trim())).unwrap_or_default();
-    assert!(state.is_empty() || state.split_whitespace().nth(2) == Some("Z"));
+    assert_descendant_dead(pid.trim().parse().unwrap()).await;
     fs::remove_file(dir.join("pid")).unwrap();
     scenario("noisy-failure");
     let error = DockerService::compose_create(&options).await.unwrap_err();
@@ -412,13 +432,7 @@ async fn lifecycle_child() {
             fs::remove_file(dir.join("parent-pid")).unwrap();
         }
         if let Ok(pid) = fs::read_to_string(dir.join("pid")) {
-            let pid: i32 = pid.trim().parse().unwrap();
-            // A dead orphan may briefly remain as a zombie until its system reaper runs.
-            let state = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap_or_default();
-            assert!(
-                state.is_empty() || state.split_whitespace().nth(2) == Some("Z"),
-                "descendant still running: {state}"
-            );
+            assert_descendant_dead(pid.trim().parse().unwrap()).await;
             fs::remove_file(dir.join("pid")).unwrap();
         }
     }
