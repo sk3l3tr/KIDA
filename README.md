@@ -1,7 +1,7 @@
 <div align="center">
 
 ```
-887    d8P  8888888 8888888b.        d8888  v0.0.5
+887    d8P  8888888 8888888b.        d8888
 887   d8P     888   888  "Y88b      d88888
 887  d8P      888   888    888     d88P888
 887d88K       888   888    888    d88P 888
@@ -11,7 +11,7 @@
 887    Y88b 8888888 8888888P" d88P     888
 ```
 
-### Simplify your server operations
+### Simplify your home server operations
 
 Manage Docker, backups, scheduled tasks and system operations from a single tool.
 
@@ -21,3 +21,11 @@ Manage Docker, backups, scheduled tasks and system operations from a single tool
 ![Built with Rust](https://img.shields.io/badge/built_with-Rust-orange)
 
 </div>
+
+---
+
+## Why KIDA
+
+## Samples
+
+## Docs & License
