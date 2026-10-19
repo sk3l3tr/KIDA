@@ -1,10 +1,12 @@
 use serde_json::Value;
 
-use super::{
-    error::RenderError,
-    json::{data, field, string, value_object},
+use crate::{
+    protocol::{command::CommandResponse, scheduler::ScheduleRule},
+    renderer::{
+        error::RenderError,
+        json::{data, field, string, value_object},
+    },
 };
-use crate::protocol::{command::CommandResponse, scheduler::ScheduleRule};
 
 pub fn add(response: &CommandResponse) -> Result<String, RenderError> {
     confirmation(response, "added")
@@ -12,16 +14,6 @@ pub fn add(response: &CommandResponse) -> Result<String, RenderError> {
 
 pub fn delete(response: &CommandResponse) -> Result<String, RenderError> {
     confirmation(response, "deleted")
-}
-
-fn confirmation(response: &CommandResponse, action: &str) -> Result<String, RenderError> {
-    let object = data(response)?;
-    let id = string(object, "id", "data.id")?;
-    origin(field(object, "origin", "data.origin")?, "data.origin")?;
-    string(object, "command", "data.command")?;
-    field(object, "params", "data.params")?;
-    rule(field(object, "schedule", "data.schedule")?, "data.schedule")?;
-    Ok(format!("Schedule {action} (ID: {id})."))
 }
 
 pub fn list(response: &CommandResponse) -> Result<String, RenderError> {
@@ -46,6 +38,16 @@ pub fn list(response: &CommandResponse) -> Result<String, RenderError> {
         Ok(format!("ID: {id}\nOrigin: {origin}\nCommand: {command}\nParameters: {params}\nSchedule: {schedule}\nNext enqueue attempt: {next}"))
     }).collect::<Result<Vec<_>, RenderError>>()
         .map(|blocks| blocks.join("\n------------------------------------------------------------\n"))
+}
+
+fn confirmation(response: &CommandResponse, action: &str) -> Result<String, RenderError> {
+    let object = data(response)?;
+    let id = string(object, "id", "data.id")?;
+    origin(field(object, "origin", "data.origin")?, "data.origin")?;
+    string(object, "command", "data.command")?;
+    field(object, "params", "data.params")?;
+    rule(field(object, "schedule", "data.schedule")?, "data.schedule")?;
+    Ok(format!("Schedule {action} (ID: {id})."))
 }
 
 fn rule(value: &Value, path: &str) -> Result<String, RenderError> {
