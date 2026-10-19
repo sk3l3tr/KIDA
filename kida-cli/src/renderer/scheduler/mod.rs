@@ -1,15 +1,18 @@
 use crate::{protocol::command::CommandResponse, renderer::error::RenderError};
 
-mod scheduler;
+mod add;
+mod delete;
+mod helpers;
+mod list;
 
 pub fn add(response: &CommandResponse) -> Result<String, RenderError> {
-    scheduler::add(response)
+    add::add(response)
 }
 
 pub fn delete(response: &CommandResponse) -> Result<String, RenderError> {
-    scheduler::delete(response)
+    delete::delete(response)
 }
 
 pub fn list(response: &CommandResponse) -> Result<String, RenderError> {
-    scheduler::list(response)
+    list::list(response)
 }
