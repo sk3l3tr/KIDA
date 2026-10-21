@@ -1,4 +1,3 @@
-
 # Repository Guidelines
 
 ## Project Structure
@@ -7,8 +6,8 @@ KIDA is a Rust 2024 workspace:
 
 - `kida-core/`: Server agent. `features/` contains backup, Docker, scheduler and system services; `exec/` handles commands and workers; `infrastructure/` provides configuration, storage and transports.
 - `kida-cli/`: CLI client following `cli → input → mapper → client → renderer`.
-- Tests live alongside modules (`tests.rs`, `*_tests.rs`) and in `kida-cli/tests/`. Backup fixtures live in `tests/fixtures/` and `testdata/backup/`.
-- `.forgejo/workflows/release.yml` handles releases; `install.sh` installs binaries.
+- Tests live alongside modules (`tests.rs`, `*_tests.rs`) and in `kida-cli/tests/`. Backup fixtures live in `tests/fixtures/`.
+- `.forgejo/workflows/release.yml` handles releases; `resources/scripts/install.sh` installs binaries.
 
 ## Build & Validation
 

@@ -1,4 +1,4 @@
-# Regenerate safely with: python3 scripts/record-demo.py
+# Regenerate safely with: python3 resources/scripts/record-demo.py
 # Run only through the runner: it supplies a private agent and Docker daemon.
 Require kida-demo-guard
 Output assets/demo.gif

@@ -1,4 +1,4 @@
-# python3 scripts/record-demo.py --demo scheduler
+# python3 resources/scripts/record-demo.py --demo scheduler
 Require kida-demo-guard
 Output assets/scheduler.gif
 Set Shell bash

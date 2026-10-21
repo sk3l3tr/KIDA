@@ -3,14 +3,14 @@
 From the workspace root, run:
 
 ```sh
-python3 scripts/record-demo.py
+python3 resources/scripts/record-demo.py
 ```
 
 Generate the focused demos together, or select a single name:
 
 ```sh
-python3 scripts/record-demo.py --demo scheduler backup-run backup-health
-python3 scripts/record-demo.py --demo backup-health
+python3 resources/scripts/record-demo.py --demo scheduler backup-run backup-health
+python3 resources/scripts/record-demo.py --demo backup-health
 ```
 
 `--demo all` also regenerates the original overview. If Chromium is outside
@@ -19,9 +19,9 @@ PATH, prefix the command with `CHROME_BIN=/path/to/chromium`.
 | Tape | GIF | Recorded flow |
 |---|---|---|
 | `demo.tape` | `demo.gif` | Original container and backup overview |
-| `demos/scheduler.tape` | `scheduler.gif` | Inspect a TOML definition, add it, list the resulting schedule |
-| `demos/backup-run.tape` | `backup-run.gif` | Inspect a TOML job, create it, queue its backup |
-| `demos/backup-health.tape` | `backup-health.gif` | Start an isolated restoration, inspect restored data and diagnosis, delete its environment |
+| `resources/demos/scheduler.tape` | `scheduler.gif` | Inspect a TOML definition, add it, list the resulting schedule |
+| `resources/demos/backup-run.tape` | `backup-run.gif` | Inspect a TOML job, create it, queue its backup |
+| `resources/demos/backup-health.tape` | `backup-health.gif` | Start an isolated restoration, inspect restored data and diagnosis, delete its environment |
 
 Requires Linux with unprivileged user namespaces, Rust/Cargo, Python 3, VHS
 0.12.1, FFmpeg/ffprobe, ttyd, Bubblewrap, Docker with rootless support,
@@ -57,7 +57,7 @@ Do not run the tapes directly with `vhs`: their required guard and private sessi
 supplied by the runner. Missing prerequisites or failed isolation stop recording;
 the host agent and Docker daemon are never used as a fallback.
 
-The [root README](../README.md) embeds the overview and focused previews using
+The [root README](../../README.md) embeds the overview and focused previews using
 relative Markdown image paths and descriptive alt text. GitHub serves them from
 the same revision. Actual GitHub rendering can be checked only after the GIFs
 and README are published.

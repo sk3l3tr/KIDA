@@ -20,7 +20,7 @@ Local installation for development:
 ```bash
 curl -fsSL \
   --user 'YOUR_USER:YOUR_TOKEN' \
-  http://git.atlantis.arpa/sk3l3t0r/kida/raw/branch/master/install.sh \
+  http://git.atlantis.arpa/sk3l3t0r/kida/raw/branch/master/resources/scripts/install.sh \
   -o /tmp/kida-install.sh
 ```
 

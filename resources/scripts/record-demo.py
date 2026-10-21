@@ -16,15 +16,15 @@ import tempfile
 import time
 
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 TOOLS = ("cargo", "vhs", "ffmpeg", "ffprobe", "ttyd", "bwrap", "docker",
          "dockerd", "dockerd-rootless.sh", "rootlesskit", "newuidmap",
          "newgidmap", "slirp4netns", "busybox", "fc-match", "fc-cache")
 SCENES = {
     "overview": ("demo.tape", "demo.gif", 3),
-    "scheduler": ("demos/scheduler.tape", "scheduler.gif", 2),
-    "backup-run": ("demos/backup-run.tape", "backup-run.gif", 2),
-    "backup-health": ("demos/backup-health.tape", "backup-health.gif", 3),
+    "scheduler": ("resources/demos/scheduler.tape", "scheduler.gif", 2),
+    "backup-run": ("resources/demos/backup-run.tape", "backup-run.gif", 2),
+    "backup-health": ("resources/demos/backup-health.tape", "backup-health.gif", 3),
 }
 
 
@@ -341,16 +341,16 @@ def main():
             for key, value in isolated.items():
                 sandbox += ["--setenv", key, value]
             subprocess.run([*sandbox, "--chdir", "/demo", "/usr/bin/python3",
-                            "/repo/scripts/record-demo.py", "--inside"], check=True,
+                            "/repo/resources/scripts/record-demo.py", "--inside"], check=True,
                            timeout=240 * len(selected))
             # Publish only after every execution and media check passes.
             results = json.loads((root / "validation.json").read_text())
             for scene, result in results.items():
-                destination = REPO / "assets" / SCENES[scene][1]
+                destination = REPO / "resources/assets" / SCENES[scene][1]
                 staging = destination.with_suffix(".gif.tmp")
                 shutil.copyfile(root / "assets" / destination.name, staging)
                 staging.replace(destination)
-                print("Generated assets/" + destination.name + ": " + json.dumps(result), flush=True)
+                print("Generated resources/assets/" + destination.name + ": " + json.dumps(result), flush=True)
         finally:
             stop(daemon)
             if daemon_info(env):

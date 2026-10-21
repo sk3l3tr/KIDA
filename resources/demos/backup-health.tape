@@ -1,4 +1,4 @@
-# python3 scripts/record-demo.py --demo backup-health
+# python3 resources/scripts/record-demo.py --demo backup-health
 # A real backup and CREATED manual run are prepared before recording.
 # run_id and restore_dir refer exclusively to that run in the private agent.
 Require kida-demo-guard
@@ -32,7 +32,7 @@ Wait+Screen /Backup Health admitted/
 Sleep 1s
 
 Hide
-Type "python3 /repo/scripts/record-demo.py --wait-health"
+Type "python3 /repo/resources/scripts/record-demo.py --wait-health"
 Enter
 Wait+Screen@60s /HEALTH_READY/
 Ctrl+L

@@ -48,22 +48,22 @@ Managing servers shouldn't mean juggling scripts, cron jobs, and endless command
 <div align="center">
 
 Define your sources and destinations, register the job, and run it on demand.
-![KIDA creating a backup job from TOML and queuing its execution](assets/backup-run.gif)
+![KIDA creating a backup job from TOML and queuing its execution](resources/assets/backup-run.gif)
 
 \>< >< >< ><
 
 Backup Health restores a saved backup into a separate environment.
-![KIDA restoring isolated data, checking its health and cleaning up the environment](assets/backup-health.gif)
+![KIDA restoring isolated data, checking its health and cleaning up the environment](resources/assets/backup-health.gif)
 
 \>< >< >< ><
 
 Add a schedule and inspect when it will next submit work.
-![KIDA adding a daily backup schedule and displaying its rule and next enqueue time](assets/scheduler.gif)
+![KIDA adding a daily backup schedule and displaying its rule and next enqueue time](resources/assets/scheduler.gif)
 
 \>< >< >< ><
 
 Inspect your containers, restart a servicxe, and queue a backup from the same CLI.
-![KIDA listing containers, restarting a demo container, and queuing a backup](assets/demo.gif)
+![KIDA listing containers, restarting a demo container, and queuing a backup](resources/assets/demo.gif)
 
 </div>
 

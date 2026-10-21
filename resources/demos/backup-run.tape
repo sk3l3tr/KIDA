@@ -1,4 +1,4 @@
-# python3 scripts/record-demo.py --demo backup-run
+# python3 resources/scripts/record-demo.py --demo backup-run
 Require kida-demo-guard
 Output assets/backup-run.gif
 Set Shell bash
