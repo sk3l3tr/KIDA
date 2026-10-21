@@ -1,35 +1,18 @@
 # Weekly shutdown and RTC wake via CLI
 
-[Castellano](../../es/cli/weekly-power-cycle.md) · [Documentation index](../000-index.md)
+[Castellano](../../es/cli/weekly-power-cycle.md) · [Index](../000-index.md)
 
-Schedule a server to shut down at 22:00 and wake at 05:00 the next day:
+Shut down at 22:00 on Sunday, Monday, Wednesday and Thursday; wake at 05:00 the following day.
+The server must use `Europe/Madrid` and be running at 21:55 on those days.
+First review [RTC requirements](../006-system-control.md#shutdown-with-rtc-wake) and test waking on your hardware.
 
-| Shutdown day | Wake day |
-| --- | --- |
-| Sunday | Monday |
-| Monday | Tuesday |
-| Wednesday | Thursday |
-| Thursday | Friday |
-
-This is shutdown followed by RTC power-on, not `system.reboot`.
-CORE's local timezone must be `Europe/Madrid`, matching the cron timezone, because shutdown/wake clock
-parameters use the server timezone. CORE must be running at 21:55 on shutdown days.
-The machine/firmware must support RTC wake from power-off, and CORE needs `rtcwake`, RTC access and shutdown privileges.
-Registration alone does not verify physical wake; test that separately on the target hardware.
-
-## 1. Check prerequisites and RTC
-
-Check [installation and service status](../001-installation.md) and the server timezone before continuing.
-Use an account allowed to access the socket; run `kida` with `sudo` if required by its permissions.
-An elevated CLI does not change CORE's service privileges.
+## 1. Query RTC
 
 ```bash
 kida system wake-capabilities
 ```
 
-This query does not modify alarms.
-
-## 2. Register one weekly schedule
+## 2. Register
 
 ```bash
 kida scheduler add \
@@ -39,34 +22,26 @@ kida scheduler add \
   --timezone Europe/Madrid
 ```
 
-Record the returned schedule ID.
+Save the returned ID.
+The task is submitted at 21:55 to leave five minutes before the requested shutdown.
+Repeating creation adds another schedule.
 
-## 3. Check the registered task
+## 3. Check
 
 ```bash
 kida scheduler list
 ```
 
-The cron runs at 21:55 to leave five minutes before shutdown. Each execution programs and verifies the
-05:00 alarm, then requests 22:00 shutdown. The five-minute margin accommodates the minimum 60-second
-shutdown lead and its recheck after alarm programming. Alarm programming/verification failure prevents shutdown.
+Verify ID, command, parameters, cron and timezone. `Next enqueue attempt` / `next_enqueue_at` is in UTC;
+its local equivalent depends on the date and clock changes. It is a pending attempt, not an already programmed alarm.
 
-Inspect the command, parameters, cron and timezone in the returned entry.
-`Next enqueue attempt` / `next_enqueue_at` is in UTC; convert it for the relevant date.
-It confirms a pending queue submission, not execution or an already programmed alarm/shutdown.
-Cron follows Madrid's daylight-saving changes; the UTC equivalent varies.
+## 4. Delete
 
-## 4. Remove the schedule when needed
-
-Replace `<SCHEDULE_UUID>` with the ID returned at creation:
+Replace `SCHEDULE_UUID` with the saved ID:
 
 ```bash
-kida scheduler delete --id <SCHEDULE_UUID>
-kida scheduler list
+kida scheduler delete --id SCHEDULE_UUID
 ```
 
-Use the UUID returned for your own schedule, never a historical example ID.
-Repeating add creates another schedule; it does not update the original.
-Deletion prevents future submissions but does not cancel queued/running commands, undo a shutdown,
-or clear an RTC alarm programmed by an earlier execution. This recipe makes no claim that physical
-wake or later deletion has been observed on your machine.
+List again to confirm. Deletion prevents future submissions but does not cancel already admitted work,
+undo requested shutdowns or clear RTC alarms.

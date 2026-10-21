@@ -1,44 +1,34 @@
 # KIDA CLI
 
-[English](../../en/cli/README.md) · [Índice de documentación](../000-index.md)
+[English](../../en/cli/README.md) · [Índice](../000-index.md)
 
-La interfaz de terminal utiliza este formato:
-
-```text
-kida <command> [subcommand] [argument]
-```
-
-Consulta la ayuda en cualquier nivel:
+Ejecuta `kida` en el servidor. Si es tu primera vez, sigue los [primeros pasos](../002-usage-overview.md).
 
 ```bash
 kida --help
-kida system --help
-kida docker --help
-kida docker container --help
+kida backup config create --help
+kida scheduler add --help
 ```
 
-El comando instalado es `kida`, procedente del binario `kida-cli`. Conecta con el socket local
-`/tmp/kida.sock`; no tiene selector HTTP remoto. Consulta la [instalación](../001-installation.md).
-
-- [Docker](docker-management.md)
-- [Backups y Backup Health](backups-management.md)
-- [Scheduler](task-scheduling.md)
-- [Sistema](system-control.md)
-- [Apagado semanal y encendido RTC](weekly-power-cycle.md)
+| Tarea | Guía |
+| --- | --- |
+| Contenedores | [Docker](docker-management.md) |
+| Copias y restauraciones de prueba | [Backups y Backup Health](backups-management.md) |
+| Automatización | [Scheduler](task-scheduling.md) |
+| Información, apagado y encendido | [Sistema](system-control.md) |
+| Apagado semanal y encendido RTC | [Receta](weekly-power-cycle.md) |
 
 ## Salida y errores
 
-Los resultados se presentan en formato legible: información agrupada por secciones, tablas de sensores y
-contenedores y confirmaciones breves. No hay opción `--json`.
+La salida es legible para personas; los errores se escriben en stderr.
+Los comandos usan espacios: `kida system info`. Los nombres con puntos corresponden a la API y al comando que se programa en scheduler.
 
-La presentación se selecciona por identificador interno de comando. Si no hay un renderer específico,
-`data` se muestra como JSON formateado; si falta, como `null`. Si existe renderer y la respuesta correcta
-no cumple su contrato, CLI informa del fallo de presentación sin sustituirlo silenciosamente por JSON.
-Los errores de CORE se escriben en stderr. Un comando incompleto o desconocido muestra el uso esperado;
-la indisponibilidad del agente y los fallos producen un código distinto de cero.
+| Código de salida | Significado |
+| --- | --- |
+| `0` | Éxito del comando; en trabajos asíncronos solo confirma admisión |
+| `1` | Error de entrada, operación o agente no disponible |
+| `2` | Permiso denegado en el socket o error de sintaxis de la CLI |
+| `3` | Error de comunicación o presentación de respuesta |
 
-Los comandos usan espacios entre niveles. No se aceptan formas con puntos como `system.info` o
-`docker.containers.list`.
-
-Códigos de salida: `0` éxito; `1` error de entrada/comando o agente no disponible; `2` permiso denegado
-sobre el socket; `3` fallo de comunicación o presentación de respuesta. Los errores de uso de Clap también pueden devolver `2`.
+En Health, revisa también diagnóstico y limpieza aunque el comando termine correctamente.
+Consulta [solución de problemas](../troubleshooting.md) si falla una operación.

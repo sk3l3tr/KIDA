@@ -1,27 +1,64 @@
-# Backup management
+# Backups and Backup Health
 
-[Castellano](../es/004-backups-management.md) · [Documentation index](000-index.md)
+[Castellano](../es/004-backups-management.md) · [Index](000-index.md)
 
-## Jobs and execution
+## Create and run backups
 
-A job describes sources, targets, compression, lifecycle steps and optional schedule/retention metadata.
-Create, list or delete jobs, then queue executions by ID or name. Deleting a job is permanent.
-`backup.run` acceptance returns a queue execution ID; it does not confirm a completed archive.
-The `schedule` field in a job is metadata: create a separate scheduler entry to automate execution.
+A configuration defines what to copy and where to store it. Creating it does not run a backup.
+Use the [CLI](cli/backups-management.md) or [API](api/backups-management.md) to create, list, run and delete configurations.
+Deleting a configuration does not delete saved backups.
 
-Source and target paths retain their literal values and are checked by CORE at execution.
-Compression is `tar_zstd`. Targets default to required. Backup lifecycle steps support only
-`docker.container.stop`, `docker.container.start` and `docker.container.restart`.
-Pre-backup stops at the first failure; post-backup attempts all steps even after pre/archive errors.
-Post-backup failure prevents checksum calculation and replication. Process termination or cancellation
-does not guarantee recovery steps. See the [configuration contract](api/backups-management.md).
+| Field | Use and default |
+| --- | --- |
+| `name` | Backup name, without path components |
+| `sources` | Paths to copy on the server |
+| `targets` | Destinations; each requires `path` |
+| `targets[].required` | `true`: an unavailable or failed destination fails the backup |
+| `targets[].filesystem_uuid` | Optional metadata; **does not verify disk identity** |
+| `compression` | `tar_zstd`, the only supported format |
+| `lifecycle` | Before and after steps; empty by default |
+| `schedule` | Metadata only; use the [scheduler](005-task-scheduling.md) to automate |
+| `retention` | Metadata only; **does not delete backups automatically** |
+
+Use existing sources and prepared destination directories with free space and write access for the service.
+Paths are checked when running, not when creating the configuration. Prefer absolute paths.
+If the destination is a mounted disk, check the mount before running; `filesystem_uuid` does not protect it.
+Destinations must support hard links to publish the files.
+
+`retention` accepts `max_age` (text), `keep_last` (integer from 0 to 4294967295) and
+`protected_restore_points` (list of strings, empty by default). Arrange backup cleanup separately.
+[Health report retention](#reports-and-cleanup) is active and independent.
+
+## Before and after steps
+
+`lifecycle.pre_backup` and `lifecycle.post_backup` are lists of steps with `command` and JSON `params` (`null` by default).
+Only `docker.container.stop`, `docker.container.start` and `docker.container.restart` are supported.
+The first failure interrupts the before steps. All after steps are attempted, even if a before step or archiving fails.
+If an after step fails, the backup is not distributed. A service interruption cannot guarantee these steps:
+check your containers after a failure.
+
+## Check a run
+
+`Backup queued` or `state: QUEUED` confirms admission, not completion. Save the execution ID.
+Read the service log and look for that ID:
+
+```bash
+sudo journalctl -u kida --since '10 minutes ago' --no-pager
+```
+
+`Execution completed: ID` indicates completion; `Execution failed: ID` indicates failure and its cause.
+There is no backup progress or execution history command. Also check the file in the intended destinations:
+`<name>-<UTC-date>-<artifact_id>.tar.zst`. An error may leave valid copies in some destinations.
+Use Backup Health to test restoration.
 
 ## Backup Health
 
-Health restores a registered artifact into a separate directory, starts its reviewed Compose environment,
-collects a technical diagnosis and manages cleanup and reports. It is not a standalone `backup restore` command.
+Health restores a registered backup and starts a separate Compose environment to check it.
+It requires Docker and the Docker Compose plugin. There is no separate `backup restore` command.
 
-Prepare a definition on the CORE server, separate from the backup job:
+### Prepare the definition
+
+Save on the server, for example as `/srv/health/app.toml`:
 
 ```toml
 id = "app-health"
@@ -35,66 +72,45 @@ version = "latest"
 compose = "./docker-compose.health.yml"
 ```
 
-All fields are required and nonempty. Use a unique, stable definition ID. `reference` selects an existing
-job by unambiguous ID/name; `version` is `latest` or a registered artifact UUID. Older unregistered backups
-are not imported. Compose paths are relative to the canonical definition directory on CORE.
+All fields are required and non-empty; unknown fields are rejected.
+Use a stable, unique ID. `reference` is the ID or unambiguous name of a configuration.
+`version` accepts `latest` or a registered backup UUID. Older backups without a record are not imported.
+`latest` selects the most recent registered backup; if it cannot be used, it does not fall back to an older version.
 
-```yaml
-services:
-  app:
-    image: example/app:stable
-    restart: "no"
-    volumes:
-      - type: bind
-        source: ${KIDA_RESTORE_DIR}/app-data
-        target: /app/data
-        bind:
-          create_host_path: false
-```
+The Compose path is resolved relative to the definition. Adapt the
+[Compose example](../../../kida-core/examples/backup-health/docker-compose.health.yml) to your application:
+image, healthcheck and data paths. It is not ready to run without changes.
+Use `${KIDA_RESTORE_DIR}` for restored data and `restart: "no"`.
+Archive paths preserve the source without its leading `/`: `/srv/app/data` restores as `srv/app/data`.
+**Do not mount production data:** Compose runs with the service's permissions and is not a sandbox.
+Restoration verifies size and checksum; it rejects links and paths escaping the restore directory.
 
-This Compose fragment illustrates the bind, not a runnable application. Replace the image and add suitable
-healthchecks. `app-data` must match the archive's relative structure, which preserves source paths without
-the leading `/`. Health supplies `KIDA_RESTORE_DIR`. Use `restart: "no"` and avoid production mounts:
-Compose is trusted administrator configuration, not a sandbox. The administrator validates functional integrity.
-Repository examples: [definition](../../../kida-core/examples/backup-health/nextcloud-health.toml)
-and [Compose](../../../kida-core/examples/backup-health/docker-compose.health.yml).
+### Choose a mode and read the result
 
-### Runs, diagnosis and cleanup
+| Mode | Behavior |
+| --- | --- |
+| Manual | Keeps the environment available for inspection until stopped or expired: four hours from start by default |
+| Automatic | Diagnoses, stops and cleans up the environment |
 
-`create` produces `CREATED`; `start` admits work asynchronously and returns a Health run ID plus a separate
-queue execution ID. Capacity, queue saturation or an active run of the same definition can prevent admission.
-Manual runs remain available after diagnosis until stopped or expired (default four hours from `started_at`).
-Automatic runs diagnose, stop and clean their environment. Stopped runs cannot restart; create a new one.
-On CORE restart, interrupted runs are closed and cleanup is attempted; manual environments are not resumed.
+The Health ID identifies the environment; the execution ID identifies the admitted work.
+Check the state, whether the diagnosis is complete, its anomalies and cleanup errors.
 
-Operational state and technical result are distinct. Results include `FAILED`, `UNHEALTHY`, `UNKNOWN`,
-`DEGRADED` and `HEALTHY`. Inspect completion, anomalies and cleanup errors even when the protocol returns `OK`.
-`stop` stops the environment; `delete` also requests removal of owned resources and the restored directory,
-preserving history and reports. Cleanup errors remain visible for retry. External, shared or unproven resources
-are preserved rather than removed by force.
+| Result | Meaning |
+| --- | --- |
+| `HEALTHY` | Healthchecks pass, with no detected incidents |
+| `DEGRADED` | Healthchecks pass after detected restarts or memory incidents |
+| `UNKNOWN` | Insufficient evidence, for example a missing or pending healthcheck |
+| `UNHEALTHY` | A healthcheck reports failure |
+| `FAILED` | Execution or required service failure |
 
-### Artifacts and reports
+An `OK` response does not guarantee a positive diagnosis. Even with `HEALTHY`, check that your application and data work as expected.
 
-New backups use `<name>-<UTC-date>-<artifact_id>.tar.zst`. Names cannot contain path components.
-Verified destinations are recorded under `backup_health.data_root/artifacts/<job-id>/<artifact-id>.json`
-with size, SHA-256 and absolute paths. Targets and catalog storage must support hard links for publication
-without overwrite. A required-target failure remains an error even if another destination is registered;
-a catalog failure preserves copied files but makes them unavailable to Health without a valid record.
-No verified destination means no catalog record. Optional-target failures retain their existing treatment.
+### Reports and cleanup
 
-`latest` selects the newest date, then greatest UUID on ties; it tries that artifact's destinations in order,
-without falling back to an older version. Corrupt catalog records prevent `latest` resolution.
-Restoration verifies size/checksum and accepts regular files/directories, rejecting links and escaping paths.
-Ordinary permissions and relative paths are retained; ownership and special bits are not restored.
+- `stop` stops the environment; `delete` also requests removal of its owned resources and restored data. Both keep history and reports.
+- Shared, external or unproven resources are preserved. If cleanup fails, review the error and retry `delete` after correcting it.
+- A stopped run cannot be restarted: create another. Restarting KIDA closes interrupted runs and attempts cleanup without resuming manual environments.
+- Reports are kept for 90 days by default. Deleting a report does not delete the environment or history, and it is not rebuilt automatically. List reports to check availability.
 
-Reports default to 90 days' retention. History needed for pending cleanup is preserved.
-Deleting a report keeps history and prevents automatic reconstruction. A recorded report path can outlive
-the report; use report listing to check availability. The catalog has no historical import or report-retention policy.
-
-## Choose your interface
-
-- [CONSOLE](console/backups-management.md) — not implemented yet.
-- [CLI](cli/backups-management.md).
-- [Direct API](api/backups-management.md).
-
-See [configuration](configuration.md) for storage, TTL, timeouts and limits.
+See the [CLI commands](cli/backups-management.md#backup-health), [API commands](api/backups-management.md#backup-health)
+and [timeout and limit configuration](configuration.md).

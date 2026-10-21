@@ -1,10 +1,9 @@
-# Configuración de CORE
+# Configurar KIDA
 
-[English](../en/configuration.md) · [Índice de documentación](000-index.md)
+[English](../en/configuration.md) · [Índice](000-index.md)
 
-CORE carga `/etc/kida/kida.toml` una sola vez antes de iniciar sus servicios. Si falta,
-crea la configuración predeterminada; una configuración inválida impide el arranque.
-Las secciones y campos omitidos usan estos valores:
+Edita `/etc/kida/kida.toml` con permisos de administrador. KIDA crea el archivo con valores predeterminados
+si falta; una configuración inválida impide arrancar. Los campos omitidos usan estos valores:
 
 ```toml
 [unix]
@@ -36,33 +35,37 @@ report_retention_days = 90
 max_active_runs = 2
 ```
 
-## Límites y rutas
+## Qué ajustar
 
-- Capacidad y concurrencia de la cola deben ser positivas y respetar los límites de admisión y semáforos. Los trabajos `backup.run` se ejecutan de uno en uno.
-- Los tiempos y el cupo de Health deben ser positivos y caber en sus límites. `max_active_runs` incluye entornos manuales activos y es independiente de la concurrencia del worker.
-- Las raíces Health deben ser absolutas, distintas y no contenerse entre sí. La validación resuelve antecesores existentes y enlaces sin crear directorios.
-- CORE necesita permisos de lectura/escritura para configuración, definiciones de backup, scheduler, almacenamiento Health y registros de propiedad Docker cuando se utilicen.
-- Un archivo de scheduler ausente empieza vacío; uno corrupto impide arrancar y no se sobrescribe. Consulta el [comportamiento del scheduler](005-task-scheduling.md).
-- El TTL de Health se mide desde `started_at`; consultar no lo renueva. La expiración se comprueba periódicamente. La retención de informes no afecta al catálogo de artefactos.
+| Ajuste | Uso |
+| --- | --- |
+| `unix.socket_path` | Conexión local. La CLI exige `/tmp/kida.sock`; cambiarlo impide que conecte |
+| `http.host`, `http.port` | Dirección de escucha para [integraciones API](api/README.md) |
+| `backup.backup_dir` | Configuraciones de backup; no es el destino de las copias |
+| `scheduler.path` | Archivo de programaciones; si falta empieza vacío, si está corrupto impide arrancar |
+| `queue.capacity` | Capacidad de trabajo pendiente |
+| `queue.max_concurrent_jobs` | Trabajos simultáneos; positivo. Los backups se ejecutan de uno en uno |
+| `docker.ownership_dir` | Registro de recursos Docker gestionados; consérvalo para permitir su limpieza segura |
+| `backup_health.restore_root` | Directorios temporales de restauración |
+| `backup_health.data_root` | Catálogo de copias, historial e informes; consérvalo para usar Health |
+| `backup_health.manual_ttl_hours` | Duración del entorno manual desde su arranque; consultarlo no renueva el plazo |
+| `backup_health.health_timeout_seconds` | Tiempo máximo de espera del diagnóstico |
+| `backup_health.report_retention_days` | Retención de informes; no elimina copias de backup |
+| `backup_health.max_active_runs` | Entornos activos, incluidos manuales; independiente de la concurrencia de trabajos |
 
-## Endpoints y reinicio
+Los tiempos y `max_active_runs` deben ser positivos. Las raíces Health deben ser absolutas, distintas y no contenerse entre sí.
+El servicio necesita permisos de lectura y escritura en las rutas utilizadas.
+HTTP no incluye autenticación ni TLS: limita el acceso a clientes y redes de confianza.
 
-La CLI actual usa la ruta fija `/tmp/kida.sock`. Si cambias `unix.socket_path`, los clientes directos
-deben utilizar la nueva ruta y la CLI actual dejará de conectar.
-HTTP escucha en loopback por defecto. El servidor actual no incorpora autenticación ni TLS;
-limita el acceso a clientes y redes de confianza.
+## Aplicar cambios
 
-El directorio del socket debe permitir crear el socket y su archivo de bloqueo y estar protegido de
-modificaciones ajenas. CORE rechaza entradas que no sean sockets y sockets activos; solo recupera uno
-obsoleto ante `ConnectionRefused`. `<socket_path>.lock` permanece tras detener CORE. No lo borres mientras
-haya una instancia activa. Los errores de permisos e inspección impiden arrancar sin borrar la entrada.
-
-Tras revisar los cambios, reinicia y comprueba el servicio:
+Los cambios requieren reiniciar. Antes, espera a que termine el trabajo pendiente y revisa los entornos Health:
+[no se recuperan las ejecuciones interrumpidas](005-task-scheduling.md#borrado-y-reinicio).
 
 ```bash
 sudo systemctl restart kida
 systemctl --no-pager --full status kida
+kida system info
 ```
 
-El reinicio no recupera peticiones encoladas ni reanuda entornos Health manuales.
-Consulta [backups](004-backups-management.md) y [scheduler](005-task-scheduling.md) antes de reiniciar durante operaciones.
+Si falla, consulta [solución de problemas](troubleshooting.md).

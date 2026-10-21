@@ -1,27 +1,33 @@
 # System control
 
-[Castellano](../es/006-system-control.md) · [Documentation index](000-index.md)
+[Castellano](../es/006-system-control.md) · [Index](000-index.md)
 
-Inspect system information, temperatures and fans; request shutdown or reboot; inspect RTC capabilities;
-or program an RTC wake alarm before shutdown. Operations apply to the CORE server.
+Use the [CLI](cli/system-control.md) or [API](api/system-control.md) to inspect hardware and sensors,
+shut down, reboot or schedule an RTC wake. All actions affect the KIDA server.
 
-## Shutdown and RTC wake
+## Shutdown and reboot
 
-`system.reboot` restarts a running machine. A power cycle requests shutdown and uses RTC for a later wake.
-RTC availability alone does not prove permission to program alarms or physical S5 wake support.
-That requires a test on the target hardware and firmware.
+`now` means immediately, `+N` is a delay in minutes and `HH:MM` is a 24-hour time.
+Reboot acts on a powered-on machine; waking it after shutdown requires RTC.
 
-- Wake time is the next server-local `HH:MM`, or a relative delay of at least 120 seconds from execution.
-- Without an explicit shutdown time, shutdown is requested in one minute.
-- An explicit shutdown time refers to today in the server's local timezone and must be at least 60 seconds ahead. Past, nonexistent and ambiguous local times are rejected.
-- Wake must be at least 120 seconds after execution and 60 seconds after shutdown. Incompatible times are rejected rather than moved to another day.
-- CORE verifies the RTC alarm before requesting shutdown and rechecks the shutdown margin afterward. If the margin has elapsed, shutdown is not requested, but the alarm may remain active.
-- A later alarm can replace an earlier one. Deleting a schedule does not clear an alarm or undo a shutdown already requested. Timing checks do not guarantee hardware shutdown duration.
+## Shutdown with RTC wake
 
-## Choose your interface
+Requires `rtcwake`, service permissions and hardware/firmware supporting wake from shutdown (S5).
+Querying RTC capabilities does not change alarms or prove that the machine will wake: test your hardware.
 
-- [CONSOLE](console/system-control.md) — not implemented yet.
-- [CLI](cli/system-control.md).
-- [Direct API](api/system-control.md).
+| Option | Meaning |
+| --- | --- |
+| Wake time | Next `HH:MM` in the server's local timezone |
+| Wake delay | Seconds from execution, not from shutdown; minimum 120 |
+| Optional shutdown time | Today in the server's local timezone; at least 60 seconds ahead |
+| No shutdown time | Requests shutdown in one minute |
 
-Weekly shutdown and wake recipe: [CLI](cli/weekly-power-cycle.md) · [API](api/weekly-power-cycle.md).
+Supply exactly one wake option. Wake must be at least 120 seconds after execution
+and 60 seconds after shutdown. Past, nonexistent or ambiguous shutdown times and incompatible timings are rejected;
+they are not automatically moved to the next day.
+
+KIDA verifies the alarm before requesting shutdown. If verification fails or the margin runs out, it does not request shutdown;
+the alarm may remain active. Margins do not guarantee how long hardware takes to shut down.
+A later alarm may replace an earlier one. Deleting a schedule does not clear the alarm or undo a requested shutdown.
+
+Recipe: [weekly shutdown via CLI](cli/weekly-power-cycle.md) or [API](api/weekly-power-cycle.md).

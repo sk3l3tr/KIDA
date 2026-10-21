@@ -1,34 +1,25 @@
 # Docker via CLI
 
-[Castellano](../../es/cli/docker-management.md) · [Documentation index](../000-index.md)
+[Castellano](../../es/cli/docker-management.md) · [Index](../000-index.md)
 
-### List containers
-
-List Docker containers and their current status, including stopped containers:
+## List
 
 ```bash
 kida docker containers list
 ```
 
-### Manage a container
+Includes stopped containers and their state.
 
-Use either the container name or container ID:
+## Manage a container
 
-```bash
-kida docker container start <id-or-name>
-kida docker container stop <id-or-name>
-kida docker container restart <id-or-name>
-kida docker container delete <id-or-name>
-```
-
-For example:
+Replace `CONTAINER` with its name or ID. Run only the action you need:
 
 ```bash
-kida docker container start web
-kida docker container restart 8f2c1a4b7d90
-kida docker container stop web
-kida docker container delete web
+kida docker container start CONTAINER
+kida docker container stop CONTAINER
+kida docker container restart CONTAINER
+kida docker container delete CONTAINER
 ```
 
-> **Warning:** Deleting a container is permanent. Stop it first and verify its
-> name or ID before deleting it.
+See the [deletion precautions](../003-docker-management.md).
+Compose inventory is available through the [API](../api/docker-management.md#compose-inventory).

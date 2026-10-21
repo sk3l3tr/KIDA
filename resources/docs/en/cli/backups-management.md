@@ -1,167 +1,103 @@
 # Backups via CLI
 
-[Castellano](../../es/cli/backups-management.md) · [Documentation index](../000-index.md)
+[Castellano](../../es/cli/backups-management.md) · [Index](../000-index.md)
 
-### List backup jobs
+## Create a configuration
 
-List every backup job configured in KIDA Core:
-
-```bash
-kida backup config list
-```
-
-Each job includes its sources, targets, lifecycle operations, schedule, and
-retention policy. For example:
-
-```text
-Name: Nextcloud
-ID: 8e1dba64-36c2-4eac-937c-d23a283256ec
-Compression: tar_zstd
-Schedule:
-  {
-    "cron": "0 3 * * *"
-  }
-Sources:
-  - /srv/nextcloud
-Targets:
-  - /mnt/backups (required, filesystem UUID: 2d89-55c1)
-Lifecycle:
-  Pre-backup: None
-  Post-backup: None
-Retention:
-  Max age: 30d
-  Keep last: 7
-  Protected restore points: None
-```
-
-### Create a backup job
-
-Choose one of three input modes:
+Prepare a destination on the server, for example `/mnt/backups`, with free space and write permissions for KIDA.
+If it is on a separate disk, check its mount first. Run one of these alternatives:
 
 ```bash
-# Read a local TOML file (-f and --file are aliases).
+kida backup config create --name daily --source /etc/hosts --target /mnt/backups
 kida backup config create --file ./backup-job.toml
-
-# Supply configuration fields directly.
-kida backup config create --name daily --source /etc/hosts --target ../backups
-
-# Start the interactive assistant.
 kida backup config create
 ```
 
-The CLI reads and validates the TOML locally, relative to its current working
-directory. It sends the configuration to CORE; the input-file path is never sent.
-Source and target paths retain their literal values and are interpreted by CORE
-when the backup runs. Creation does not check whether these paths exist.
-
-File and parameter modes are exclusive. Any configuration flag selects parameter
-mode, which requires `--name`, at least one `--source`, and at least one `--target`.
-Incomplete or invalid parameters fail locally with exit code 1, without opening
-the assistant or contacting CORE. The assistant requires an interactive terminal,
-writes prompts to stderr, shows defaults, retries invalid values, asks list counts
-before their elements, and confirms optional blocks. EOF or Ctrl+C cancels it.
-
-Repeat `--source`, `--target`, `--pre-backup`, `--post-backup`, and
-`--retention-protected-restore-point` to add ordered elements. Indexed modifiers
-use zero-based `INDEX=VALUE` assignments and may appear before or after the elements:
-
-```bash
-kida backup config create --name daily \
-  --source /etc/hosts --target ./primary --target ../secondary \
-  --target-required '1=false' --target-filesystem-uuid '0=volume-id' \
-  --pre-backup docker.container.stop --pre-backup-params '0={"container":"backup-source"}' \
-  --post-backup docker.container.start --post-backup-params '0={"container":"backup-source"}' \
-  --schedule '{"custom":[null,1]}' \
-  --retention-max-age 7d --retention-keep-last 7 \
-  --retention-protected-restore-point point-a
-```
-
-Adapt `backup-source` to your container before running the job. Duplicate or out-of-range modifiers fail locally. `--compression` accepts
-`tar_zstd` (the default). Targets default to `required = true`; lifecycle command
-parameters default to JSON `null`. `--schedule` and lifecycle parameters accept
-arbitrary JSON; `--retention-keep-last` accepts an unsigned 32-bit integer.
-
-A minimal TOML file is:
+The last opens the assistant and requires an interactive terminal; Ctrl+C or end of input cancels.
+File and options are mutually exclusive. Options require `--name`, at least one `--source` and one `--target`.
+`-f` is an alias for `--file`. TOML is read locally:
 
 ```toml
 name = "daily"
 sources = ["/etc/hosts"]
+
 [[targets]]
-path = "../backups"
+path = "/mnt/backups"
 ```
 
-`schedule` is optional metadata and does not create a scheduled execution. Create
-a separate CORE schedule to run the backup automatically. See the
-[CORE JSON contract](../api/backups-management.md)
-for the configuration fields used by all three modes.
+See [fields, defaults and limitations](../004-backups-management.md#create-and-run-backups).
 
-### Delete a backup job
+### Additional options
 
-Delete a backup job by its ID or name:
+Repeat `--source` and `--target` to add paths. Modifiers use `INDEX=VALUE`, with zero-based indices:
 
 ```bash
-kida backup config delete --id <id-code>
-kida backup config delete --name <name>
+kida backup config create --name daily \
+  --source /srv/app --target /mnt/backups --target /mnt/secondary \
+  --target-required '1=false' \
+  --pre-backup docker.container.stop --pre-backup-params '0={"container":"app"}' \
+  --post-backup docker.container.start --post-backup-params '0={"container":"app"}'
 ```
 
-Exactly one selector must be provided.
+Adapt paths and the container before running. `--pre-backup` and `--post-backup` can be repeated;
+their `--pre-backup-params` and `--post-backup-params` modifiers accept JSON.
+Duplicate or out-of-range indices are rejected.
 
-> **Warning:** Deleting a backup job is permanent. Verify its name or ID before
-> deleting it.
+Also supported: `--compression tar_zstd`, `--target-filesystem-uuid INDEX=TEXT`, `--schedule JSON`,
+`--retention-max-age TEXT`, `--retention-keep-last NUMBER` and repeatable `--retention-protected-restore-point TEXT`.
+Schedule, retention and UUID fields are metadata: review their limitations in the linked guide.
 
-### Run a backup job
-
-Queue a configured backup job by its ID or name:
+## List and run
 
 ```bash
-kida backup run --id <id-code>
-kida backup run --name <name>
+kida backup config list
+kida backup run --name daily
 ```
 
-Exactly one selector must be provided. When KIDA Core accepts the execution,
-KIDA CLI prints its execution ID:
+You can also use `--id BACKUP_UUID` instead of `--name`. Running returns `Backup queued (Execution ID: …)`.
+Save that ID and [check completion](../004-backups-management.md#check-a-run).
+For automation, [schedule `backup.run`](task-scheduling.md).
 
-```text
-Backup queued (Execution ID: 4f79f9e1-1628-4e86-88bb-e96f5507aa1f).
+## Delete a configuration
+
+```bash
+kida backup config delete --name daily
+# Alternative by ID:
+kida backup config delete --id BACKUP_UUID
 ```
+
+Choose one selector. Check the name or ID: deleting the configuration is permanent.
 
 ## Backup Health
 
-Health commands return human-readable text, with no `--json` option or wizard.
-Every required flag must be supplied. UUIDs and modes are validated before
-connecting to CORE. `--file` is the definition path on the CORE server: the CLI
-passes it unchanged, including relative paths, without reading or resolving it
-locally. CORE resolves the Compose path relative to that definition.
+First prepare the [definition and Compose](../004-backups-management.md#backup-health).
+`--file` points to the definition **on the server**. Replace `RUN_UUID` with the returned Health ID.
 
-Create and start a manual environment:
+### Manual environment
 
 ```bash
 kida backup health create --file /srv/health/app.toml --mode manual
-kida backup health start --run-id <UUID>
-kida backup health get --run-id <UUID>
-kida backup health stop --run-id <UUID>
-kida backup health delete --run-id <UUID>
+kida backup health start --run-id RUN_UUID
+kida backup health get --run-id RUN_UUID
 ```
 
-`create` returns a run in `CREATED`. `start` admits it asynchronously and prints
-both the Health Run ID and the separate Queue execution ID. A manual environment
-remains available after diagnosis until stopped or expired. Its TTL defaults to
-four hours (`backup_health.manual_ttl_hours` in `/etc/kida/kida.toml`), measured
-from `started_at`. Maintenance checks expiration periodically; expiration is not an
-exact deadline. Capacity, queue saturation or an active run of the same definition
-can prevent admission.
+Query with `get` until diagnosis is available. To end inspection:
 
-For an automatic run that diagnoses and then stops and cleans its environment:
+```bash
+kida backup health stop --run-id RUN_UUID
+kida backup health delete --run-id RUN_UUID
+```
+
+### Automatic check
 
 ```bash
 kida backup health run --file /srv/health/app.toml
-# Alternatively, create first and start the returned UUID:
-kida backup health create --file /srv/health/app.toml --mode automatic
-kida backup health start --run-id <UUID>
 kida backup health list
+kida backup health get --run-id RUN_UUID
 ```
 
-Schedule a new automatic run on each occurrence using the existing Scheduler:
+Alternatively, `create --mode automatic` followed by `start` separates creation and startup.
+To automate a fresh check at each occurrence:
 
 ```bash
 kida scheduler add --command backup.health.run \
@@ -169,33 +105,13 @@ kida scheduler add --command backup.health.run \
   --cron '30 2 * * *' --timezone Europe/Madrid
 ```
 
-`get`, `stop` and `delete` display the operational state separately from the
-technical result (`FAILED`, `UNHEALTHY`, `UNKNOWN`, `DEGRADED`, `HEALTHY`), plus
-partial or complete diagnosis, timestamps, selected artifact, anomalies, cleanup
-errors and the report path recorded by CORE. Use `report list` to check which
-reports remain available; a recorded path can outlive a deleted report. A technical failure or incomplete cleanup
-can be returned in a successful protocol response; inspect these fields. Protocol
-and transport errors keep their existing error messages and exit statuses.
-
-`stop` stops the environment; `delete` also requests removal of its owned Docker
-resources and restored directory, preserving history and reports. Cleanup errors
-remain visible for later retry. Stopped executions cannot be restarted: create a
-new run. CORE restart closes interrupted runs and attempts cleanup; it does not
-resume manual environments.
+### Reports
 
 ```bash
 kida backup health report list
-kida backup health report get --run-id <UUID>
-kida backup health report delete --run-id <UUID>
+kida backup health report get --run-id RUN_UUID
+kida backup health report delete --run-id RUN_UUID
 ```
 
-`report get` prints the Markdown received from CORE. Deleting a report preserves
-history and prevents automatic reconstruction of that voluntarily deleted report.
-Reports default to 90 days of retention (`backup_health.report_retention_days`);
-records needed for pending cleanup are preserved. Runtime configuration changes
-require a CORE restart.
-
-Use an administrator-reviewed Compose definition for isolated restoration paths.
-Compose is trusted configuration: bind mounts can affect production. Health
-checks provide a technical diagnosis; the administrator must validate functional
-integrity. Simulated tests do not establish real Docker acceptance.
+`report get` prints the Markdown report. `report delete` removes it; only run it if you want to delete it.
+See [modes, results and cleanup](../004-backups-management.md#choose-a-mode-and-read-the-result) to interpret output.

@@ -1,59 +1,46 @@
-# Programación de tareas
+# Programar tareas
 
-[English](../en/005-task-scheduling.md) · [Índice de documentación](000-index.md)
+[English](../en/005-task-scheduling.md) · [Índice](000-index.md)
 
-Las programaciones persisten definiciones de comandos y las envían a la cola compartida al vencer.
-Se puede programar cualquier comando público registrado, incluidos los propios comandos del scheduler.
-Los parámetros específicos y los recursos referenciados se validan al ejecutar, no al dar de alta.
-Los metadatos `schedule` de una configuración de backup no crean ejecuciones.
+Crea programaciones con la [CLI](cli/task-scheduling.md) o la [API](api/task-scheduling.md).
+Cada alta crea una entrada nueva. Para cambiarla, elimina la anterior y crea otra.
+Los parámetros y recursos del comando se comprueban al ejecutar: registrar no demuestra que la tarea vaya a completarse.
 
-## Reglas y validación
+## Reglas
 
-- `once`: fecha futura RFC3339 con desplazamiento explícito. Elige una fecha futura al adaptar ejemplos.
-- `interval`: segundos positivos. El primer intento ocurre un intervalo después del alta; el anclaje original sobrevive a reinicios.
-- `cron`: cinco campos (minuto, hora, día del mes, mes y día de la semana) y zona IANA, `UTC` por defecto.
-  Si ambos campos de día están restringidos, basta que coincida uno. Las horas inexistentes se omiten;
-  las repetidas se intentan una vez, en su primera aparición.
+| Regla | Comportamiento |
+| --- | --- |
+| `once` | Fecha futura RFC3339 con zona explícita, por ejemplo `2030-01-01T12:00:00Z` |
+| `interval` | Segundos positivos; primer intento un intervalo después del alta |
+| `cron` | Cinco campos: minuto, hora, día del mes, mes y día de semana; zona IANA, `UTC` por defecto |
 
-El alta siempre crea entradas `USER`. El listado usa `USER` por defecto y permite filtros `INTERNAL` y `ALL`.
-Las entradas internas las gestiona CORE y no se pueden borrar públicamente. Los IDs deben ser válidos y corresponder
-a entradas de usuario existentes. No hay comando de modificación: borrar y crear son operaciones independientes.
-Borrar evita futuros encolados, sin cancelar peticiones en cola o ejecutándose. `next_enqueue_at` es un vencimiento
-pendiente en UTC, no un inicio de ejecución garantizado.
+En cron, si ambos campos de día están restringidos, basta que coincida uno.
+Las horas inexistentes por cambio horario se omiten; las repetidas se intentan una vez, en su primera aparición.
+Los intervalos conservan su anclaje tras reinicios.
 
-## Comportamiento de cola y reinicio
+## Interpretar el listado
 
-Los comandos programados y backups manuales comparten FIFO y worker. La concurrencia se configura mediante
-`queue.max_concurrent_jobs` (2 por defecto); `backup.run` se ejecuta de uno en uno. Pueden encolarse nuevos
-vencimientos mientras hay trabajo anterior pendiente o ejecutándose. El orden de admisión no garantiza el de inicio ni finalización.
+El listado muestra entradas de usuario (`USER`) por defecto. `INTERNAL` son tareas gestionadas por KIDA;
+puedes consultarlas, pero no eliminarlas. `ALL` muestra ambas.
+`Next enqueue attempt` / `next_enqueue_at` está en UTC e indica un intento pendiente, no la hora garantizada de ejecución.
 
-Se admite primero el vencimiento más antiguo entre ambos orígenes; los empates conservan el orden almacenado.
-Una cola llena conserva el vencimiento y reintenta tras un segundo monotónico, sujeto al sondeo del temporizador.
-Las recurrencias conservan un único vencimiento pendiente y después avanzan a una fecha futura manteniendo regla
-y anclaje, sin recuperar cada repetición omitida. Una entrada `once` se elimina tras admitirse; las que siguen
-pendientes y ya vencieron al reiniciar se descartan sin ejecutar.
+Si hay saturación, el vencimiento queda pendiente y se reintenta. Las recurrencias mantienen un único vencimiento pendiente,
+sin acumular todas las repeticiones omitidas. La concurrencia se ajusta en [configuración](configuration.md);
+los backups se ejecutan de uno en uno. El orden de admisión no garantiza el de finalización.
 
-No se recuperan peticiones en cola ni ejecuciones interrumpidas. La admisión no garantiza ejecución ni entrega
-exactamente una vez. Solo se encolan comando y parámetros; los recursos se resuelven al ejecutar.
-Un fallo de persistencia procesando vencimientos o una cola cerrada termina CORE con error.
-El scheduler no ofrece historial, consulta de ejecuciones ni cancelación.
+## Borrado y reinicio
 
-## Actualizaciones
+Eliminar evita futuros envíos, pero no cancela trabajo ya pendiente o ejecutándose.
+Las programaciones se conservan al reiniciar; el trabajo ya admitido o interrumpido no se recupera.
+Las entradas `once` vencidas que seguían pendientes al reiniciar se descartan.
+No hay historial ni cancelación de ejecuciones; consulta el [registro del servicio](troubleshooting.md).
 
-Actualiza CORE antes que CLI. La CLI actual exige `origin` en las respuestas y puede informar de un fallo de
-presentación aunque el alta/borrado se haya completado contra un CORE anterior. Consulta el listado antes de repetir un alta.
-CORE lee archivos antiguos sin `origin` como `USER`, pero al guardar añade ese campo y los hace incompatibles
-con el CORE anterior. Conserva respaldo si necesitas volver atrás; no retires el origen de entradas `INTERNAL`.
+## Actualizar desde versiones anteriores
 
-El comando histórico `health` está retirado; `system.health` es una consulta de sensores independiente.
-Una programación pendiente guardada con `health` impide cargar el scheduler, identificando su UUID y comando
-sin sobrescribir el archivo. Elimina o sustituye esa definición antes de arrancar.
+Actualiza CORE antes que CLI. Si se pierde una respuesta, lista antes de repetir un alta para evitar duplicados.
+Conserva una copia del archivo de programaciones antes de actualizar: el campo `origin` guardado actualmente
+no es compatible con versiones anteriores. No elimines el origen de las entradas internas.
+Si el arranque indica una programación antigua con comando `health`, sustitúyela o elimínala del archivo indicado;
+`system.health` es la consulta de sensores actual.
 
-## Elige tu interfaz
-
-- [CONSOLE](console/task-scheduling.md) — aún no implementada.
-- [CLI](cli/task-scheduling.md).
-- [API directa](api/task-scheduling.md).
-
-Receta de apagado semanal y encendido RTC con [CLI](cli/weekly-power-cycle.md) o [API](api/weekly-power-cycle.md).
-Consulta la [configuración](configuration.md) para almacenamiento y permisos del scheduler.
+Receta: apagado semanal y encendido RTC con [CLI](cli/weekly-power-cycle.md) o [API](api/weekly-power-cycle.md).

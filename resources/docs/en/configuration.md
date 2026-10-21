@@ -1,10 +1,9 @@
-# CORE configuration
+# Configure KIDA
 
-[Castellano](../es/configuration.md) · [Documentation index](000-index.md)
+[Castellano](../es/configuration.md) · [Index](000-index.md)
 
-CORE loads `/etc/kida/kida.toml` once before starting runtime services. If missing,
-it creates the default configuration; malformed configuration prevents startup.
-Omitted sections and fields use these defaults:
+Edit `/etc/kida/kida.toml` with administrator permissions. KIDA creates the file with defaults
+if missing; invalid configuration prevents startup. Omitted fields use these values:
 
 ```toml
 [unix]
@@ -36,33 +35,37 @@ report_retention_days = 90
 max_active_runs = 2
 ```
 
-## Limits and paths
+## What to adjust
 
-- Queue capacity and concurrency must be positive and fit admission/semaphore limits. `backup.run` jobs execute one at a time.
-- Health times and capacity must be positive and fit their supported limits. `max_active_runs` includes active manual environments and is independent of worker concurrency.
-- Health roots must be absolute, distinct and not contain one another. Validation resolves existing ancestors and symlinks without creating directories.
-- CORE needs read/write permissions for its configuration, backup definitions, scheduler and Health storage, and Docker ownership records when used.
-- A missing scheduler file starts empty; a corrupt one prevents startup and is not overwritten. See [scheduler behavior](005-task-scheduling.md).
-- Health TTL is measured from `started_at`; querying does not renew it. Expiration is checked periodically. Report retention does not apply to the artifact catalog.
+| Setting | Use |
+| --- | --- |
+| `unix.socket_path` | Local connection. The CLI requires `/tmp/kida.sock`; changing it prevents CLI connections |
+| `http.host`, `http.port` | Listen address for [API integrations](api/README.md) |
+| `backup.backup_dir` | Backup configurations; not the destination for saved backups |
+| `scheduler.path` | Schedule file; starts empty if missing, prevents startup if corrupt |
+| `queue.capacity` | Pending work capacity |
+| `queue.max_concurrent_jobs` | Simultaneous jobs; positive. Backups run one at a time |
+| `docker.ownership_dir` | Managed Docker resource records; keep these for safe cleanup |
+| `backup_health.restore_root` | Temporary restore directories |
+| `backup_health.data_root` | Backup catalog, history and reports; keep these to use Health |
+| `backup_health.manual_ttl_hours` | Manual environment lifetime from start; querying does not renew it |
+| `backup_health.health_timeout_seconds` | Maximum wait for diagnosis |
+| `backup_health.report_retention_days` | Report retention; does not delete backup files |
+| `backup_health.max_active_runs` | Active environments, including manual ones; independent of job concurrency |
 
-## Endpoints and restart
+Durations and `max_active_runs` must be positive. Health roots must be absolute, distinct and must not contain each other.
+The service needs read and write permissions for the paths it uses.
+HTTP has no authentication or TLS: restrict access to trusted clients and networks.
 
-The CLI currently uses the fixed path `/tmp/kida.sock`. Changing `unix.socket_path`
-requires direct socket clients to use the new path and makes the current CLI unable to connect.
-HTTP is bound to loopback by default. The current server has no built-in authentication or TLS;
-keep access limited to trusted clients and networks.
+## Apply changes
 
-The socket directory must allow socket and lock-file creation and be protected from unrelated modification.
-CORE rejects non-socket entries and active sockets; it only recovers a stale socket on `ConnectionRefused`.
-`<socket_path>.lock` remains after shutdown. Do not remove it while an instance is active.
-Permission and inspection errors stop startup without deleting the entry.
-
-After reviewing changes, restart and check the service:
+Changes require a restart. First wait for pending work to finish and review Health environments:
+[interrupted runs are not recovered](005-task-scheduling.md#deletion-and-restart).
 
 ```bash
 sudo systemctl restart kida
 systemctl --no-pager --full status kida
+kida system info
 ```
 
-Restart does not recover queued requests or resume manual Health environments.
-See [backups](004-backups-management.md) and [scheduling](005-task-scheduling.md) before restarting during operations.
+If this fails, see [troubleshooting](troubleshooting.md).

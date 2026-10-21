@@ -1,6 +1,6 @@
-# Control del sistema mediante API
+# Sistema mediante API
 
-[English](../../en/api/system-control.md) · [Índice de documentación](../000-index.md)
+[English](../../en/api/system-control.md) · [Índice](../000-index.md)
 
 Envía cada objeto por separado mediante [HTTP o socket](README.md).
 
@@ -12,33 +12,27 @@ Envía cada objeto por separado mediante [HTTP o socket](README.md).
 {"id":"rtc","command":"system.wake_capabilities","params":{}}
 ```
 
-`system.info` informa de sistema operativo y hardware. `system.health` consulta sensores.
-`system.wake_capabilities` inspecciona RTC sin cambiar la alarma; los campos desconocidos y advertencias
-son diagnóstico, no prueba de permisos ni compatibilidad de encendido S5.
+`system.info` informa de sistema operativo y hardware; `system.health`, de sensores.
+`system.wake_capabilities` consulta RTC sin modificar alarmas.
 
 ## Apagado y reinicio
-
-Estas peticiones afectan al servidor CORE. Revisa el horario antes de enviarlas.
 
 ```json
 {"id":"shutdown","command":"system.shutdown","params":{"when":"+15"}}
 {"id":"reboot","command":"system.reboot","params":{"when":"23:30"}}
 ```
 
-`when` acepta `now`, `+N` minutos o `HH:MM` de 24 horas; los handlers usan `+1` si no reciben una cadena.
-Un reinicio actúa sobre un equipo encendido; no enciende uno que ya está apagado.
+`when` usa los [formatos de apagado](../006-system-control.md#apagado-y-reinicio);
+si se omite o no es una cadena, se aplica `+1`.
 
-## Apagado con encendido RTC
+## Apagado y encendido RTC
 
 ```json
-{"id":"cycle-clock","command":"system.power_cycle","params":{"shutdown_time":"23:30","wake_time":"06:00"}}
-{"id":"cycle-delay","command":"system.power_cycle","params":{"wake_after_seconds":28800}}
+{"id":"clock","command":"system.power_cycle","params":{"shutdown_time":"23:30","wake_time":"06:00"}}
+{"id":"delay","command":"system.power_cycle","params":{"wake_after_seconds":28800}}
 ```
 
-Indica exactamente uno de `wake_time` (siguiente `HH:MM` local) y `wake_after_seconds` (retraso entero desde
-la ejecución). `shutdown_time` es opcional y corresponde a hoy en hora local; omitirlo solicita apagar en un minuto.
-API no tiene asistente. El identificador público es `system.power_cycle`; CLI utiliza `powercicle`.
-
-Consulta los [márgenes temporales y el comportamiento de alarmas](../006-system-control.md).
-La respuesta informa de fecha/zona del encendido y, si se indica, del apagado.
-Una respuesta correcta no demuestra encendido físico. Consulta la [receta semanal](weekly-power-cycle.md).
+Indica exactamente uno de `wake_time` (texto `HH:MM`) y `wake_after_seconds` (entero).
+`shutdown_time` es texto `HH:MM` opcional. La respuesta muestra fecha y zona del encendido y, si se indica, del apagado.
+Revisa los [requisitos y márgenes RTC](../006-system-control.md#apagado-con-encendido-rtc).
+Para automatizarlo, sigue la [receta semanal](weekly-power-cycle.md).

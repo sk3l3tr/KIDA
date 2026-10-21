@@ -1,33 +1,25 @@
 # Docker mediante CLI
 
-[English](../../en/cli/docker-management.md) · [Índice de documentación](../000-index.md)
+[English](../../en/cli/docker-management.md) · [Índice](../000-index.md)
 
-## Listar contenedores
-
-Incluye los detenidos y su estado actual:
+## Listar
 
 ```bash
 kida docker containers list
 ```
 
+Incluye contenedores detenidos y su estado.
+
 ## Gestionar un contenedor
 
-Usa el nombre o ID del contenedor:
+Sustituye `CONTAINER` por su nombre o ID. Ejecuta solo la acción que necesites:
 
 ```bash
-kida docker container start <id-or-name>
-kida docker container stop <id-or-name>
-kida docker container restart <id-or-name>
-kida docker container delete <id-or-name>
+kida docker container start CONTAINER
+kida docker container stop CONTAINER
+kida docker container restart CONTAINER
+kida docker container delete CONTAINER
 ```
 
-Por ejemplo:
-
-```bash
-kida docker container start web
-kida docker container restart 8f2c1a4b7d90
-kida docker container stop web
-kida docker container delete web
-```
-
-Eliminar es permanente. Detén el contenedor y comprueba su nombre o ID antes de borrarlo.
+Consulta las [precauciones de borrado](../003-docker-management.md).
+El inventario Compose está disponible mediante [API](../api/docker-management.md#inventario-compose).

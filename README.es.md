@@ -24,22 +24,18 @@ Gestiona Docker, backups, tareas programadas y operaciones del sistema desde una
 
 ## .✦ ݁˖ Por qué KIDA
 
-Gestionar servidores no debería exigir combinar scripts, cron y comandos sin fin. **KIDA reúne Docker, backups, tareas programadas y operaciones del sistema en un agente autoalojado.** Controla tu infraestructura desde la terminal o intégrala con tus herramientas.
-
-> Menos trabajo manual. Más control. Tu infraestructura, tus reglas.
+Automatiza tareas habituales, prepara tus copias y controla tu servidor desde un solo lugar. Autoalojado, con cliente de terminal y API para tus herramientas.
 
 ## .✦ ݁˖ Capacidades
 
-**Un agente para gestionar tus servidores.**
-
 |     | Capacidad                  | Qué permite hacer                                                             |
 | --- | -------------------------- | ----------------------------------------------------------------------------- |
-| 🐳  | **Gestión de Docker**      | Listar, iniciar, detener, reiniciar y eliminar contenedores.                  |
-| 💾  | **Gestión de backups**     | Configurar, gestionar y ejecutar backups.                                     |
-| 🕒  | **Programación de tareas** | Automatizar operaciones recurrentes.                                          |
+| 🐳   | **Gestión de Docker**      | Listar, iniciar, detener, reiniciar y eliminar contenedores.                  |
+| 💾   | **Gestión de backups**     | Configurar, gestionar y ejecutar backups.                                     |
+| 🕒   | **Programación de tareas** | Automatizar operaciones recurrentes.                                          |
 | 🖥️  | **Control del sistema**    | Consultar salud y hardware, reiniciar y apagar.                               |
-| 🔌  | **CLI & HTTP**             | Utilizar CLI mediante Unix socket o enviar JSON directamente por HTTP/socket. |
-| 🏠  | **Autoalojado y ligero**   | Agente nativo en Rust que funciona en tu infraestructura, bajo tu control.    |
+| 🔌   | **CLI & HTTP**             | Trabajar desde la terminal o integrar tus herramientas.                       |
+| 🏠   | **Autoalojado y ligero**   | Agente nativo en Rust que funciona en tu infraestructura, bajo tu control.    |
 
 ## .✦ ݁˖ KIDA en acción
 
@@ -50,12 +46,12 @@ Define orígenes y destinos, registra la configuración y ejecuta el backup cuan
 
 \>< >< >< ><
 
-Backup Health restaura un backup guardado en un entorno independiente.
+Pon a prueba tus copias en un entorno independiente con Backup Health.
 ![KIDA restaurando datos aislados, comprobando su salud y limpiando el entorno](resources/assets/backup-health.gif)
 
 \>< >< >< ><
 
-Añade una programación y consulta cuándo intentará encolar trabajo.
+Automatiza backups y operaciones recurrentes del servidor.
 ![KIDA programando un backup diario y mostrando su regla y próximo intento de encolado](resources/assets/scheduler.gif)
 
 \>< >< >< ><
@@ -69,8 +65,8 @@ Consulta contenedores, reinicia un servicio y encola un backup desde la misma CL
 
 [English](README.md) · [Toda la documentación](resources/docs/index.md)
 
-Empieza por la [instalación](resources/docs/es/001-installation.md) y la
-[guía de uso general](resources/docs/es/002-usage-overview.md).
+Empieza por la [instalación](resources/docs/es/001-installation.md) o consulta las
+[guías de usuario](resources/docs/es/000-index.md).
 
 ## .✦ ݁˖ Licencia
 

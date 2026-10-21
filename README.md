@@ -24,22 +24,18 @@ Manage Docker, backups, scheduled tasks and system operations from a single tool
 
 ## .✦ ݁˖ Why KIDA
 
-Managing servers shouldn't mean juggling scripts, cron jobs, and endless commands. **KIDA brings Docker, backups, scheduled tasks, and system operations together in one self-hosted agent.** Control your infrastructure from the terminal or integrate it with your own tools.
-
-> Less manual work. More control. Your infrastructure, your rules.
+Automate routine work, keep your backups ready and control your server from one place. Self-hosted, with a terminal client and an API for your own tools.
 
 ## .✦ ݁˖ Capabilities
 
-**One agent. Everything you need to manage your servers.**
-
 |     | Capability                    | What it does                                                            |
 | --- | ----------------------------- | ----------------------------------------------------------------------- |
-| 🐳  | **Docker Management**         | List, start, stop, restart, and remove containers.                      |
-| 💾  | **Backup Management**         | Configure, manage, and execute backup jobs.                             |
-| 🕒  | **Task Scheduling**           | Automate recurring operations with scheduled jobs.                      |
+| 🐳   | **Docker Management**         | List, start, stop, restart, and remove containers.                      |
+| 💾   | **Backup Management**         | Configure, manage, and execute backup jobs.                             |
+| 🕒   | **Task Scheduling**           | Automate recurring operations with scheduled jobs.                      |
 | 🖥️  | **System Control**            | Monitor system health, inspect hardware, reboot, and shut down.         |
-| 🔌  | **CLI & HTTP**                | Use CLI over Unix socket or send JSON directly over HTTP/socket.        |
-| 🏠  | **Self-Hosted & Lightweight** | A native Rust agent running on your infrastructure, under your control. |
+| 🔌   | **CLI & HTTP**                | Work from the terminal or integrate your own tools.                     |
+| 🏠   | **Self-Hosted & Lightweight** | A native Rust agent running on your infrastructure, under your control. |
 
 ## .✦ ݁˖ KIDA in action
 
@@ -50,12 +46,12 @@ Define your sources and destinations, register the job, and run it on demand.
 
 \>< >< >< ><
 
-Backup Health restores a saved backup into a separate environment.
+Test your backups in a separate environment with Backup Health.
 ![KIDA restoring isolated data, checking its health and cleaning up the environment](resources/assets/backup-health.gif)
 
 \>< >< >< ><
 
-Add a schedule and inspect when it will next submit work.
+Automate recurring backups and server operations.
 ![KIDA adding a daily backup schedule and displaying its rule and next enqueue time](resources/assets/scheduler.gif)
 
 \>< >< >< ><
@@ -69,8 +65,8 @@ Inspect your containers, restart a service, and queue a backup from the same CLI
 
 [Castellano](README.es.md) · [All documentation](resources/docs/index.md)
 
-Start with [installation](resources/docs/en/001-installation.md) and the
-[usage overview](resources/docs/en/002-usage-overview.md).
+Start with [installation](resources/docs/en/001-installation.md) or browse the
+[user guides](resources/docs/en/000-index.md).
 
 ## .✦ ݁˖ License
 

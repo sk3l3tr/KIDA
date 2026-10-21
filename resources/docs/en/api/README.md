@@ -1,62 +1,57 @@
-# Direct API: HTTP and Unix socket
+# API for integrations
 
-[Castellano](../../es/api/README.md) · [Documentation index](../000-index.md)
+[Castellano](../../es/api/README.md) · [Index](../000-index.md)
 
-Send the same JSON command envelope over either transport. These examples perform a read-only query:
+Send JSON commands over HTTP or Unix socket. Operations run on the KIDA server.
+Defaults: HTTP `127.0.0.1:8989` and socket `/tmp/kida.sock`.
+To change these or restrict access, see [configuration](../configuration.md).
+
+## First request
+
+With `curl`, over HTTP:
 
 ```bash
 curl -sS http://127.0.0.1:8989/command \
   -H 'Content-Type: application/json' \
-  --data '{"id":"system-check","command":"system.health","params":{}}'
+  --data '{"id":"check","command":"system.info","params":{}}'
 ```
 
+With `socat`, over Unix socket:
+
 ```bash
-printf '%s\n' '{"id":"system-check","command":"system.health","params":{}}' \
+printf '%s\n' '{"id":"check","command":"system.info","params":{}}' \
   | socat - UNIX-CONNECT:/tmp/kida.sock
 ```
 
-The commands require `curl` or `socat`, respectively. The HTTP endpoint defaults to
-`127.0.0.1:8989/command`; the socket defaults to `/tmp/kida.sock`. See [configuration](../configuration.md).
-The current server does not enforce authentication or provide TLS. Socket access depends on filesystem permissions.
+HTTP uses `POST /command` and `Content-Type: application/json`.
+The socket requires one compact JSON object per line and replies with one line per request;
+a connection accepts multiple requests. Do not send multiline JSON to the socket.
 
 ## Request and response
 
-A request contains string `id`, string `command`, and JSON `params` (default `null` if omitted).
-The outer ID correlates the response; it is not a job ID, schedule ID, execution ID or idempotency key.
+| Request field | Type and use |
+| --- | --- |
+| `id` | String correlating request and response; not a resource ID or an idempotency key |
+| `command` | Dotted command name, for example `scheduler.list` |
+| `params` | JSON; `null` if omitted |
 
-HTTP uses `POST /command` and `Content-Type: application/json`. The Unix socket uses one compact JSON object
-per line and sends one response line per request; do not send multiline pretty JSON to the socket.
-The connection can carry multiple request lines.
-
-```json
-{"id":"request-1","command":"scheduler.list","params":{}}
-```
-
-Example empty-list response:
+Send each JSON example in the guides as a separate request.
+Example with no schedules and example error:
 
 ```json
-{"id":"request-1","status":"OK","data":[]}
+{"id":"list","status":"OK","data":[]}
+{"id":"check","status":"ERROR","error":"Unknown command: unknown.command"}
 ```
 
-Example command error:
-
-```json
-{"id":"request-1","status":"ERROR","error":"Unknown command: unknown.command"}
-```
-
-Inspect `status` and `error`, not just the HTTP status code. Command errors are JSON responses;
-invalid HTTP JSON is rejected by the HTTP layer, while invalid socket messages terminate that connection.
-`data` and `error` are omitted when absent. Successful queue admission is not task completion.
-Health diagnosis and cleanup require checking result fields even when `status` is `OK`.
-Do not blindly retry writes after a transport failure: the command may have already executed.
+Check `status`, not only the HTTP code. `data` and `error` are omitted if absent.
+HTTP rejects invalid JSON; an invalid socket message closes that connection.
+Asynchronous admission does not confirm completion. For Health, also review diagnosis and cleanup even if `status` is `OK`.
+If a write response is lost, query state before retrying: the command may have run.
 
 ## Commands by task
 
-- [Docker](docker-management.md)
-- [Backups and Backup Health](backups-management.md)
-- [Scheduler](task-scheduling.md)
-- [System](system-control.md)
-- [Weekly shutdown and RTC wake](weekly-power-cycle.md)
-
-JSON blocks containing several request lines are separate examples: submit each object independently.
-For socket transport, keep each object on its own line.
+- [Docker and Compose](docker-management.md).
+- [Backups and Backup Health](backups-management.md).
+- [Task scheduling](task-scheduling.md).
+- [System and RTC](system-control.md).
+- [Weekly shutdown recipe](weekly-power-cycle.md).
