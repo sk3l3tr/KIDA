@@ -1,329 +1,84 @@
-```
-888    d8P  8888888 8888888b.        d8888  v0.0.5
-888   d8P     888   888  "Y88b      d88888  CORE
-888  d8P      888   888    888     d88P888
-888d88K       888   888    888    d88P 888
-8888888b      888   888    888   d88P  888
-888  Y88b     888   888    888  d88P   888
-888   Y88b    888   888  .d88P d8888888888
-888    Y88b 8888888 8888888P" d88P     888
-```
+# KIDA CORE
 
-> KIDA is the intelligent agent at the core of your server, quietly watching over the place, automating operations, and keeping everything under control.
+[Castellano](README.es.md) · [Documentation](../resources/docs/index.md)
 
-# What is KIDA CORE
+CORE executes server operations. Users interact through [CLI](../resources/docs/en/cli/README.md),
+the [direct HTTP/Unix socket API](../resources/docs/en/api/README.md), or the planned
+[CONSOLE web interface](../resources/docs/en/console/README.md), which is not implemented yet.
 
-KIDA CORE ejecuta las operaciones del servidor y permite programar comandos persistentes con SCHEDULER. Puedes acceder a sus comandos mediante HTTP o Unix socket.
+For installation, configuration and operating procedures, use the [English documentation](../resources/docs/en/000-index.md).
+This README retains internal implementation contracts and acceptance notes; methods below are not additional public commands.
 
-# Using KIDA CORE
+## Socket reservation
 
-El servidor Unix conserva los sockets activos y rechaza archivos, directorios y enlaces en la ruta configurada. Solo recupera un socket obsoleto cuando la conexión devuelve `ConnectionRefused`; los errores de permisos y de comprobación impiden el arranque sin borrar esa entrada.
+The Unix listener refuses active sockets and non-socket entries. Stale sockets are recovered only after `ConnectionRefused`;
+permission/inspection errors stop startup without unlinking the entry. CORE retains a lock on `<socket_path>.lock`
+for the listener lifetime. The file remains afterward; never unlink while instances are active.
+The directory must allow socket/lock creation and resist unrelated modification. This coordinates cooperating CORE instances,
+not external processes that ignore the lock or change the path.
 
-Para excluir arranques simultáneos de KIDA, mantiene un bloqueo en `<ruta-del-socket>.lock` durante la vida del listener. Este archivo permanece tras detener el servidor; no debe borrarse mientras haya instancias activas. El directorio debe permitir crear el socket y su archivo de bloqueo y estar protegido frente a modificaciones ajenas. La reserva coordina instancias de KIDA que usan este mecanismo; no ofrece exclusión frente a procesos externos que cambien la ruta sin respetarlo.
+## Internal Backup Health contracts
 
-KIDA tiene 2 formas de comunicación: HTTP y Unix socket. En ambos casos, el formato de entrada es JSON. Algunos ejemplos son:
+Public commands, configuration and definitions are documented in the [backup guide](../resources/docs/en/004-backups-management.md).
+Health coordinates execution, admission limits, TTL, maintenance and public commands.
 
-```bash
-curl -X POST http://127.0.0.1:8989/command -H 'Content-Type: application/json' -d '{"id": "1", "command": "system.health", "params": {}}'
+`features::backup::health::definition::load` reads a CORE-local TOML and returns its definition,
+canonical definition/Compose paths and resolved `BackupJob`. Compose is relative to the canonical TOML directory,
+never the client. Loading alone neither runs Compose nor creates resources. Definition IDs are stable and unique;
+there is no separate global definition registry.
 
-echo '{"id": "1", "command": "system.health", "params": {}}' | socat - UNIX-CONNECT:/tmp/kida.sock
-```
+`features::backup::health::restore::restore` takes a resolved artifact and a new destination with an existing parent.
+It verifies size and SHA-256 before creating the directory and reads the same descriptor during extraction.
+It retains relative structure and ordinary permissions, not owners or special bits. Only regular files and directories
+are accepted; links, special entries and escaping paths are rejected. The current backup producer dereferences links.
+Failure preserves partial data and returns the created directory's path/provenance for recovery; source and existing
+destinations are never removed. The Health service coordinates lifecycle and cleanup.
 
-## Configurar la capacidad de la cola
+`health::compose::HealthCompose` prepares an exclusive `kida-bh-<run_id>` project and supplies `KIDA_RESTORE_DIR`
+only to its Docker child processes. It obtains inventory through Compose, requires non-autostart policies before
+creation/start, excludes optional profiles, and retains replicas, path/hash and configured images. For build-only services
+without a declared image, reports complete the image from actual container inspection.
+Partial creation preserves the reserved identity and registered resources. Start/Stop validate identity;
+Remove reuses selective deletion, without forced stop or removal of external/shared resources.
+The coordinator persists evidence and checks cleanup report errors.
 
-En `/etc/kida/kida.toml`, puedes ajustar cuántos comandos pendientes admite la cola compartida por los backups manuales y SCHEDULER:
+`health::diagnosis::DiagnosticSession` compares expected replicas with Docker observations.
+Only satisfactory healthchecks establish `HEALTHY`; restart/OOM evidence is retained and failures,
+unhealthy state and insufficient evidence remain distinct. Observation ends at timeout or a conclusive result.
+Logs do not affect diagnosis; omitted by default, authorized publication filters known sensitive values and bounds size.
 
-```toml
-[queue]
-capacity = 16
-max_concurrent_jobs = 2
-```
+`health::history::ExecutionRepository` stores JSON in `executions/<run_id>.json` and Markdown in
+`reports/<run_id>.md` beneath `backup_health.data_root`. Final reports include the cleanup attempt and errors.
+JSON is saved first so missing Markdown can be reconstructed if finalization fails. Deleting a report preserves history
+and marks it against reconciliation reconstruction. Corrupt records are reported, never overwritten.
+Directory provenance is retained, known sensitive values are redacted and logs are omitted by default.
 
-El valor predeterminado es 16 si se omite la sección o el campo. La capacidad debe ser mayor que cero; con cero, CORE devuelve un error al arrancar. El worker permite hasta `queue.max_concurrent_jobs` ejecuciones simultáneas (2 por defecto); este valor también debe ser positivo y respetar los límites de concurrencia y admisión. Los `backup.run` se ejecutan de uno en uno. Reinicia CORE para aplicar los cambios.
+## Internal artifact resolution
 
-## Configuración y definiciones de Backup Health
+Each new `backup.run` includes an artifact UUID in `<name>-<UTC-date>-<artifact_id>.tar.zst`.
+Backup names cannot contain path components; existing response fields are retained.
+Verified destinations are registered beneath
+`<backup_health.data_root>/artifacts/<backup-job-id>/<artifact-id>.json`, with identity, UTC date,
+SHA-256, size and absolute verified destination paths. CORE needs write access to `data_root`.
+The catalog neither imports old backups nor follows Health history/report retention.
 
-En `/etc/kida/kida.toml`, los parámetros globales de Health son:
+Publication uses same-directory temporary files and hard links to avoid overwriting destinations or records,
+even on collisions. Both target and catalog filesystems must support hard links. Failure preserves previous destinations;
+there is no overwrite fallback. Owned temporary files are removed on completion.
+A required destination failure remains a `backup.run` error even if another verified copy is registered.
+Catalog-write failure preserves copies but leaves them unavailable to Health without a valid record.
+No verified target means no metadata; optional-target failures keep their existing response treatment.
 
-```toml
-[backup_health]
-restore_root = "/tmp/kida/restored"
-data_root = "/var/lib/kida/backup-health"
-manual_ttl_hours = 4
-health_timeout_seconds = 180
-report_retention_days = 90
-max_active_runs = 2
-```
+Synchronous `BackupService::resolve_artifact(reference, version)` returns `ResolvedBackupArtifact`, verifying
+size and SHA-256. Job ID/name resolution rejects ambiguity. `latest` picks the newest date, then greatest UUID,
+and tries registered destinations in order without falling back to older versions. Explicit selection only reads
+its record; `latest` fails on corrupt job catalog records. This blocks on I/O and belongs in blocking work during
+Health orchestration. Restoration verifies the actual opened file again; resolution retains no open descriptor
+and cannot prevent external changes.
 
-Estos son los defaults, también si se omite la sección. Los tiempos y el cupo
-deben ser positivos y caber en sus límites. Las raíces deben ser absolutas,
-distintas y no contenerse entre sí; la validación resuelve los antecesores
-existentes y sus enlaces simbólicos, sin crear directorios. La configuración se
-publica una sola vez al arrancar; los cambios requieren reiniciar CORE.
+## Internal Docker diagnostics
 
-`max_active_runs` limita entornos Health, incluidos manuales que sigan activos;
-es independiente del límite de trabajos `queue.max_concurrent_jobs`. El TTL
-contará desde el arranque de la ejecución, sin renovarse al consultar.
-
-Cada prueba tiene su propio TOML, separado del `BackupJob`:
-
-```toml
-id = "nextcloud-health"
-name = "Nextcloud Backup Health"
-
-[backup]
-reference = "nextcloud-daily"
-version = "latest"
-
-[docker]
-compose = "./docker-compose.health.yml"
-```
-
-Todos los campos son obligatorios y no admiten valores vacíos. `reference`
-identifica un backup existente por ID o nombre, sin coincidencias ambiguas.
-`version` acepta `latest` o un UUID de artefacto registrado. No se incorporarán
-copias históricas sin registro. Cada definición debe tener un ID único y estable;
-no se crea un registro global de definiciones en esta fase.
-
-El cargador interno `features::backup::health::definition::load` lee un TOML
-local de CORE y devuelve la definición, la ruta absoluta del TOML y del Compose,
-y el `BackupJob` resuelto. Resuelve el Compose respecto al directorio del TOML
-canónico, nunca respecto al cliente. No ejecuta Compose ni crea recursos.
-
-El [ejemplo TOML](examples/backup-health/nextcloud-health.toml) y su
-[Compose](examples/backup-health/docker-compose.health.yml) ilustran el bind:
-
-```yaml
-services:
-  app:
-    image: example/app:stable
-    restart: "no"
-    volumes:
-      - type: bind
-        source: ${KIDA_RESTORE_DIR}/app-data
-        target: /app/data
-        bind:
-          create_host_path: false
-```
-
-Adapta imagen y healthcheck a la aplicación. La ruta `app-data` es ilustrativa:
-debe coincidir con la estructura relativa del tar, que el backup actual conserva
-desde sus sources sin el `/` inicial. Health inyectará `KIDA_RESTORE_DIR` con el
-directorio exclusivo del run; no añadas rutas de producción a esos binds. El
-Compose es configuración confiable del administrador, no un sandbox: un bind
-incorrecto puede afectar a datos reales. La validación funcional de los datos
-restaurados corresponde al administrador.
-
-El extractor interno `features::backup::health::restore::restore` recibe un
-artefacto resuelto y un destino nuevo cuyo padre debe existir. Verifica tamaño y
-SHA-256 antes de crear el directorio y lee el mismo descriptor durante la
-extracción. Conserva la estructura relativa y permisos ordinarios, sin restaurar
-propietarios ni bits especiales. Solo acepta archivos regulares y directorios;
-rechaza enlaces, entradas especiales y rutas que puedan escapar. El productor
-actual de backup desreferencia los enlaces al crear la copia.
-
-Si falla, conserva los datos parciales y devuelve la ruta y procedencia del
-directorio creado para su recuperación posterior; nunca borra el origen ni un
-destino preexistente. La integración con el ciclo de vida y la limpieza Health
-permanece pendiente.
-
-El adaptador interno `health::compose::HealthCompose` prepara un proyecto exclusivo
-`kida-bh-<run_id>` y pasa `KIDA_RESTORE_DIR` solo a sus procesos Docker. Obtiene el
-inventario mediante Compose y exige políticas sin autoarranque antes de crear o
-iniciar. Excluye perfiles opcionales y conserva réplicas, ruta/hash e imágenes
-configuradas. Para servicios con build sin imagen declarada, el informe deberá
-completar la imagen desde la inspección real del contenedor.
-
-La creación conserva la identidad reservada y los recursos registrados incluso
-si falla parcialmente. Start/Stop comprueban esa identidad; Remove reutiliza la
-eliminación selectiva existente, sin parar por la fuerza ni borrar recursos
-externos o compartidos. El coordinador aún pendiente debe persistir la evidencia
-y comprobar los errores del informe de limpieza.
-
-El evaluador interno `health::diagnosis::DiagnosticSession` compara las réplicas
-esperadas con las observaciones Docker. Solo declara `HEALTHY` con healthchecks
-satisfactorios; conserva reinicios/OOM y distingue fallos, unhealthy y evidencia
-insuficiente. Observa hasta el timeout o un resultado concluyente. Los logs no
-influyen en el resultado: se omiten por defecto y su publicación autorizada
-filtra valores sensibles conocidos con límites de tamaño.
-
-El repositorio interno `health::history::ExecutionRepository` guarda historial
-JSON en `executions/<run_id>.json` e informes Markdown en `reports/<run_id>.md`,
-bajo `backup_health.data_root`. El informe definitivo se escribe tras conocer
-el intento de limpieza; errores de limpieza también quedan documentados.
-Guarda primero el JSON para reconstruir un Markdown perdido si falla el cierre.
-Eliminar un informe conserva el historial y deja una marca que impide recrearlo
-durante la conciliación. Los registros corruptos se informan y no se sobrescriben.
-El repositorio conserva la procedencia del directorio restaurado, redacta los
-valores sensibles conocidos y omite logs por defecto.
-
-Esta fase incorpora configuración, cargador, tipos compartidos, catálogo de copias,
-restauración segura, adaptación Compose, diagnóstico e historial/informes. La ejecución,
-límites activos, TTL y comandos
-Health siguen pendientes; consulta el [índice de tareas](../docs/tasks/backup-health/README.md).
-
-### Catálogo de copias
-
-Cada `backup.run` nuevo incorpora un UUID al nombre:
-`<nombre>-<fecha-UTC>-<artifact_id>.tar.zst`. El nombre del backup no puede
-contener componentes de ruta. Los campos de su respuesta se conservan.
-
-Tras replicar, CORE registra la copia en
-`<backup_health.data_root>/artifacts/<backup-job-id>/<artifact-id>.json`, con
-identidad, fecha UTC, SHA-256, tamaño y rutas absolutas de los destinos
-verificados. El usuario de CORE necesita poder escribir en `data_root`.
-El catálogo no incorpora copias anteriores ni está sujeto a la retención de
-historial e informes Health.
-
-La publicación usa archivos temporales en el mismo directorio y enlaces duros
-para no sobrescribir destinos ni registros existentes, incluso ante colisiones.
-Los sistemas de archivos de los targets y del catálogo deben permitir enlaces
-duros. Un fallo conserva los destinos anteriores; no se usa una alternativa
-que pueda sobrescribirlos. Los temporales propios se retiran al terminar.
-
-Un destino requerido fallido mantiene el resultado de error de `backup.run`,
-aunque otra copia verificada quede registrada. Si falla la escritura del catálogo,
-el comando devuelve error y conserva los archivos ya copiados; esas copias no
-están disponibles para Health sin un registro válido. Un backup sin destinos
-verificados no publica metadatos; los fallos opcionales mantienen su tratamiento
-actual en la respuesta.
-
-La API interna síncrona `BackupService::resolve_artifact(reference, version)`
-devuelve `ResolvedBackupArtifact` y comprueba tamaño y SHA-256. Resuelve el job
-por ID/nombre sin ambigüedad. `latest` elige la fecha más reciente y, en empate,
-el UUID mayor. Prueba los destinos registrados en orden, sin cambiar a una
-versión anterior cuando la elegida falla. Una selección explícita consulta solo
-su registro; `latest` falla ante registros corruptos en el catálogo del job.
-Esta operación hace I/O bloqueante y debe llamarse desde el trabajo bloqueante
-de la futura orquestación Health. La restauración volverá a verificar el archivo
-que lea; la resolución no conserva un descriptor abierto ni impide cambios externos.
-
-## Crear configuraciones de backup
-
-`backup.config.create` recibe la configuración directamente en `params`.
-CORE es independiente del modo de entrada: CLI puede leer un TOML local,
-componer parámetros o usar su asistente, y envía el mismo contrato JSON.
-El payload antiguo `{"file":"ruta.toml"}` se rechaza.
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{
-    "id": "create-backup",
-    "command": "backup.config.create",
-    "params": {
-      "name": "daily",
-      "sources": ["/etc/hosts"],
-      "targets": [
-        {"path": "../primary", "filesystem_uuid": "volume-id"},
-        {"path": "./secondary", "required": false}
-      ],
-      "compression": "tar_zstd",
-      "lifecycle": {
-        "pre_backup": [{"command": "docker.container.stop", "params": {"container": "backup-source"}}],
-        "post_backup": [{"command": "docker.container.start", "params": {"container": "backup-source"}}]
-      },
-      "schedule": {"custom": [null, 1]},
-      "retention": {
-        "max_age": "7d",
-        "keep_last": 7,
-        "protected_restore_points": ["point-a"]
-      }
-    }
-  }'
-```
-
-`name`, `sources` y `targets` son obligatorios. Cada target exige `path`;
-`required` tiene default `true` y `filesystem_uuid` es opcional. La compresión
-actual es `tar_zstd` y se aplica si se omite. `lifecycle` es opcional y sus listas
-`pre_backup` y `post_backup` tienen default vacío. Cada comando exige `command`;
-`params` acepta JSON arbitrario y tiene default `null`.
-
-Al ejecutar el backup, el lifecycle permite exclusivamente `docker.container.stop`,
-`docker.container.start` y `docker.container.restart`. Pre se detiene al primer
-fallo; post intenta todos sus pasos secuencialmente y en orden, también si falla
-pre o la creación del artefacto. Los errores de post indican posición (desde 1),
-comando y causa. Si también hubo un fallo previo, este permanece como causa
-principal y el diagnóstico incluye todos los fallos de recuperación. Un fallo de
-post impide calcular el checksum y replicar el artefacto. Si post termina bien,
-un fallo previo conserva su error original.
-
-Esta recuperación cubre errores devueltos y errores de la tarea bloqueante de
-creación. Cancelar la tarea de backup o terminar el proceso no garantiza ejecutar
-post. El temporal sigue perteneciendo al trabajo bloqueante que lo esté utilizando.
-
-`schedule` y `retention` son opcionales. En retention, `max_age` es una cadena
-opcional, `keep_last` es un entero opcional de 0 a 4294967295 y
-`protected_restore_points` es una lista de cadenas con default vacío. Los valores
-JSON libres se guardan como cadenas JSON en la representación TOML persistida;
-los jobs TOML antiguos siguen siendo legibles. Los tipos JSON de la API se conservan.
-
-Una respuesta `OK` devuelve el job completo en `data`, con un UUID nuevo en
-`data.id`. Las rutas de sources y targets se conservan literalmente; su existencia
-se comprueba al ejecutar el backup. `schedule` solo guarda metadata: no crea una
-programación. Usa `scheduler.add` para programar `backup.run` con el ID o nombre del job.
-
-Los tres modos de CLI son:
-
-```bash
-kida backup config create -f ./backup-job.toml
-kida backup config create --name daily --source /etc/hosts --target ../backups
-kida backup config create
-```
-
-Consulta las [opciones y defaults de CLI](../kida-cli/README.md#create-a-backup-job).
-
-## Consultar Docker Compose
-
-CORE ofrece tres comandos de solo lectura, mediante HTTP o Unix socket:
-
-```json
-{"id":"compose-version","command":"docker.compose.version","params":{}}
-{"id":"compose-list","command":"docker.compose.projects.list","params":{}}
-{"id":"compose-inspect","command":"docker.compose.project.inspect","params":{"project":"my-project"}}
-```
-
-`docker.compose.version` ejecuta `docker compose version --short`. Devuelve
-`data: {"version":"2.40.0"}` si el plugin puede ejecutarse, o `ERROR` con el
-diagnóstico. Esto no comprueba la disponibilidad del daemon. Se utiliza el plugin
-`docker compose`, sin fallback al ejecutable antiguo `docker-compose`.
-
-Las consultas de inventario solo necesitan acceso al daemon mediante `docker`;
-funcionan aunque el plugin Compose no esté instalado. Descubren los contenedores
-mediante `com.docker.compose.project`, incluidos los detenidos, y los inspeccionan.
-No leen archivos Compose: un proyecto sin contenedores presentes y los servicios
-sin contenedores no aparecen.
-
-`docker.compose.projects.list` devuelve en `data` un array (vacío si no hay
-proyectos). `docker.compose.project.inspect` devuelve un único proyecto:
-
-```json
-{
-  "name": "my-project",
-  "services": [{ "name": "web", "containers": [] }]
-}
-```
-
-El esquema anterior abrevia la lista de contenedores: cada entrada real conserva
-los campos de `docker.containers.list`, incluidos `id`, `name`, `image`, `online`,
-`status`, `health`, fechas, código de salida, reinicios, puertos y redes. Las
-réplicas se agrupan por servicio; los contenedores sin etiqueta de servicio se
-agrupan bajo `name: null`. Proyectos y servicios se ordenan por nombre, y los
-contenedores por ID. No se sintetiza un estado agregado del proyecto.
-
-`params.project` debe ser una cadena no vacía; se recortan espacios exteriores.
-Un proyecto inexistente o un fallo de Docker devuelve `ERROR`, sin resultado
-parcial. El nombre identifica el proyecto únicamente dentro del daemon/contexto
-Docker consultado: no es un identificador global ni acredita propiedad de KIDA.
-Los modelos `ComposeVersion`, `ComposeProject` y `ComposeService` se exportan desde
-`features::docker`, junto con los modelos existentes de contenedores, para su
-reutilización interna. El protocolo y la CLI mantienen únicamente estas consultas
-Compose; el lifecycle siguiente es interno.
-
-### Diagnóstico Docker interno
-
-Estos métodos asíncronos de `DockerService` son internos y no registran comandos
-ni cambian el protocolo o las respuestas de las consultas existentes:
+These asynchronous `DockerService` methods register no commands and do not change the protocol or existing query responses:
 
 ```rust
 let timeout = std::time::Duration::from_secs(10);
@@ -332,360 +87,160 @@ let project = DockerService::diagnose_compose_project("my-project", timeout).awa
 let logs = DockerService::container_logs("my-container", 100, timeout).await?;
 ```
 
-`ContainerDiagnostics` contiene `container: DockerContainer`, `oom_killed:
-Option<bool>` y `docker_error: Option<String>`. Valida identidad y datos técnicos
-antes del mapeo; datos incompletos o mal tipados son errores. El healthcheck es
-opcional; si está presente, su estado debe ser `healthy`, `unhealthy` o `starting`.
-Conserva fechas y valores reportados: son observaciones actuales, sin reconstruir
-historiales ni inferir OOM a partir del código de salida. OOM y error técnico
-ausentes son `None`; una cadena de error vacía se conserva.
+`ContainerDiagnostics` contains `container: DockerContainer`, `oom_killed: Option<bool>` and
+`docker_error: Option<String>`. Identity and technical fields are validated before mapping; missing/mistyped
+required data is an error. Healthchecks are optional but, when present, must be `healthy`, `unhealthy` or `starting`.
+Dates and current observations are retained without reconstructing history or inferring OOM from exit codes.
+Absent OOM/error values are `None`; an empty error string is retained.
 
-`ComposeDiagnostics` contiene `project`, `containers` (cada elemento con `service:
-Option<String>` y `diagnostics`) y `errors` (cada elemento con `id` y `error`).
-Valida el identificador de proyecto y enumera todos los contenedores presentes,
-incluidos los detenidos, mediante etiquetas Compose e IDs completos. Inspecciona
-cada ID y comprueba identidad y proyecto. Conserva los éxitos ante desapariciones,
-fallos o datos incompletos individuales. Un fallo o respuesta inválida al enumerar
-es global; una enumeración vacía válida produce un diagnóstico vacío. No permite
-inferir servicios declarados sin contenedores ni acredita propiedad de KIDA.
-Un único plazo cubre toda la operación; al agotarse, conserva resultados y marca
-los IDs pendientes sin iniciar más comandos.
+`ComposeDiagnostics` contains `project`, `containers` (with `service: Option<String>` and `diagnostics`),
+and `errors` (with `id` and `error`). It validates project identity and enumerates all present containers,
+including stopped ones, by Compose labels and full IDs. Each inspection verifies identity and project.
+Individual disappearance, failure or invalid data preserves successful results. Invalid enumeration is a global error;
+a valid empty enumeration yields an empty diagnosis. It neither infers declared services without containers nor proves ownership.
+One deadline covers the whole operation; at expiry it preserves results and marks pending IDs without launching more commands.
 
-`ContainerLogs` contiene `container`, `tail: u32`, `stdout: Vec<u8>`, `stderr:
-Vec<u8>` y `warning`. Ejecuta `docker container logs --tail N` sin seguimiento;
-acepta de 1 a 10.000 líneas y requiere un timeout positivo, como las demás
-consultas. Limita cada canal a 1 MiB: exceder cualquiera devuelve un error,
-sin entregar contenido parcial. No interpreta, imprime ni persiste el contenido,
-y los errores de ejecución de logs tampoco lo incluyen. **Los logs pueden contener
-credenciales y datos personales**; el resultado incorpora esta advertencia para
-que el consumidor gestione su exposición. Docker puede no proporcionar logs con
-algunos drivers; stdout/stderr conservan exactamente los canales del proceso CLI.
-Las consultas reutilizan la terminación y recolección de procesos del lifecycle.
+`ContainerLogs` contains `container`, `tail: u32`, `stdout: Vec<u8>`, `stderr: Vec<u8>` and `warning`.
+It runs `docker container logs --tail N` without following, accepts 1–10,000 lines and a positive timeout.
+Each channel is limited to 1 MiB; overflow errors return no partial content. It does not interpret, print or persist logs,
+and execution errors do not include log content. Logs may contain credentials/personal data; the warning lets consumers
+manage disclosure. Some Docker drivers do not supply logs. Channels preserve the Docker CLI process output exactly.
+Queries reuse lifecycle process termination and reaping.
 
-Las pruebas automáticas usan Docker simulado con PATH aislado. La aceptación real
-requiere un daemon accesible y la imagen local `busybox:1.37`; no descarga imágenes
-ni utiliza red, y elimina únicamente su contenedor temporal de prueba:
+Automated tests use fake Docker with isolated PATH. Real diagnostics acceptance requires a daemon and local
+`busybox:1.37`, downloads no images, uses no network and deletes only its temporary test container.
 
-```bash
+Real diagnostics acceptance does not induce OOM or alter production containers; OOM is verified using explicit fake-Docker evidence.
+
+```sh
 KIDA_DOCKER_DIAGNOSTICS_REAL=1 cargo test -p kida-core features::docker::diagnostics_tests::diagnostics_real -- --exact --ignored --nocapture
 ```
 
-Esta aceptación no provoca OOM ni altera contenedores de producción; OOM se
-verifica con evidencia explícita en las respuestas del Docker simulado.
+## Internal Compose lifecycle
 
-### Lifecycle Compose interno
-
-`features::docker` exporta `ComposeOptions` y estos métodos de `DockerService`:
+These methods are internal, with no public CLI or protocol commands:
 
 ```rust
 let mut options = ComposeOptions::new("my-project", "/srv/my-project/compose.yaml");
 options.variables.insert("APP_TAG".into(), "stable".into());
-// options.timeout = std::time::Duration::from_secs(300); // valor predeterminado
+// options.timeout = std::time::Duration::from_secs(300); // default
 DockerService::compose_create(&options).await?; // Result<(), String>
 DockerService::compose_start(&options).await?;
-let project = DockerService::compose_project(&options.project)?; // inspección existente
+let project = DockerService::compose_project(&options.project)?;
 DockerService::compose_stop(&options).await?;
 ```
 
-`ComposeOptions` contiene `project: String`, `file: PathBuf`,
-`variables: BTreeMap<String, String>` y `timeout: Duration`. El proyecto explícito
-cumple `[a-z0-9][a-z0-9_-]*`, sin normalización. Se canonicaliza un único archivo
-local regular; su directorio se pasa como `--project-directory`. Las rutas deben
-ser UTF-8 y no contener comas, porque la etiqueta nativa de archivos usa comas
-sin escape. Las variables deben tener nombres de entorno portables y valores sin
-NUL. Se rechazan `DOCKER_*`, `COMPOSE_*`, `PATH`, `HOME`, `XDG_CONFIG_HOME`,
-`LD_*` y `DYLD_*` antes de ejecutar Docker.
+`ComposeOptions` has `project: String`, `file: PathBuf`, `variables: BTreeMap<String, String>` and `timeout: Duration`.
+Explicit project names match `[a-z0-9][a-z0-9_-]*`, without normalization. One local regular file is canonicalized;
+its directory becomes `--project-directory`. Paths must be UTF-8 and contain no commas because Compose's file label
+has no comma escaping. Variables need portable environment names and no NUL values. `DOCKER_*`, `COMPOSE_*`,
+`PATH`, `HOME`, `XDG_CONFIG_HOME`, `LD_*` and `DYLD_*` are rejected before invoking Docker.
 
-Todos los argumentos se pasan separados, sin shell. Las variables se inyectan
-solo en los hijos; se conserva el destino/contexto Docker heredado. Se fuerzan
-los perfiles predeterminados (`COMPOSE_PROFILES` vacío) y se desactiva la
-eliminación automática de huérfanos del entorno. No se ofrecen selección de
-servicios ni perfiles. La única combinación adicional es el archivo de propiedad generado por KIDA. Compose resuelve y valida el
-documento con `compose config --format json`, incluidas su interpolación y rutas;
-CORE solo lee el modelo JSON resultante para Create y Start. Stop comprueba la
-procedencia y ejecuta directamente `compose stop`, sin resolver `env_file` ni
-comprobar la existencia de redes o volúmenes externos. El archivo Compose
-principal debe seguir existiendo y ser válido para el comando nativo.
+Arguments are separate, without a shell. Variables apply only to children; inherited Docker destination/context is retained.
+Default profiles are forced (`COMPOSE_PROFILES` empty) and environment-driven orphan removal is disabled.
+No service/profile selection is exposed. The only additional merged file is KIDA's generated ownership file.
+Compose resolves interpolation and paths using `compose config --format json`; CORE reads that model for Create/Start.
+Stop checks provenance and invokes `compose stop` directly, without resolving `env_file` or checking external networks/volumes.
+The main Compose file must still exist and be valid for the native command.
 
-Create rechaza contenedores, redes o volúmenes etiquetados con el proyecto,
-nombres explícitos de contenedores ocupados y nombres resueltos de redes y
-volúmenes no externos ya existentes. Ejecuta
-[`compose create --no-recreate`](https://docs.docker.com/reference/cli/docker/compose/create/)
-sin arrancar contenedores ni cambiar las políticas nativas de build/pull.
-Para Create y Start, los recursos `external: true` deben existir y los gestiona
-Compose.
+Create rejects project-labeled containers/networks/volumes, occupied explicit container names and already-existing
+resolved non-external network/volume names. `compose create --no-recreate` does not start containers or change native
+build/pull policies. External resources must exist for Create/Start and are managed by Compose.
 
-Start y Stop requieren contenedores presentes. En cada uno se exige coincidencia
-exacta de las etiquetas nativas `com.docker.compose.project`,
-`com.docker.compose.project.config_files` (archivo canonicalizado y, si está gestionado, archivo adicional de propiedad) y
-`com.docker.compose.project.working_dir`. Se rechaza procedencia ausente, mixta,
-ambigua o con archivos distintos de los registrados. Se admiten proyectos creados fuera de KIDA con un único archivo coincidente; Start/Stop no los incorporan al registro. Se usan las
-[etiquetas oficiales de Compose](https://github.com/docker/compose/blob/main/pkg/api/labels.go).
-[`compose start`](https://docs.docker.com/reference/cli/docker/compose/start/)
-no espera salud; [`compose stop`](https://docs.docker.com/reference/cli/docker/compose/stop/)
-conserva IDs, contenedores, redes y volúmenes. Ambos actúan sobre todos los
-servicios habilitados por defecto, sin selección explícita.
+Start/Stop require present containers with exact matching native labels: `com.docker.compose.project`,
+`com.docker.compose.project.config_files` (canonical main file plus ownership file when managed),
+and `com.docker.compose.project.working_dir`. Missing, mixed, ambiguous or changed provenance is rejected.
+Externally created projects with one matching file are accepted for Start/Stop without adoption into the registry.
+`compose start` does not await health. `compose stop` preserves IDs, containers, networks and volumes.
+Both apply to all default-enabled services.
 
-Las operaciones del mismo proyecto se serializan dentro del proceso KIDA.
-El timeout cubre la espera de ese bloqueo, las comprobaciones y el comando final,
-con captura concurrente mediante `tokio::process`. Las consultas admiten hasta
-8 MiB de stdout; superar ese límite termina el proceso y devuelve un error sin
-analizar datos truncados. Create, Start y Stop descartan stdout. De stderr se
-conservan los primeros 64 KiB y se drena el resto; los errores indican si el
-diagnóstico fue truncado. Al vencer el timeout se mata y recoge el proceso; en
-Unix también se termina su grupo, incluido el
-plugin. Los errores distinguen entrada, conflicto, Docker/plugin ausente, daemon
-inaccesible, salida inválida, fallo del comando y timeout. Un fallo puede dejar
-recursos parciales: no hay rollback ni limpieza automática. No se garantiza
-exclusión frente a clientes Docker externos ni cambios del archivo durante una
-operación. No se usan `down` ni operaciones globales.
+Same-project operations are serialized in-process. Timeout covers locking, checks and final command, with concurrent
+`tokio::process` capture. Queries allow up to 8 MiB stdout; overflow terminates the process without parsing truncated data.
+Create/Start/Stop discard stdout. Only the first 64 KiB stderr is retained while the rest is drained; truncation is reported.
+Timeout kills/reaps the process and its Unix group, including the plugin. Errors distinguish input, conflict, missing Docker/plugin,
+unreachable daemon, invalid output, command failure and timeout. Partial resources may remain: no rollback/automatic cleanup.
+There is no exclusion against external Docker clients or file edits during operations. No `down` or global operation is used.
 
-### Propiedad y eliminación selectiva de Docker
+Models `ComposeVersion`, `ComposeProject` and `ComposeService` are exported from `features::docker` alongside container models.
+Their public read-only queries are described in the [API guide](../resources/docs/en/api/docker-management.md).
 
-La configuración global admite una sección opcional, compatible con configuraciones anteriores:
+## Docker ownership and selective removal
 
-```toml
-[docker]
-ownership_dir = "/etc/kida/docker.d"
-```
+See [configuration](../resources/docs/en/configuration.md) for `docker.ownership_dir` (default `/etc/kida/docker.d`).
+The registry opens when lifecycle is invoked, not at startup; Create/Remove need write access.
+Each creation reserves a UUID and versioned `JsonStorage` JSON before Create, retaining daemon, project, provenance,
+file hashes, external resources and verified identities. Containers/networks use full IDs; volumes use name, creation date,
+driver, scope, options, mount point and labels.
 
-El registro se abre al invocar el lifecycle, nunca durante el arranque. CORE requiere
-permisos de escritura para Create y Remove. Cada creación reserva un UUID y un JSON
-versionado mediante `JsonStorage` antes de ejecutar Create. Registra daemon, proyecto,
-procedencia, hashes de archivos, recursos externos e identidades verificadas. Los
-contenedores y redes usan IDs completos; los volúmenes se identifican por nombre,
-fecha de creación, driver, ámbito, opciones, punto de montaje y etiquetas.
-
-KIDA conserva el Compose original y genera un archivo adicional persistente con
-`io.kida.owner=<uuid>` en servicios, redes y volúmenes no externos. Compose combina
-ambos según sus [reglas de merge](https://docs.docker.com/reference/compose-file/merge/).
-Create rechaza etiquetas de usuario `io.kida.*`, colisiones y proyectos con registro
-activo o pendiente. Start/Stop reutilizan ambos archivos y exigen que sus hashes,
-procedencia, daemon, identidades y etiquetas concuerden. Los proyectos ajenos conservan
-su contrato anterior y nunca se adoptan por nombre ni por etiquetas.
-
-Contratos internos, sin comandos CLI ni cambios de protocolo:
+KIDA preserves the original Compose file and writes a persistent override with `io.kida.owner=<uuid>` on services and
+non-external networks/volumes. Create rejects user `io.kida.*` labels, collisions and active/pending registry projects.
+Start/Stop reuse both files and require matching hashes, provenance, daemon, identities and labels.
+Foreign projects retain their contract and are never adopted by name or labels.
 
 ```rust
 let reference = DockerService::compose_managed_project("my-project").await?;
 let report = DockerService::compose_remove(&reference, Duration::from_secs(60)).await?;
 // reference: ManagedProject { owner, project }
-// report: removed, absent, preserved, failed; cada entrada incluye kind, identity, reason
-// report.errors: errores generales de persistencia o timeout; comprobar failed y errors.
+// report: removed, absent, preserved, failed; entries include kind, identity, reason
+// report.errors: general persistence/timeout errors; check both failed and errors.
 ```
 
-La referencia corresponde a una creación concreta. Los registros completados se
-conservan para reconocer repeticiones; una referencia antigua no puede borrar una
-creación posterior con el mismo proyecto. Remove no lee el Compose ni necesita su
-plugin. Antes de cualquier mutación exige inventario válido, daemon e identidades
-concordantes y todos los contenedores gestionados detenidos. Recursos adicionales
-con etiquetas coincidentes son ambiguos: bloquean la operación sin adopción.
+A reference identifies one creation. Completed records are retained for idempotent recognition; an old reference cannot
+remove a newer creation with the same project name. Remove needs neither original Compose nor plugin.
+Before mutation it requires valid inventory, matching daemon/identities and all managed containers stopped.
+Extra matching-labeled resources are ambiguous and block removal without adoption.
 
-Remove elimina individualmente contenedores por ID, redes por ID y finalmente
-volúmenes verificados. Reinspecciona antes de borrar, sin `--force`, `rm -v`,
-`compose down`, desconexiones ajenas ni limpieza global. Examina todos los
-contenedores, incluidos los detenidos, y las conexiones de red. Conserva redes y
-volúmenes que sigan en uso; continúa con los exclusivos. Conserva recursos externos,
-bind mounts y volúmenes anónimos sin propiedad acreditada. Solo elimina volúmenes
-con driver `local`, ámbito `local` y opciones nulas o vacías; los demás aparecen
-como conservados con un motivo explícito.
+Remove deletes verified containers by ID, then networks by ID and volumes. It reinspects before deletion without
+`--force`, `rm -v`, `compose down`, foreign disconnects or global cleanup. All containers, including stopped ones,
+and network connections are examined. Shared networks/volumes are preserved while exclusive resources can proceed.
+External resources, bind mounts and unproven anonymous volumes are preserved. Only `local` driver/scope volumes with
+null/empty options are removable; others are preserved with a reason.
 
-Cada identidad se persiste en cuanto se verifica tras Create; un fallo conserva el
-registro pendiente, sin rollback. Tras un reinicio solo se recuperan identidades ya
-persistidas: no se descubre propiedad a partir de etiquetas. Un registro pendiente
-bloquea Create/Start/Stop; Remove puede retirar sus recursos acreditados si el inventario
-no contiene ambigüedades. La pérdida del registro impide autorizar la eliminación.
-Un registro corrupto bloquea las operaciones y no se sobrescribe. Los avances de
-Remove se guardan tras cada recurso y los registros parciales permiten reintentos.
-Solo una consulta válida confirma ausencia; un error Docker se informa como fallo.
-Los errores previos se devuelven sin mutaciones; los posteriores quedan en el informe,
-con los recursos no intentados señalados como conservados.
+Identities are persisted as verified after Create; failure retains a pending record without rollback.
+After restart, only persisted identities are recovered; labels do not establish ownership.
+Pending records block Create/Start/Stop; Remove can delete proven resources when inventory is unambiguous.
+Lost registry evidence prevents authorized removal. Corrupt records block operations and are not overwritten.
+Progress is saved after each removal for retry. Only valid inspection proves absence; Docker errors remain failures.
+Pre-traversal errors cause no mutation; later failures appear in reports, with unattempted resources preserved.
 
-Se presupone un único proceso KIDA escritor por directorio y un registro confiable.
-No existe exclusión frente a clientes Docker externos. Las reinspecciones reducen la
-ventana de carrera; Docker rechaza eliminar redes conectadas y volúmenes utilizados.
-La protección evita adopciones accidentales y copias simples de etiquetas, pero no
-protege frente a un administrador que controle Docker y el registro. No hay limpieza
-al arrancar. Backup Health dispone de un adaptador interno; su coordinación con
-Worker y Scheduler sigue pendiente.
+The registry assumes one trusted writer process per directory. Reinspection narrows races but cannot exclude external
+Docker clients; Docker itself rejects in-use volume and connected-network deletion. Protection prevents accidental
+adoption/simple copied labels, not an administrator controlling Docker and registry. There is no generic Docker lifecycle
+cleanup at startup; Health coordinates its own adapter, worker, scheduler and recovery.
 
-El lifecycle mantiene exclusión por proyecto, incluida la consulta de referencia y la
-persistencia; proyectos distintos pueden avanzar simultáneamente. El registro
-presupone un único proceso escritor y sustitución atómica de cada JSON mediante
-`JsonStorage`; se sigue leyendo y validando el registro completo.
+Project locking covers reference queries and persistence; different projects can proceed concurrently.
+`JsonStorage` atomically replaces individual JSON files; the entire registry is still read/validated.
+Timeout bounds initiating/continuing work, not already-started disk I/O, which is awaited to completion.
+Cancellation retains the project lock until that I/O finishes. No commands or saves start after expiry.
+Removal persistence/timeouts appear in `RemovalReport.errors`, retaining confirmed progress and preserving remaining resources.
+Check both `failed` and `errors`; pre-traversal errors remain `Err(String)`.
 
-El timeout es un presupuesto para iniciar y continuar trabajo. La E/S de disco ya
-iniciada se espera hasta terminar, incluso si vence el plazo; no se garantiza un
-límite estricto de respuesta con disco bloqueado. Una cancelación conserva el
-bloqueo del proyecto hasta terminar esa E/S. Tras vencer el plazo no se inician
-nuevos comandos ni guardados. Durante la eliminación, los fallos de persistencia
-y timeout se devuelven en `RemovalReport.errors`, conservando los resultados
-confirmados y preservando los recursos restantes por interrupción. El consumidor
-debe comprobar tanto `failed` como `errors`. Los errores anteriores al recorrido
-siguen siendo `Err(String)`.
+## Validation and real acceptance
 
-Verificación simulada (sin daemon; el Docker simulado en Unix usa Python 3):
+Fake Docker on Unix needs Python 3. Normal tests are simulated:
 
 ```sh
 cargo test -p kida-core features::docker
 ```
 
-Aceptación real optativa (requiere daemon, plugin Compose e imagen descargable):
+Real lifecycle acceptance is opt-in, requiring a daemon, Compose plugin and a downloadable image:
 
 ```sh
 KIDA_COMPOSE_REAL=1 cargo test -p kida-core compose_lifecycle_real -- --ignored --nocapture
 ```
 
-Esta prueba usa los métodos internos, crea dos proyectos únicos y un archivo en
-`/tmp/kida-accept-.../compose.yaml`, con dos servicios, tres contenedores, una red
-y un volumen por proyecto. Comprueba Create → Start → Inspect → Stop, conserva
-las identidades de los recursos y compara el estado del proyecto de control
-antes y después. Imprime proyectos y recursos y deja ambos detenidos sin borrar
-contenedores, redes, volúmenes ni archivos. Las pruebas normales no ejecutan esta
-aceptación; sus resultados simulados no acreditan el comportamiento de un daemon
-real.
+It creates two unique projects under `/tmp/kida-accept-.../compose.yaml`, each with two services,
+three containers, a network and a volume. It checks Create → Start → Inspect → Stop, preserves resource identities,
+and compares the control project before/after. It prints resources and leaves both projects stopped without deleting
+containers, networks, volumes or files. Simulated results do not prove real-daemon acceptance.
 
-Aceptación real de eliminación, con autorización **independiente** y desactivada por defecto:
+Real removal acceptance requires separate authorization and is disabled by default:
 
 ```sh
 KIDA_DOCKER_REMOVE_REAL=1 cargo test -p kida-core features::docker::lifecycle_tests::compose_remove_real -- --exact --ignored --nocapture
 ```
 
-Crea recursos nuevos bajo un proyecto único y otro de control; elimina únicamente
-la creación de prueba con los contenedores detenidos y el Compose original ausente,
-verifica idempotencia y compara el control. Deja el control detenido, sus recursos y
-el registro para inspección. No ejecutar sin autorización expresa para crear y borrar
-estos recursos. Las pruebas simuladas cubren estado persistente, reinicio del consumidor,
-interrupciones, reintentos, conflictos, uso compartido y prohibición de comandos forzados.
-
-## Programar comandos con SCHEDULER
-
-SCHEDULER permite programar cualquier comando registrado en KIDA CORE, incluidos `scheduler.add`, `scheduler.list` y `scheduler.delete`. Los ejemplos usan HTTP; los mismos mensajes JSON se pueden enviar por Unix socket.
-
-La ruta del archivo de programaciones se configura en `/etc/kida/kida.toml`:
-
-```toml
-[scheduler]
-path = "/etc/kida/scheduler.toml"
-```
-
-Si omites la sección o el campo, se usa `/etc/kida/scheduler.toml`. Reinicia CORE para aplicar los cambios de ruta. CORE necesita permisos para escribir en el directorio configurado. Si el archivo no existe, empieza sin programaciones; si está corrupto, CORE no arranca y no lo sobrescribe.
-
-### Crear una programación
-
-Envía la definición directamente en `params`, con `command`, `params` y `schedule`. Los parámetros del comando programado son obligatorios y pueden contener cualquier valor JSON, incluido `null`.
-
-Para intentar ejecutar `scheduler.list` cada 60 segundos:
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{
-    "id": "schedule-list",
-    "command": "scheduler.add",
-    "params": {
-      "command": "scheduler.list",
-      "params": {},
-      "schedule": {"type": "interval", "seconds": 60}
-    }
-  }'
-```
-
-Una respuesta `OK` devuelve en `data` la definición con su UUID en `data.id`. Guarda ese UUID para eliminarla. El `id` exterior identifica la petición, no la programación.
-
-`interval.seconds` debe ser un entero positivo. El primer intento ocurre un intervalo después del alta; los siguientes mantienen el anclaje original incluso después de reiniciar CORE.
-
-Para un único intento, usa `once` con una fecha futura RFC3339 y desplazamiento horario explícito (`Z` o, por ejemplo, `+02:00`). Sustituye la fecha del ejemplo por la que necesites:
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{
-    "id": "schedule-once",
-    "command": "scheduler.add",
-    "params": {
-      "command": "scheduler.list",
-      "params": null,
-      "schedule": {"type": "once", "at": "2027-01-15T10:00:00+01:00"}
-    }
-  }'
-```
-
-Para un intento diario a las 02:30 en Madrid:
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{
-    "id": "schedule-cron",
-    "command": "scheduler.add",
-    "params": {
-      "command": "scheduler.list",
-      "params": {},
-      "schedule": {
-        "type": "cron",
-        "expression": "30 2 * * *",
-        "timezone": "Europe/Madrid"
-      }
-    }
-  }'
-```
-
-CRON acepta cinco campos: minuto, hora, día del mes, mes y día de la semana. La zona debe ser IANA; si omites `timezone`, se usa `UTC`. Cuando el día del mes y el día de la semana están restringidos, basta que coincida uno de ellos. En cambios horarios, las horas locales inexistentes se omiten y cada coincidencia de una hora repetida se intenta una sola vez, en su primera aparición.
-
-El comando histórico `health` está retirado; `system.health` sigue siendo una consulta de sensores independiente. Una programación pendiente guardada con `health` impide cargar el scheduler: el error identifica su UUID y comando, y el archivo se conserva intacto. Antes de arrancar CORE, retira esa programación o cambia su comando y parámetros por los que realmente necesites.
-
-El alta valida el comando registrado y la regla temporal. Los parámetros específicos del comando y los recursos referenciados se validan al ejecutar, no al crear la programación.
-
-### Listar y eliminar
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{"id":"list-schedules","command":"scheduler.list","params":{}}'
-```
-
-Sin filtro, `scheduler.list` devuelve solo programaciones `USER`. También acepta `params: null` con ese mismo resultado. Para consultar las internas o todas, envía `{"origin":"INTERNAL"}` o `{"origin":"ALL"}` en `params`; los valores del protocolo son `USER`, `INTERNAL` y `ALL`, en mayúsculas.
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{"id":"list-all-schedules","command":"scheduler.list","params":{"origin":"ALL"}}'
-```
-
-Una respuesta `OK` contiene en `data` un array con `id`, `origin`, `command`, `params`, `schedule` y `next_enqueue_at` para cada programación, en su orden almacenado. Si no hay coincidencias, devuelve `[]`. El origen de una entrada es `USER` o `INTERNAL`; `ALL` solo es un filtro. `next_enqueue_at` está en UTC e indica el vencimiento pendiente de admisión, no un inicio de ejecución garantizado. Si la cola está llena, esa fecha puede quedar en el pasado mientras se espera un reintento.
-
-`scheduler.add` crea siempre entradas `USER`. Las entradas `INTERNAL` las gestiona CORE mediante su API interna. Los comandos públicos de alta y borrado no aceptan un campo de origen para cambiar sus permisos.
-
-Para eliminar una programación, sustituye `UUID_DEVUELTO` por su UUID:
-
-```bash
-curl -sS http://127.0.0.1:8989/command \
-  -H 'Content-Type: application/json' \
-  --data '{
-    "id": "delete-schedule",
-    "command": "scheduler.delete",
-    "params": {"id": "UUID_DEVUELTO"}
-  }'
-```
-
-La respuesta `OK` devuelve la definición eliminada y garantiza que esa programación no producirá nuevos encolados. No elimina peticiones ya encoladas ni interrumpe ejecuciones. Un UUID inválido, inexistente o perteneciente a una entrada `INTERNAL` devuelve `ERROR`. El borrado público solo permite eliminar entradas `USER`. No existe `scheduler.modify`: para sustituir una programación, elimínala y crea otra mediante operaciones independientes.
-
-### Qué ocurre al vencer o reiniciar
-
-- Los comandos programados comparten la cola FIFO y el worker con los backups manuales. El worker limita las ejecuciones simultáneas mediante `queue.max_concurrent_jobs` (2 por defecto); los `backup.run` se ejecutan de uno en uno. Se pueden encolar nuevos vencimientos aunque una ejecución anterior siga pendiente o ejecutándose. El orden de admisión no garantiza el orden de inicio o finalización.
-- Se intenta admitir primero el vencimiento más antiguo, tanto para entradas `USER` como `INTERNAL`. En caso de empate se conserva el orden almacenado. Así, las recurrencias recién vencidas no adelantan a entradas que llevan más tiempo pendientes.
-- Si la cola está llena, se conserva el vencimiento pendiente y se vuelve a intentar su admisión al cabo de un segundo, medido con reloj monotónico. El temporizador comprueba periódicamente el plazo; no se garantiza un instante exacto de admisión.
-- Una `once` se elimina después de admitirse en la cola. Si aún está pendiente cuando CORE se detiene y su fecha ya pasó al reiniciar, se elimina al arrancar sin ejecutarse.
-- Las recurrencias conservan un único vencimiento pendiente durante la saturación. Tras admitirlo, avanzan directamente a una fecha futura manteniendo su regla y anclaje, sin ráfagas para recuperar cada repetición omitida. No se recuperan peticiones encoladas ni ejecuciones interrumpidas tras reiniciar. Admitir una petición no garantiza su ejecución ni ofrece ejecución exactamente una vez.
-- Al encolar se conserva únicamente el comando y sus parámetros. Los recursos referenciados se resuelven al ejecutar; borrar una programación no cambia las peticiones ya encoladas.
-- Un fallo de persistencia durante el procesamiento de vencimientos o una cola cerrada termina CORE con error; no se reintenta automáticamente desde SCHEDULER.
-- SCHEDULER no ofrece historial, consulta de ejecuciones ni cancelación. El campo `schedule` de una configuración de backup no activa automáticamente una programación.
-
-### Compatibilidad al actualizar
-
-Actualiza CORE antes que CLI. La CLI actual exige `origin` en las respuestas del scheduler y rechaza las respuestas del CORE anterior que no lo incluyen, incluso si el alta o borrado se completó. No repitas automáticamente un alta por un error de presentación: consulta primero las programaciones existentes.
-
-CORE lee archivos anteriores sin `origin` y trata esas entradas como `USER`. Al guardar, escribe el campo en cada entrada. El CORE anterior rechaza ese formato: conserva un respaldo antes de actualizar si necesitas poder volver a esa versión. No elimines el campo de entradas `INTERNAL` para forzar compatibilidad, porque perderían su protección de origen.
-
-# License and trademarks
+It creates unique test/control resources, removes only its test creation with containers stopped and original Compose absent,
+checks idempotency, and compares the control. Control resources and registry remain stopped/preserved for inspection.
+Do not run without express authorization to create and delete these resources. Simulated tests cover persistence,
+consumer restart, interruption, retry, conflicts, sharing and prohibition of forced commands.
