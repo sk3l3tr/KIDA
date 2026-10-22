@@ -12,6 +12,34 @@ ng serve
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
 
+## Backend connection
+
+Start FastAPI in a separate terminal from `kida-console/backend`:
+
+```bash
+uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Then run `pnpm start` from `kida-console/frontend`. Angular calls FastAPI directly
+at `http://127.0.0.1:8000/api`. FastAPI allows CORS requests from
+`http://localhost:4200` and `http://127.0.0.1:4200`.
+
+API configuration lives in `src/environments/environment.ts` (production) and
+`src/environments/environment.development.ts` (development). Production uses `/api`
+as `apiBaseUrl`; development uses `http://127.0.0.1:8000/api`. Change the development
+base URL if the backend address changes. Add each new endpoint path, starting with `/`, to the `endpoints`
+catalog in both files, without repeating `/api`. Keep the base URL without a trailing `/`.
+Services import `environment` from `environment.ts`; Angular replaces it for development.
+
+`HealthService.getHealth()` returns an observable for `GET /api/health` with a
+`{ status: string }` response. Subscribe to it from a consumer when needed; HTTP
+errors reach the subscriber. No request is made automatically.
+
+In production, `pnpm build` compiles Angular and copies it to `backend/static`.
+FastAPI serves these files and the API from the same origin inside the container.
+Requests use `/api` on that origin, so no fixed hostname or cross-origin access
+is needed in production.
+
 ## Code scaffolding
 
 Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
