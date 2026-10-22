@@ -1,0 +1,14 @@
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.angular
+**/dist
+**/coverage
+**/.vscode
+**/.idea
+**/.env
+**/.env.*
+backend/static
+backend/test_*.py
+frontend/src/**/*.spec.ts

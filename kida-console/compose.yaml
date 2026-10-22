@@ -1,0 +1,5 @@
+services:
+  kida-console:
+    build: .
+    network_mode: host
+    restart: unless-stopped
