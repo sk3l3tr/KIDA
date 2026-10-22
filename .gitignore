@@ -1,5 +1,17 @@
+# Rust
 target/
+
+# Node
 node_modules/
 package.json
 package-lock.json
 pnpm-lock.yaml
+
+# Uvicorn
+__pycache__
+.venv
+
+# Angular
+.angular
+.vscode
+.editorconfig
