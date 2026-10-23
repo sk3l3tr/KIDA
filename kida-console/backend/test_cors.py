@@ -38,7 +38,9 @@ class CorsTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(origin=origin):
                 status, headers = await self.request(origin)
                 self.assertEqual(status, 200)
-                self.assertEqual(headers[b"access-control-allow-origin"], origin.encode())
+                self.assertEqual(
+                    headers[b"access-control-allow-origin"], origin.encode()
+                )
 
     async def test_does_not_allow_other_origins(self):
         status, headers = await self.request("http://example.com")
@@ -55,6 +57,10 @@ class CorsTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(status, 200)
-        self.assertEqual(headers[b"access-control-allow-origin"], b"http://localhost:4200")
+        self.assertEqual(
+            headers[b"access-control-allow-origin"], b"http://localhost:4200"
+        )
         self.assertIn(b"POST", headers[b"access-control-allow-methods"])
-        self.assertEqual(headers[b"access-control-allow-headers"], b"content-type")
+        self.assertIn(b"Content-Type", headers[b"access-control-allow-headers"])
+        self.assertIn(b"X-CSRF-Token", headers[b"access-control-allow-headers"])
+        self.assertEqual(headers[b"access-control-allow-credentials"], b"true")

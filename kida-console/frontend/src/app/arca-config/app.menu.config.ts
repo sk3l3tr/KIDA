@@ -1,20 +1,17 @@
 import { MenuConfig, MenuPosition } from 'arca';
 
 export const appMenu: MenuConfig = {
-  title: "",
-  floatingPosition: MenuPosition.disabled,
-  fixedPosition: MenuPosition.disabled,
-  itemsStyle: "",
+  title: '',
+  floatingPosition: MenuPosition.left,
+  fixedPosition: MenuPosition.left,
+  itemsStyle: '',
   items: [
-    {
-      id: "ARCA001",
-      title: "Display name",
-      assetIcon: "*.png",
-      style: "",
-      path: "/path/to/redirect",
-    },
-    {
-      title: "separator",
-    },
+    { id: 'dashboard', title: 'Dashboard', path: '/dashboard' },
+    { id: 'system', title: 'System', path: '/system' },
+    { id: 'docker', title: 'Docker', path: '/docker' },
+    { id: 'backups', title: 'Backups', path: '/backups' },
+    { id: 'scheduler', title: 'Scheduler', path: '/scheduler' },
+    { id: 'settings', title: 'Settings', path: '/settings' },
+    { id: 'administrators', title: 'Administradores', path: '/administrators' },
   ],
 };

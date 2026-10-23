@@ -1,3 +1,4 @@
+import { authInterceptor } from './auth/auth.interceptor';
 import {
   ApplicationConfig,
   provideZoneChangeDetection,
@@ -7,12 +8,7 @@ import {
 } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
-import {
-  provideHttpClient,
-  HTTP_INTERCEPTORS,
-  withJsonpSupport,
-  withInterceptorsFromDi,
-} from '@angular/common/http';
+import { provideHttpClient, withJsonpSupport, withInterceptors } from '@angular/common/http';
 import {
   provideRouter,
   RouteReuseStrategy,
@@ -20,7 +16,8 @@ import {
   withPreloading,
 } from '@angular/router';
 import { routes } from './app.routes';
-import { provideIonicAngular, IonicRouteStrategy } from '@ionic/angular/standalone';
+import { MenuController as ArcaMenuController } from '@ionic/angular';
+import { provideIonicAngular, IonicRouteStrategy, MenuController } from '@ionic/angular/standalone';
 
 // ARCA
 import {
@@ -28,7 +25,6 @@ import {
   GLOBAL_CONFIG,
   LANG_CONFIG,
   MENU_CONFIG,
-  ArcaInterceptor,
   CoreComponentsModule,
 } from 'arca';
 import { appGlobalConfig } from './arca-config/app.global.config';
@@ -44,14 +40,15 @@ export const appConfig: ApplicationConfig = {
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: LOCALE_ID, useValue: 'es' },
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(withJsonpSupport(), withInterceptorsFromDi()),
+    provideHttpClient(withJsonpSupport(), withInterceptors([authInterceptor])),
     importProvidersFrom(CoreComponentsModule),
     { provide: GLOBAL_CONFIG, useValue: appGlobalConfig },
     { provide: MENU_CONFIG, useValue: appMenu },
     { provide: LANG_CONFIG, useValue: langConfig },
     { provide: ACTIONS_CONFIG, useValue: appActions },
-    { provide: HTTP_INTERCEPTORS, useClass: ArcaInterceptor, multi: true },
     provideRouter(routes, withPreloading(PreloadAllModules)),
     provideIonicAngular({}),
+    // ARCA uses the module API; share the controller used by standalone Ionic elements.
+    { provide: ArcaMenuController, useExisting: MenuController },
   ],
 };

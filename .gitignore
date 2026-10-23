@@ -18,3 +18,13 @@ kida-console/backend/static
 
 # Other
 vendor
+
+# Console credentials and persistent authentication data
+kida-console/.env
+kida-console/.env.*
+!kida-console/.env.example
+kida-console/backend/data/
+kida-console/**/*.sqlite3
+kida-console/**/*.sqlite3-journal
+kida-console/**/*.sqlite3-wal
+kida-console/**/*.sqlite3-shm

@@ -1,0 +1,39 @@
+<ion-content class="login-content">
+  <div class="login-layout">
+    <section class="login-card" aria-labelledby="login-title">
+      <p class="eyebrow">KIDA CONSOLE</p>
+      <h1 id="login-title">Iniciar sesión</h1>
+      <p>Accede con tu cuenta de administrador.</p>
+      @if (notice) {
+        <p role="status">{{ notice }}</p>
+      }
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+      <form #form="ngForm" (ngSubmit)="submit()">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          name="username"
+          [(ngModel)]="username"
+          autocomplete="username"
+          required
+          maxlength="64"
+        />
+        <label for="password">Contraseña</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          [(ngModel)]="password"
+          autocomplete="current-password"
+          required
+          maxlength="128"
+        />
+        <button type="submit" [disabled]="form.invalid || busy()">
+          {{ busy() ? 'Entrando…' : 'Entrar' }}
+        </button>
+      </form>
+    </section>
+  </div>
+</ion-content>

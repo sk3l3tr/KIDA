@@ -53,6 +53,18 @@ FastAPI serves these files and the API from the same origin inside the container
 Requests use `/api` on that origin, so no fixed hostname or cross-origin access
 is needed in production.
 
+## Pages and navigation
+
+ARCA provides a fixed left menu on desktop and a left drawer below 900 px,
+opened with the header menu button. Each entry loads its standalone page lazily:
+`/dashboard`, `/system`, `/docker`, `/backups`, `/scheduler`, `/settings` and
+`/administrators`. These routes require a session; `/login` remains public.
+The root URL and unknown paths redirect to `/dashboard`.
+
+The six new pages have empty templates. `/administrators` retains the existing
+account management. Menu entries live in `src/app/arca-config/app.menu.config.ts`;
+route definitions live in `src/app/app.routes.ts`.
+
 ## Code scaffolding
 
 Angular CLI includes powerful code scaffolding tools. To generate a new component, run:

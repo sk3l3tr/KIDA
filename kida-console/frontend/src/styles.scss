@@ -1,1 +1,243 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, sans-serif;
+  color: #182b3d;
+  background: #f3f6fa;
+}
+* {
+  box-sizing: border-box;
+}
+/* Keep routed Ionic pages within the space left by ARCA's header and footer. */
+app-root arca-core {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+app-root arca-core > ion-header {
+  flex-shrink: 0;
+}
+app-root arca-core > #mainContent {
+  flex: 1;
+  min-height: 0;
+  height: auto !important;
+}
+app-root #mainContent > ion-col {
+  padding: 0;
+  position: relative;
+}
+app-root #main-content {
+  position: absolute;
+  inset: 0;
+  height: 100% !important;
+}
+app-root arca-core > arca-footer.footer {
+  position: static !important;
+  flex: 0 0 58px;
+}
+/* Style ARCA's desktop menu and mobile drawer from the application theme. */
+:is(arca-fixed-menu, arca-side-menu) arca-menu-item {
+  display: block;
+  margin-bottom: 0.25rem;
+
+  .menuItem {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+  }
+
+  .menuItem:hover,
+  [tabindex]:focus-visible .menuItem {
+    background: #e5f1f5;
+    color: #155f75;
+    box-shadow: inset 3px 0 #155f75;
+  }
+}
+button,
+input {
+  font: inherit;
+}
+h1 {
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  margin: 0.4rem 0 1rem;
+}
+h2 {
+  margin-top: 0;
+}
+p,
+small {
+  line-height: 1.6;
+}
+small {
+  display: block;
+  color: #526579;
+}
+a {
+  color: #185d87;
+}
+button {
+  display: inline-block;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: #155f75;
+  color: white;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+button.secondary {
+  background: white;
+  color: #24445d;
+  border-color: #bdcbd6;
+}
+button.danger {
+  background: #a52c38;
+}
+input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #91a4b5;
+  border-radius: 0.4rem;
+  padding: 0.65rem;
+  background: white;
+  color: #182b3d;
+}
+input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #1c86ac;
+  outline-offset: 3px;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+form {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 32rem;
+}
+form button {
+  justify-self: start;
+  margin-top: 0.8rem;
+}
+fieldset {
+  border: 1px solid #bdcbd6;
+  border-radius: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 1rem;
+  min-width: 0;
+}
+.eyebrow {
+  color: #155f75;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+}
+.login-content {
+  --background: radial-gradient(at top left, #d9ecec, transparent 70%), #f3f6fa;
+  --color: #182b3d;
+}
+.console-content {
+  --background: #f3f6fa;
+  --color: #182b3d;
+}
+.login-layout {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+.login-card {
+  width: 100%;
+  max-width: 28rem;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border-radius: 1rem;
+  background: white;
+  box-shadow: 0 16px 60px #173c5014;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 5%;
+  background: white;
+  border-bottom: 1px solid #dce4ec;
+}
+.app-header a {
+  font-weight: 750;
+  text-decoration: none;
+  margin-right: auto;
+}
+.console-layout {
+  max-width: 72rem;
+  margin: auto;
+  padding: 2rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+.console-layout > div:first-child,
+.console-layout > .error,
+.console-layout > .success {
+  grid-column: 1 / -1;
+}
+.panel {
+  background: white;
+  border: 1px solid #dce4ec;
+  padding: 1.5rem;
+  border-radius: 0.8rem;
+  min-width: 0;
+}
+.panel form + form {
+  border-top: 1px solid #dce4ec;
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+.accounts-list {
+  padding: 0;
+  list-style: none;
+}
+.accounts-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid #e6edf3;
+  overflow-wrap: anywhere;
+}
+.error {
+  background: #fff0f1;
+  color: #9b2331;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+.success {
+  background: #e3f5ed;
+  color: #225c41;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+.confirmation {
+  background: #fff4ed;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+.confirmation button {
+  margin: 0.25rem;
+}
+@media (max-width: 700px) {
+  .console-layout {
+    grid-template-columns: 1fr;
+  }
+}

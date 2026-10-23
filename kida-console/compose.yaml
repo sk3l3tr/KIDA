@@ -3,3 +3,11 @@ services:
     build: .
     network_mode: host
     restart: unless-stopped
+    env_file: .env
+    environment:
+      KIDA_DATABASE_PATH: /app/data/auth.sqlite3
+    volumes:
+      - console-data:/app/data
+
+volumes:
+  console-data:

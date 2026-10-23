@@ -3,6 +3,7 @@ FROM node:24.15.0-bookworm-slim AS frontend
 RUN npm install --global pnpm@12.14.0
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
+COPY frontend/vendor/arca-3.2.7.tgz ./vendor/arca-3.2.7.tgz
 RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
@@ -23,11 +24,12 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 RUN groupadd --gid 10001 kida && useradd --uid 10001 --gid kida --no-create-home kida
 WORKDIR /app
+RUN mkdir -p /app/data && chown 10001:10001 /app/data
 COPY --from=backend /app/.venv /app/.venv
-COPY backend/main.py ./
+COPY backend/*.py ./
 COPY --from=frontend /build/backend/static ./static
 USER 10001:10001
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["python", "-c", "import urllib.request; import json; response = urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3); assert json.load(response) == {'status': 'OK'}"]
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

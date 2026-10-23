@@ -12,3 +12,8 @@
 backend/static
 backend/test_*.py
 frontend/src/**/*.spec.ts
+backend/data
+**/*.sqlite3
+**/*.sqlite3-journal
+**/*.sqlite3-wal
+**/*.sqlite3-shm
