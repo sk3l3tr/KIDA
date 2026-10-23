@@ -27,6 +27,8 @@ WORKDIR /app
 RUN mkdir -p /app/data && chown 10001:10001 /app/data
 COPY --from=backend /app/.venv /app/.venv
 COPY backend/*.py ./
+COPY backend/core ./core
+COPY backend/system ./system
 COPY --from=frontend /build/backend/static ./static
 USER 10001:10001
 EXPOSE 8000

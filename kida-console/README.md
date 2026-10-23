@@ -176,3 +176,86 @@ Las pruebas usan bases temporales y cubren inicialización, reinicios, sesiones,
 CSRF, límites de intentos, unicidad, cambios propios, revocación y eliminación
 concurrente. La aceptación en contenedor debe usar recursos desechables y
 comprobar también persistencia al recrearlo. No requiere operar sobre CORE.
+
+## API SYSTEM
+
+El backend actúa como puente HTTP a un único CORE por despliegue. No ejecuta el
+CLI ni acciones locales. Todos los administradores pueden consultar y ejecutar
+SYSTEM. `KIDA_CORE_URL` vale `http://127.0.0.1:8989` por defecto y admite una URL
+HTTP(S) absoluta sin credenciales, query ni fragmento. Se añade `/command` a esa
+base. `KIDA_CORE_TIMEOUT_SECONDS` vale `10` y debe ser un número finito positivo;
+es el timeout de cada fase HTTP (conexión, lectura, escritura y espera del pool).
+La configuración se valida al arrancar, sin comprobar disponibilidad de CORE.
+Reiniciar Console para aplicar cambios. Compose inyecta estas variables desde
+`.env`; con red host el valor predeterminado alcanza CORE en el host Linux.
+
+| Método y ruta | Entrada JSON |
+| --- | --- |
+| `GET /api/system/info` | Sin cuerpo |
+| `GET /api/system/health` | Sin cuerpo |
+| `GET /api/system/wake-capabilities` | Sin cuerpo |
+| `POST /api/system/shutdown` | `{"when":"+1"}` |
+| `POST /api/system/reboot` | `{"when":"23:30"}` |
+| `POST /api/system/power-cycle` | `{"wake_time":"06:00","shutdown_time":"23:00"}` o `{"wake_after_seconds":3600}` |
+
+`when` es obligatorio: `now`, `+N` (minutos, dígitos ASCII) o una hora válida de
+24 horas (`HH:MM`, también se admiten componentes de una cifra como CORE).
+Power cycle exige exactamente uno de `wake_time` o `wake_after_seconds`;
+`shutdown_time` es opcional. Sus horas requieren exactamente `HH:MM` y sus
+segundos un entero entre `120` y `18446744073709551615`. No se admiten campos
+extra, valores nulos explícitos ni conversiones de cadenas, booleanos o decimales
+a enteros. CORE resuelve fechas, zona horaria, márgenes y ejecución, y puede
+rechazar entradas válidas sintácticamente (por ejemplo, una hora ya pasada).
+
+Todas estas rutas requieren sesión; los POST conservan Origin y CSRF. Ejemplo
+en el navegador tras iniciar sesión, con el token vigente obtenido de
+`GET /api/auth/session` (este POST programa una acción real en CORE):
+
+```javascript
+const response = await fetch('/api/system/power-cycle', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+  body: JSON.stringify({ wake_after_seconds: 3600 })
+});
+const result = await response.json();
+```
+
+Un `200` devuelve directamente los datos tipados de CORE, sin sobre ni conversión
+de unidades, estados, advertencias o valores desconocidos. Por ejemplo, health
+puede devolver `{"overall":"OK","sensors":[]}`. Se conservan valores `null`
+legítimos de las consultas y campos futuros del agente. Se genera un UUID para
+cada comando y se verifica el identificador, estado y estructura de la respuesta.
+No hay reintentos ni seguimiento de redirecciones.
+
+Los errores del puente tienen forma
+`{"detail":{"code":"core_timeout","message":"..."}}`:
+
+| HTTP | Código | Significado |
+| --- | --- | --- |
+| `503` | `core_unavailable` | No se pudo conectar con CORE. |
+| `504` | `core_timeout` | Timeout HTTP. |
+| `502` | `core_transport_error` | Se perdió la respuesta. |
+| `502` | `core_http_error` | CORE devolvió HTTP no satisfactorio, incluidas redirecciones. |
+| `502` | `core_invalid_response` | JSON, sobre o datos incompatibles. |
+| `502` | `core_error` | Error del agente; se conserva su motivo en `message`. |
+
+Durante una acción, timeout o pérdida de respuesta indican que **no se pudo
+confirmar su ejecución**. No equivalen a cancelación: comprobar el estado del
+host antes de volver a solicitarla. Las entradas inválidas devuelven `422` con
+el formato de validación existente (`detail` como lista sin repetir el input).
+Autenticación y CSRF mantienen sus contratos `401`/`403`.
+
+`/api/docs` y `/api/openapi.json` requieren sesión. Swagger sirve JS, CSS y favicon
+desde rutas locales también protegidas, sin CDN. La documentación es de consulta;
+las acciones se realizan desde el cliente con las protecciones habituales.
+`GET /api/health` sigue siendo público y comprueba Console, no CORE.
+
+Las pruebas SYSTEM usan `unittest`, TestClient y `httpx.MockTransport`, sin
+contactar con el agente real. Si `.env` cambia los orígenes de desarrollo, ejecutar
+la suite con su configuración explícita:
+
+```bash
+cd kida-console/backend
+KIDA_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200 uv run python -m unittest discover -v
+```

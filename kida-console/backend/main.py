@@ -1,16 +1,23 @@
 from contextlib import asynccontextmanager
+from importlib.resources import files
 from pathlib import Path
 
-from auth import check_request, router
-from config import Settings
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+
+from auth import check_request, router
+from config import Settings
+from core.client import CoreClient
 from storage import Store
+from system.routes import router as system_router
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+SWAGGER_DIR = files("swagger_ui") / "static"
 
 
 def create_app(settings=None):
@@ -20,7 +27,14 @@ def create_app(settings=None):
     @asynccontextmanager
     async def lifespan(app):
         await run_in_threadpool(store.initialize, settings.admin_password)
-        yield
+        async with httpx.AsyncClient(
+            base_url=settings.core_url.rstrip("/") + "/",
+            timeout=settings.core_timeout_seconds,
+            follow_redirects=False,
+            trust_env=False,
+        ) as http:
+            app.state.core_client = CoreClient(http)
+            yield
 
     app = FastAPI(
         title="KIDA Console API",
@@ -80,10 +94,44 @@ def create_app(settings=None):
         return {"status": "OK"}
 
     app.include_router(router)
+    app.include_router(system_router)
 
-    @app.api_route("/api", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"])
+    @app.get("/api/openapi.json", include_in_schema=False)
+    def openapi():
+        return app.openapi()
+
+    @app.get("/api/docs", include_in_schema=False)
+    def docs():
+        return get_swagger_ui_html(
+            openapi_url="/api/openapi.json",
+            title=app.title,
+            swagger_js_url="/api/docs-assets/swagger-ui-bundle.js",
+            swagger_css_url="/api/docs-assets/swagger-ui.css",
+            swagger_favicon_url="/api/docs-assets/favicon-32x32.png",
+            swagger_ui_parameters={"supportedSubmitMethods": [], "validatorUrl": None},
+        )
+
+    @app.get("/api/docs-assets/{filename}", include_in_schema=False)
+    def docs_asset(filename: str):
+        from fastapi.responses import FileResponse
+
+        if filename not in (
+            "swagger-ui-bundle.js",
+            "swagger-ui.css",
+            "favicon-32x32.png",
+        ):
+            raise HTTPException(404, "Recurso no encontrado.")
+        return FileResponse(SWAGGER_DIR / filename)
+
     @app.api_route(
-        "/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+        "/api",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"],
+        include_in_schema=False,
+    )
+    @app.api_route(
+        "/api/{path:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"],
+        include_in_schema=False,
     )
     def unknown_api(path: str = ""):
         raise HTTPException(404, "Ruta API no encontrada.")
