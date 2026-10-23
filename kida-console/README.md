@@ -412,3 +412,112 @@ evitar, por ejemplo, programaciones duplicadas.
 Las rutas aparecen en Swagger y OpenAPI protegidos. Las pruebas usan sesiones
 temporales, TestClient, `httpx.MockTransport` y los casos compartidos de
 `tests/fixtures/scheduler.json`; no crean programaciones en el CORE habitual.
+
+## API BACKUPS
+
+Las 14 operaciones públicas de Backups utilizan el mismo puente HTTP y CORE
+configurado para SYSTEM. Todos los administradores pueden utilizarlas con sesión;
+los POST requieren Origin permitido y CSRF. Console no ejecuta el CLI ni abre,
+resuelve o comprueba los ficheros referenciados: las rutas corresponden al host de
+CORE. No hay subida/edición de ficheros, descarga de artefactos, seguimiento nuevo
+de ejecuciones ni tareas de fondo en Console.
+
+| Método y ruta | Entrada | Comando CORE |
+| --- | --- | --- |
+| `GET /api/backup/config` | Ninguna | `backup.config.list` |
+| `POST /api/backup/config/create` | Configuración descrita debajo | `backup.config.create` |
+| `POST /api/backup/config/delete` | Exactamente uno de `{id}` o `{name}` | `backup.config.delete` |
+| `POST /api/backup/run` | Exactamente uno de `{id}` o `{name}` | `backup.run` |
+| `GET /api/backup/health` | Ninguna | `backup.health.list` |
+| `GET /api/backup/health/get?run_id=UUID` | Query `run_id` obligatoria | `backup.health.get` |
+| `POST /api/backup/health/create` | `{definition_path,mode}` | `backup.health.create` |
+| `POST /api/backup/health/start` | `{run_id}` | `backup.health.start` |
+| `POST /api/backup/health/run` | `{definition_path}` | `backup.health.run` |
+| `POST /api/backup/health/stop` | `{run_id}` | `backup.health.stop` |
+| `POST /api/backup/health/delete` | `{run_id}` | `backup.health.delete` |
+| `GET /api/backup/health/reports` | Ninguna | `backup.health.report.list` |
+| `GET /api/backup/health/reports/get?run_id=UUID` | Query `run_id` obligatoria | `backup.health.report.get` |
+| `POST /api/backup/health/reports/delete` | `{run_id}` | `backup.health.report.delete` |
+
+Crear configuración requiere `name` (cadena), `sources` (array de rutas) y
+`targets` (array de objetos con `path`, `required` booleano opcional y
+`filesystem_uuid` cadena o null opcional). También admite `compression`
+(`tar_zstd`), `lifecycle` con arrays `pre_backup` y `post_backup` de
+`{command,params}`, `schedule` con cualquier JSON y `retention` con `max_age`
+(cadena o null), `keep_last` (entero u32 o null) y `protected_restore_points`
+(array de cadenas). `params` admite cualquier JSON, incluido null. Los campos
+omitidos no se envían: CORE aplica sus predeterminados (`tar_zstd`, lifecycle
+vacío, target requerido, params null y puntos protegidos vacíos). `schedule` y
+`retention` admiten null; compression, lifecycle y arrays no. Los selectores
+requieren exactamente una cadena, sin null explícito. Health create requiere
+modo `AUTOMATIC` o `MANUAL`; Health run realiza el flujo automático de CORE.
+
+Ejemplo mínimo de cuerpo para `POST /api/backup/config/create`:
+
+```json
+{"name":"daily","sources":["/srv/data"],"targets":[{"path":"/mnt/backups"}]}
+```
+
+Ejemplo completo (los comandos lifecycle también se validan en CORE):
+
+```json
+{
+  "name": "daily",
+  "sources": ["/srv/data"],
+  "targets": [{"path":"/mnt/backups","required":true,"filesystem_uuid":null}],
+  "compression": "tar_zstd",
+  "lifecycle": {
+    "pre_backup": [{"command":"system.info","params":{}}],
+    "post_backup": []
+  },
+  "schedule": {"note":"metadata"},
+  "retention": {"max_age":"7d","keep_last":3,"protected_restore_points":[]}
+}
+```
+
+Los tipos son estrictos, sin conversiones, recortes ni normalización de cadenas.
+Se rechazan campos extra, números no finitos y surrogates aislados, también en
+claves y valores JSON anidados. `keep_last` admite `0..4294967295`, sin booleanos.
+CORE valida UUID, referencias, rutas, definiciones, lifecycle y estados operativos.
+`schedule` y `retention` son **metadatos**: no programan ejecuciones ni podan
+archivos por sí solos. Eliminar una configuración no borra sus archivos de backup.
+
+Todas las rutas devuelven `200` con los datos de CORE directamente. Config list
+responde `{backups:[...]}` y create/delete devuelven el `BackupJob` completo.
+Backup run devuelve `{state,execution_id}`; Health start/run añaden `run_id`.
+`QUEUED` confirma admisión, no finalización. `run_id` identifica la ejecución de
+Health y `execution_id` la ejecución en la cola; son identificadores distintos.
+Health create/get/stop/delete devuelven la ejecución completa, con definición,
+diagnóstico, evidencias, artefacto, proyecto gestionado, servicios, recursos y
+limpieza. Health list devuelve un array de registros con esa ejecución aplanada
+y `record_version`, `restore_provenance` y `report_status`.
+
+Los informes se listan como array de IDs; consultar devuelve `{run_id,markdown}`
+y eliminar `{run_id,deleted}`. Markdown viaja como cadena JSON, sin renderizar
+HTML. Se conservan arrays vacíos, nulos legítimos, fechas como cadenas, campos
+futuros y estados/modos/resultados de respuesta desconocidos. Los resultados
+técnicos de Health **no garantizan integridad funcional**: requieren validación
+del administrador. Stop/delete conservan las reglas de limpieza y procedencia de
+CORE; revisar `cleanup` y los recursos conservados.
+
+Ejemplo tras iniciar sesión, con el token vigente de `GET /api/auth/session`
+(este POST solicita una acción real en CORE):
+
+```javascript
+const response = await fetch('/api/backup/health/create', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+  body: JSON.stringify({ definition_path: '/srv/health/app.toml', mode: 'MANUAL' })
+});
+const execution = await response.json();
+```
+
+Se mantienen `401`, `403`, `422` y los errores `core_*` descritos en SYSTEM.
+Los errores del agente siguen siendo `502 core_error`, aunque indiquen ausencia
+o conflicto; no se deduce un código HTTP de su texto. Todos los POST son acciones.
+Ante timeout o pérdida de respuesta, **no se pudo confirmar su ejecución**:
+consultar el estado antes de repetir. No hay reintentos ni redirecciones.
+Los contratos tipados aparecen en Swagger y OpenAPI protegidos. Las pruebas
+usan las fixtures compartidas de backup y Health, sesiones temporales y CORE
+simulado; no ejecutan backups ni Health contra el entorno habitual.

@@ -1,44 +1,12 @@
-import math
 from typing import Annotated, Literal
 
+from core.models import CoreData, Input
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
     JsonValue,
     RootModel,
-    model_validator,
 )
-
-from core.models import CoreData
-
-
-def validate_json(value):
-    # Validate before field parsing so invalid keys cannot enter error locations.
-    pending = [value]
-    while pending:
-        item = pending.pop()
-        if isinstance(item, str):
-            if any(0xD800 <= ord(char) <= 0xDFFF for char in item):
-                raise ValueError("Isolated Unicode surrogates are not allowed")
-        elif isinstance(item, float) and not math.isfinite(item):
-            raise ValueError("Non-finite JSON numbers are not allowed")
-        elif isinstance(item, dict):
-            pending.extend(item.keys())
-            pending.extend(item.values())
-        elif isinstance(item, list):
-            pending.extend(item)
-    return value
-
-
-class Input(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", allow_inf_nan=False)
-
-    @model_validator(mode="before")
-    @classmethod
-    def valid_json(cls, value):
-        return validate_json(value)
-
 
 Seconds = Annotated[int, Field(ge=0, le=2**64 - 1)]
 

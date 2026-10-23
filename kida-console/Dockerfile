@@ -31,6 +31,7 @@ COPY backend/core ./core
 COPY backend/system ./system
 COPY backend/docker ./docker
 COPY backend/scheduler ./scheduler
+COPY backend/backup ./backup
 COPY --from=frontend /build/backend/static ./static
 USER 10001:10001
 EXPOSE 8000
