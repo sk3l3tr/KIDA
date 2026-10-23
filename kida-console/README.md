@@ -325,3 +325,90 @@ confirmar su ejecución**: comprobar el estado antes de repetirla.
 Estas rutas aparecen en `/api/docs` y `/api/openapi.json`, ambos protegidos por
 sesión. Las pruebas Docker usan TestClient, sesiones temporales y
 `httpx.MockTransport`, sin acciones contra el daemon habitual.
+
+## API SCHEDULER
+
+El backend mapea los tres comandos públicos del scheduler al mismo CORE HTTP
+configurado para SYSTEM y DOCKER. Todos los administradores pueden utilizarlos;
+los POST requieren Origin permitido y el token CSRF vigente. Console no ejecuta
+el CLI ni mantiene un scheduler propio.
+
+| Método y ruta | Entrada | Comando CORE |
+| --- | --- | --- |
+| `GET /api/scheduler` | Query opcional `origin=USER`, `INTERNAL` o `ALL` | `scheduler.list` |
+| `POST /api/scheduler/add` | `{command,params,schedule}` | `scheduler.add` |
+| `POST /api/scheduler/delete` | `{"id":"UUID"}` | `scheduler.delete` |
+
+Sin filtro se envían parámetros vacíos y CORE lista `USER` por defecto. El filtro
+es sensible a mayúsculas. La creación pública siempre genera tareas `USER`;
+consultar `INTERNAL` o `ALL` no concede permisos para crear, modificar ni borrar
+tareas internas. CORE rechaza su borrado mediante el comando público. No hay
+rutas de actualización o ejecución inmediata.
+
+La creación requiere `command`, `params` y exactamente una regla `schedule`.
+`params` admite cualquier valor JSON, incluido `null`, objetos, arrays y escalares.
+Ejemplos de cuerpos para `POST /api/scheduler/add`:
+
+```json
+{"command":"system.info","params":{},"schedule":{"type":"once","at":"2030-01-01T12:00:00Z"}}
+```
+
+```json
+{"command":"docker.containers.list","params":{},"schedule":{"type":"interval","seconds":60}}
+```
+
+```json
+{"command":"system.health","params":{},"schedule":{"type":"cron","expression":"0 2 * * *","timezone":"Europe/Madrid"}}
+```
+
+`once.at` es una cadena RFC3339 con zona explícita y debe indicar una fecha futura
+para CORE. `interval.seconds` debe ser positivo y compatible con los límites de
+fecha y duración de CORE. Cron usa cinco campos y una zona IANA; si `timezone`
+se omite, Console no la envía y CORE aplica `UTC`.
+
+Console valida únicamente la estructura y los tipos: rechaza campos extra,
+conversiones de tipos, nulos fuera de `params`, números no finitos y surrogates
+Unicode aislados, también en claves o valores anidados. `seconds` debe ser un
+entero entre `0` y `18446744073709551615`, sin booleanos. El valor `0`, las fechas,
+cron, zonas, UUID y comandos se someten a la validación de dominio de CORE.
+Las cadenas no se recortan ni normalizan; se conservan los caracteres de control
+legítimos dentro de `params`. Console no duplica el catálogo de comandos ni
+valida sus parámetros como si fueran peticiones a las rutas SYSTEM o DOCKER:
+CORE decide qué comandos públicos pueden programarse.
+
+Ejemplo desde el navegador tras iniciar sesión, usando el token vigente de
+`GET /api/auth/session` (este POST crea una programación real en CORE):
+
+```javascript
+const response = await fetch('/api/scheduler/add', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+  body: JSON.stringify({
+    command: 'system.info',
+    params: {},
+    schedule: { type: 'interval', seconds: 60 }
+  })
+});
+const schedule = await response.json();
+```
+
+Las tres rutas devuelven `200` con los datos de CORE directamente. Crear y borrar
+devuelven `{id,origin,command,params,schedule}`. Listar devuelve un array, incluido
+`[]`, cuyas entradas añaden `next_enqueue_at`: es el próximo intento de admisión
+a la cola, no una garantía de inicio o finalización. Se conservan fechas como
+cadenas, valores JSON de `params`, orígenes desconocidos y campos futuros.
+Borrar una programación **no cancela comandos ya encolados**, ni revierte acciones
+que estos hayan programado.
+
+Se mantienen `401` de sesión, `403` de Origin/CSRF, `422` de validación local y los
+errores `core_*` descritos en SYSTEM. Los rechazos de dominio del agente devuelven
+`502 core_error` con su motivo, incluido ID inexistente o borrado de una tarea
+`INTERNAL`; no se convierten en `404` o `403`. No hay reintentos ni redirecciones.
+Si crear o borrar termina en timeout o pérdida de respuesta, **no se pudo
+confirmar su ejecución**: consultar el listado antes de repetir la petición para
+evitar, por ejemplo, programaciones duplicadas.
+
+Las rutas aparecen en Swagger y OpenAPI protegidos. Las pruebas usan sesiones
+temporales, TestClient, `httpx.MockTransport` y los casos compartidos de
+`tests/fixtures/scheduler.json`; no crean programaciones en el CORE habitual.

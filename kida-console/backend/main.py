@@ -14,6 +14,7 @@ from auth import check_request, router
 from config import Settings
 from core.client import CoreClient
 from docker.routes import router as docker_router
+from scheduler.routes import router as scheduler_router
 from storage import Store
 from system.routes import router as system_router
 
@@ -97,6 +98,7 @@ def create_app(settings=None):
     app.include_router(router)
     app.include_router(system_router)
     app.include_router(docker_router)
+    app.include_router(scheduler_router)
 
     @app.get("/api/openapi.json", include_in_schema=False)
     def openapi():
