@@ -4,6 +4,19 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## Development server
 
+Use Node.js 24.15.0 (pinned in `.nvmrc`) or a version supported by `package.json`.
+With nvm, run `nvm use` from this directory before installing or starting:
+
+```bash
+nvm use
+pnpm install --frozen-lockfile
+pnpm run start
+```
+
+ARCA 3.2.7 uses Ionic 8 APIs; keep `@ionic/angular` on 8.8.19. Its Angular peer
+range predates Angular 22, so the explicit pnpm peer exceptions are covered by
+the application configuration integration tests and build validation.
+
 To start a local development server, run:
 
 ```bash

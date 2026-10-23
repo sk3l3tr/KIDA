@@ -3,3 +3,7 @@ allowBuilds:
   esbuild: true
   lmdb: true
   msgpackr-extract: true
+peerDependencyRules:
+  allowedVersions:
+    'arca>@angular/core': '22'
+    'arca>@angular/common': '22'

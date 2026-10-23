@@ -15,3 +15,6 @@ kida-console/backend/static
 .angular
 .vscode
 .editorconfig
+
+# Other
+vendor
