@@ -3,6 +3,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from core.models import CoreData
+
 Clock = Annotated[str, Field(pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")]
 Seconds = Annotated[int, Field(ge=120, le=2**64 - 1)]
 
@@ -35,11 +37,6 @@ class PowerCycleRequest(Input):
         if (self.wake_time is None) == (self.wake_after_seconds is None):
             raise ValueError("Specify exactly one of wake_time or wake_after_seconds")
         return self
-
-
-class CoreData(BaseModel):
-    # Preserve future fields and open-ended diagnostic strings from the agent.
-    model_config = ConfigDict(strict=True, extra="allow", allow_inf_nan=False)
 
 
 class OsInfo(CoreData):

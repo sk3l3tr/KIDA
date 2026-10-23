@@ -259,3 +259,69 @@ la suite con su configuración explícita:
 cd kida-console/backend
 KIDA_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200 uv run python -m unittest discover -v
 ```
+
+## API DOCKER
+
+Las ocho operaciones Docker de CORE están disponibles para todos los
+administradores mediante el mismo puente HTTP, configuración y cliente compartido
+que SYSTEM. Console no ejecuta Docker ni el CLI. Todas requieren sesión; los POST
+requieren además Origin permitido y el token CSRF vigente.
+
+| Método y ruta | Entrada | Comando CORE |
+| --- | --- | --- |
+| `GET /api/docker/containers` | Ninguna | `docker.containers.list` |
+| `GET /api/docker/compose/version` | Ninguna | `docker.compose.version` |
+| `GET /api/docker/compose/projects` | Ninguna | `docker.compose.projects.list` |
+| `GET /api/docker/compose/projects/inspect?project=demo` | Query `project` obligatoria | `docker.compose.project.inspect` |
+| `POST /api/docker/containers/start` | `{"container":"id-o-nombre"}` | `docker.container.start` |
+| `POST /api/docker/containers/stop` | Igual | `docker.container.stop` |
+| `POST /api/docker/containers/restart` | Igual | `docker.container.restart` |
+| `POST /api/docker/containers/delete` | Igual | `docker.container.delete` |
+
+Los identificadores deben ser cadenas: se recortan los espacios exteriores y se
+rechazan valores vacíos, caracteres de control (incluso en los extremos) y
+surrogates Unicode aislados. Los
+contenedores tampoco pueden comenzar por `-`. Los cuerpos rechazan campos extra,
+valores nulos y tipos incompatibles; no hay despacho de comandos arbitrarios.
+
+Un `200` devuelve directamente los datos de CORE: contenedores como
+`{total,running,containers}`, versión como `{version}`, proyectos como array
+(incluido `[]`), inspección como `{name,services}` y acciones como
+`{container,status}`. Se conservan los detalles de puertos y redes, servicios sin
+nombre (`null`), fechas como cadenas, valores nulos legítimos, estados desconocidos
+y campos futuros. Los proyectos son observaciones del daemon: **no acreditan
+propiedad de KIDA**. La eliminación ejecuta exactamente la operación de CORE,
+`docker rm`, sin fuerza ni eliminación de volúmenes.
+
+Ejemplo de consulta desde el navegador tras iniciar sesión:
+
+```javascript
+const response = await fetch('/api/docker/compose/projects', {
+  credentials: 'include'
+});
+const projects = await response.json();
+```
+
+Ejemplo de acción con el token vigente de `GET /api/auth/session`
+(este POST solicita una acción real en CORE):
+
+```javascript
+const response = await fetch('/api/docker/containers/start', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+  body: JSON.stringify({ container: 'mi-contenedor' })
+});
+const result = await response.json();
+```
+
+Se mantienen los errores de SYSTEM: `422` de validación local, `401` de sesión,
+`403` de Origin/CSRF y los errores `core_*` descritos arriba. Un error comunicado
+por el agente devuelve `502 core_error` con su motivo, incluso si indica que un
+contenedor o proyecto no existe; no se convierte en `404`. No hay reintentos ni
+redirecciones. Ante timeout o pérdida de respuesta de una acción, **no se pudo
+confirmar su ejecución**: comprobar el estado antes de repetirla.
+
+Estas rutas aparecen en `/api/docs` y `/api/openapi.json`, ambos protegidos por
+sesión. Las pruebas Docker usan TestClient, sesiones temporales y
+`httpx.MockTransport`, sin acciones contra el daemon habitual.
