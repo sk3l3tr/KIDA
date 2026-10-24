@@ -40,6 +40,8 @@ export class Login {
     this.active = false;
     this.arca.panels.showHeader();
     this.arca.panels.showFooter();
+    this.arca.panels.showFloatingMenu();
+    this.arca.panels.showMenu();
   }
 
   // ARCA recalculates panel visibility on resize, even while login is active.
@@ -48,6 +50,8 @@ export class Login {
     if (!this.active) return;
     this.arca.panels.hideHeader();
     this.arca.panels.hideFooter();
+    this.arca.panels.hideFloatingMenu();
+    this.arca.panels.hideMenu();
   }
 
   submit(): void {
