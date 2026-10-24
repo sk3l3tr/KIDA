@@ -1,3 +1,9 @@
 <ion-app>
   <arca-core></arca-core>
 </ion-app>
+
+@if (startupError()) {
+  <p class="startup-error" role="alert">
+    No se ha podido comprobar la sesión. Recarga la página para reintentar.
+  </p>
+}

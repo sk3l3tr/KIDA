@@ -1,0 +1,208 @@
+@use 'sass:color';
+@use 'sass:list';
+
+// Each palette is the single source for the app, Ionic and preview colours.
+$palettes: (
+  professional: (
+    light: (
+      #f3f6fa,
+      #ffffff,
+      #182b3d,
+      #526579,
+      #155f75,
+      #ffffff,
+      #718497,
+    ),
+    dark: (
+      #101b27,
+      #1b2b3c,
+      #ecf2f8,
+      #b1c3d5,
+      #83d8ef,
+      #102531,
+      #8a9eb2,
+    ),
+  ),
+  neobrutalism: (
+    light: (
+      #fff6df,
+      #ffffff,
+      #171717,
+      #454545,
+      #7137b9,
+      #ffffff,
+      #171717,
+    ),
+    dark: (
+      #161616,
+      #262626,
+      #fff6df,
+      #d5ccba,
+      #edbaff,
+      #24132d,
+      #e5dabd,
+    ),
+  ),
+  sakura: (
+    light: (
+      #fcf2f5,
+      #fffbfc,
+      #452b38,
+      #745264,
+      #9a365d,
+      #ffffff,
+      #a06d83,
+    ),
+    dark: (
+      #241b25,
+      #332635,
+      #f9e9f0,
+      #dab9cc,
+      #f1a8c7,
+      #381d2a,
+      #b68ba4,
+    ),
+  ),
+  tokyo: (
+    dark: (
+      #101321,
+      #1b2035,
+      #ecf0ff,
+      #b4bfdc,
+      #68e3e1,
+      #09282c,
+      #7d91bc,
+    ),
+  ),
+);
+@function rgb-list($value) {
+  @return color.channel($value, 'red', $space: rgb), color.channel($value, 'green', $space: rgb),
+    color.channel($value, 'blue', $space: rgb);
+}
+@mixin ionic-color($name, $base, $contrast) {
+  --ion-color-#{$name}: #{$base};
+  --ion-color-#{$name}-rgb: #{rgb-list($base)};
+  --ion-color-#{$name}-contrast: #{$contrast};
+  --ion-color-#{$name}-contrast-rgb: #{rgb-list($contrast)};
+  --ion-color-#{$name}-shade: #{color.mix(#000, $base, 12%)};
+  --ion-color-#{$name}-tint: #{color.mix(#fff, $base, 10%)};
+}
+@each $theme, $modes in $palettes {
+  @each $mode, $palette in $modes {
+    // Specificity wins against Ionic's .ion-palette-dark.ios/.md rules.
+    html[data-theme='#{$theme}'][data-mode='#{$mode}'],
+    .theme-preview[data-theme='#{$theme}'][data-mode='#{$mode}'] {
+      $bg: list.nth($palette, 1);
+      $surface: list.nth($palette, 2);
+      $text: list.nth($palette, 3);
+      $muted: list.nth($palette, 4);
+      $accent: list.nth($palette, 5);
+      $contrast: list.nth($palette, 6);
+      --ion-background-color: #{$bg};
+      --ion-background-color-rgb: #{rgb-list($bg)};
+      --ion-text-color: #{$text};
+      --ion-text-color-rgb: #{rgb-list($text)};
+      --ion-border-color: #{list.nth($palette, 7)};
+      --ion-item-background: #{$surface};
+      --ion-card-background: #{$surface};
+      --ion-card-color: #{$text};
+      --ion-toolbar-background: #{$surface};
+      --ion-toolbar-color: #{$text};
+      --ion-toolbar-border-color: #{list.nth($palette, 7)};
+      --ion-tab-bar-background: #{$surface};
+      --ion-tab-bar-color: #{$muted};
+      --ion-tab-bar-color-selected: #{$accent};
+      --ion-overlay-background-color: #{$surface};
+      --ion-placeholder-color: #{$muted};
+      --ion-placeholder-opacity: 1;
+      --kida-muted: #{$muted};
+      @include ionic-color(primary, $accent, $contrast);
+      @include ionic-color(secondary, $accent, $contrast);
+      @include ionic-color(tertiary, $accent, $contrast);
+      @include ionic-color(medium, $muted, $bg);
+      @include ionic-color(light, $surface, $text);
+      @include ionic-color(dark, $text, $surface);
+      @if $mode == light {
+        @include ionic-color(danger, #a52c38, #fff);
+        @include ionic-color(success, #225c41, #fff);
+        @include ionic-color(warning, #805100, #fff);
+      } @else {
+        @include ionic-color(danger, #ffacb6, #35121a);
+        @include ionic-color(success, #94e2b8, #102b20);
+        @include ionic-color(warning, #ffdb96, #302000);
+      }
+      @for $step from 1 through 19 {
+        $weight: $step * 5%;
+        --ion-color-step-#{$step * 50}: #{color.mix($text, $bg, $weight)};
+        --ion-background-color-step-#{$step * 50}: #{color.mix($text, $bg, $weight)};
+        --ion-text-color-step-#{$step * 50}: #{color.mix($bg, $text, $weight)};
+      }
+    }
+  }
+}
+html[data-theme],
+.theme-preview {
+  --app-background-color: var(--ion-background-color);
+  --app-primary-background-color: var(--ion-item-background);
+  --app-font-color: var(--ion-text-color);
+  --app-header-background-color: var(--ion-item-background);
+  --app-header-font-color: var(--ion-text-color);
+  --app-footer-background-color: var(--ion-item-background);
+  --app-footer-font-color: var(--kida-muted);
+  --app-border-radius: var(--kida-radius);
+  --ion-font-family: var(--kida-font);
+  --kida-font: Arial, 'Liberation Sans', sans-serif;
+  --kida-heading-font: var(--kida-font);
+  --kida-radius: 0.75rem;
+  --kida-border-width: 1px;
+  --kida-space: 1.5rem;
+  --kida-shadow: 0 12px 40px #00000014;
+  // Effects are composed into a shadow list, where `none` is invalid.
+  --kida-effect: 0 0 0 0 transparent;
+}
+html[data-theme='neobrutalism'],
+.theme-preview[data-theme='neobrutalism'] {
+  --kida-radius: 0;
+  --kida-border-width: 3px;
+  --kida-shadow: 5px 5px 0 var(--ion-border-color);
+}
+html[data-theme='sakura'],
+.theme-preview[data-theme='sakura'] {
+  --kida-heading-font: Georgia, 'Liberation Serif', serif;
+  --kida-radius: 1.25rem;
+  --kida-space: 2rem;
+}
+html[data-theme='tokyo'],
+.theme-preview[data-theme='tokyo'] {
+  --kida-font: 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  --kida-radius: 0.25rem;
+  --kida-shadow: 0 0 0 1px var(--ion-border-color);
+  --kida-effect: 0 0 18px #68e3e12b;
+}
+// Ionic Shadow DOM uses inherited variables and documented public parts.
+html[data-theme][data-mode] :is(ion-modal, ion-alert, ion-popover, ion-loading, ion-toast) {
+  --background: var(--ion-overlay-background-color);
+  --color: var(--ion-text-color);
+  --border-color: var(--ion-border-color);
+  --border-radius: var(--kida-radius);
+  --box-shadow: var(--kida-shadow);
+  --ion-background-color: var(--ion-overlay-background-color);
+  --ion-toolbar-background: var(--ion-item-background);
+  // Alert message text uses these public stepped tokens instead of --color.
+  --ion-color-step-550: var(--kida-muted);
+  --ion-color-step-600: var(--kida-muted);
+  --ion-text-color-step-400: var(--kida-muted);
+}
+html[data-theme] ion-modal::part(content),
+html[data-theme] ion-popover::part(content) {
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+}
+html[data-theme] ion-toast::part(button) {
+  color: var(--ion-color-primary);
+}
+html[data-theme] :is(ion-button, ion-input, ion-select, ion-textarea, ion-card) {
+  --border-radius: var(--kida-radius);
+  --border-color: var(--ion-border-color);
+  --highlight-color-focused: var(--ion-color-primary);
+}

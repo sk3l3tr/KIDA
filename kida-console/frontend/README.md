@@ -61,8 +61,10 @@ opened with the header menu button. Each entry loads its standalone page lazily:
 `/administrators`. These routes require a session; `/login` remains public.
 The root URL and unknown paths redirect to `/dashboard`.
 
-The six new pages have empty templates. `/administrators` retains the existing
-account management. Menu entries live in `src/app/arca-config/app.menu.config.ts`;
+`/settings` contains the appearance gallery. `/administrators` retains account
+management; the remaining pages keep their existing placeholders. See
+[theme registration and validation](src/theme/README.md) and the portable
+[theming engine](src/lib/theming/README.md). Menu entries live in `src/app/arca-config/app.menu.config.ts`;
 route definitions live in `src/app/app.routes.ts`.
 
 ## Code scaffolding

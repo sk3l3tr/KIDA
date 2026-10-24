@@ -1,3 +1,4 @@
+import { THEME_STORAGE, ThemeService } from '../../lib/theming/theme.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { inject } from '@angular/core';
@@ -30,6 +31,10 @@ const arcaProviders = [
       hideFooter: vi.fn(),
       showHeader: vi.fn(),
       showFooter: vi.fn(),
+      hideFloatingMenu: vi.fn(),
+      hideMenu: vi.fn(),
+      showFloatingMenu: vi.fn(),
+      showMenu: vi.fn(),
     },
   },
 ];
@@ -38,9 +43,23 @@ describe('Session authentication', () => {
   let auth: AuthService;
   let http: HttpTestingController;
   let router: Router;
+  let themeValues: Map<string, string>;
   beforeEach(() => {
+    themeValues = new Map();
     TestBed.configureTestingModule({
-      providers: [...arcaProviders, provideHttpClientTesting()],
+      providers: [
+        ...arcaProviders,
+        provideHttpClientTesting(),
+        {
+          provide: THEME_STORAGE,
+          useValue: {
+            getItem: (key: string) => themeValues.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+              themeValues.set(key, value);
+            },
+          },
+        },
+      ],
     });
     auth = TestBed.inject(AuthService);
     http = TestBed.inject(HttpTestingController);
@@ -65,6 +84,115 @@ describe('Session authentication', () => {
     expect(complete).toHaveBeenCalledOnce();
     auth.restore().subscribe((valid) => expect(valid).toBe(true));
     http.expectOne(`${base}/auth/session`).flush(session);
+  });
+
+  it('applies account appearance before session completion, keeps it on rename and logout', () => {
+    themeValues.set(
+      'kida:appearance:account:1',
+      JSON.stringify({ version: 1, theme: 'sakura', mode: 'dark' }),
+    );
+    const themes = TestBed.inject(ThemeService);
+    auth.restore().subscribe(() => {
+      expect(themes.scope()).toBe('1');
+      expect(themes.theme()).toBe('sakura');
+      expect(themes.mode()).toBe('dark');
+    });
+    expect(themes.scope()).toBeNull();
+    http.expectOne(`${base}/auth/session`).flush(session);
+    auth.rename('renamed').subscribe();
+    http.expectOne(`${base}/admins/me`).flush({ id: 1, username: 'renamed' });
+    expect(themes.scope()).toBe('1');
+    expect(themes.theme()).toBe('sakura');
+    auth.logout().subscribe();
+    http.expectOne(`${base}/auth/logout`).flush(null, { status: 204, statusText: 'No Content' });
+    expect(themes.scope()).toBeNull();
+    expect(themes.theme()).toBe('sakura');
+    expect(themeValues.size).toBe(1); // restoration/rename/logout never write preferences
+  });
+
+  it('keeps an unconfirmed theme scope after a network error without declaring anonymity', () => {
+    const themes = TestBed.inject(ThemeService);
+    auth.restore().subscribe();
+    http.expectOne(`${base}/auth/session`).flush(session);
+    const failure = vi.fn();
+    auth.restore().subscribe({ error: failure });
+    themes.selectTheme('tokyo');
+    http.expectOne(`${base}/auth/session`).flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(auth.user()).toEqual(session.user);
+    expect(failure).toHaveBeenCalledOnce();
+    expect(themes.scope()).toBeNull();
+    expect([...themeValues.keys()]).toEqual(['kida:appearance:global']);
+  });
+
+  it('discards a theme restoration that completes after session expiration', () => {
+    const themes = TestBed.inject(ThemeService);
+    auth.restore().subscribe();
+    const pending = http.expectOne(`${base}/auth/session`);
+    auth.expired();
+    pending.flush(session);
+    expect(themes.scope()).toBeNull();
+    expect(auth.user()).toBeNull();
+    themes.selectTheme('sakura');
+    expect([...themeValues.keys()]).toEqual(['kida:appearance:global']);
+  });
+
+  it.each([200, 401])(
+    'discards an old session response (%s) after login to another account',
+    (status) => {
+      auth.restore().subscribe();
+      const pending = http.expectOne(`${base}/auth/session`);
+      auth.login('second', 'password').subscribe();
+      http.expectOne(`${base}/auth/csrf`).flush({ csrf_token: 'second-csrf' });
+      const second = { user: { id: 2, username: 'second' }, csrf_token: 'second-token' };
+      http.expectOne(`${base}/auth/login`).flush(second);
+      if (status === 200) pending.flush(session);
+      else pending.flush({}, { status: 401, statusText: 'Unauthorized' });
+      const themes = TestBed.inject(ThemeService);
+      expect(auth.user()).toEqual(second.user);
+      expect(auth.csrfToken()).toBe('second-token');
+      expect(themes.scope()).toBe('2');
+      themes.selectTheme('tokyo');
+      expect([...themeValues.keys()].sort()).toEqual([
+        'kida:appearance:account:2',
+        'kida:appearance:global',
+      ]);
+    },
+  );
+
+  it.each([200, 401])(
+    'correlates overlapping SESSION outcomes (%s) before applying identity',
+    (status) => {
+      const firstComplete = vi.fn();
+      auth.restore().subscribe({ complete: firstComplete });
+      const first = http.expectOne(`${base}/auth/session`);
+      const next = vi.fn();
+      auth.restore().subscribe(next);
+      const second = http.expectOne(`${base}/auth/session`);
+      expect(firstComplete).toHaveBeenCalledOnce();
+      if (status === 200) first.flush(session);
+      else first.flush({}, { status: 401, statusText: 'Unauthorized' });
+      expect(next).not.toHaveBeenCalled();
+      expect(auth.user()).toBeNull();
+      const other = { user: { id: 2, username: 'second' }, csrf_token: 'other' };
+      second.flush(other);
+      expect(next).toHaveBeenCalledExactlyOnceWith(true);
+      expect(auth.user()).toEqual(other.user);
+      expect(TestBed.inject(ThemeService).scope()).toBe('2');
+    },
+  );
+
+  it('keeps unsaved account appearance through protected navigation', () => {
+    auth.restore().subscribe();
+    http.expectOne(`${base}/auth/session`).flush(session);
+    vi.spyOn(TestBed.inject(THEME_STORAGE), 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    const themes = TestBed.inject(ThemeService);
+    themes.selectTheme('tokyo');
+    auth.restore().subscribe();
+    http.expectOne(`${base}/auth/session`).flush(session);
+    expect(themes.theme()).toBe('tokyo');
+    expect(themes.persistenceUnavailable()).toBe(true);
   });
 
   it('propagates CSRF errors without sending login credentials', () => {
@@ -509,6 +637,8 @@ describe('Authentication views', () => {
     view.ionViewWillEnter();
     expect(panels.hideHeader).toHaveBeenCalledTimes(1);
     expect(panels.hideFooter).toHaveBeenCalledTimes(1);
+    expect(panels.hideMenu).toHaveBeenCalledTimes(1);
+    expect(panels.hideFloatingMenu).toHaveBeenCalledTimes(1);
     window.dispatchEvent(new Event('resize'));
     expect(panels.hideHeader).toHaveBeenCalledTimes(2);
     expect(panels.hideFooter).toHaveBeenCalledTimes(2);
@@ -517,6 +647,8 @@ describe('Authentication views', () => {
     view.ionViewWillLeave();
     expect(panels.showHeader).toHaveBeenCalledOnce();
     expect(panels.showFooter).toHaveBeenCalledOnce();
+    expect(panels.showMenu).toHaveBeenCalledOnce();
+    expect(panels.showFloatingMenu).toHaveBeenCalledOnce();
     window.dispatchEvent(new Event('resize'));
     expect(panels.hideHeader).toHaveBeenCalledTimes(2);
     view.ionViewWillEnter();

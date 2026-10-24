@@ -2,3 +2,15 @@
   display: block;
   height: 100%;
 }
+
+.startup-error {
+  visibility: visible;
+  position: fixed;
+  inset: 2rem;
+  height: fit-content;
+  padding: 1rem;
+  background: var(--ion-item-background);
+  color: var(--ion-color-danger);
+  border: 1px solid currentColor;
+  border-radius: var(--kida-radius);
+}

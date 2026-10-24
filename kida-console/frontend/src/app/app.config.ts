@@ -1,3 +1,6 @@
+import { provideTheming } from '../lib/theming/theme.service';
+import { themeConfig } from '../theme/catalog';
+import { provideKidaThemeIntegration } from '../theme/integration';
 import { authInterceptor } from './auth/auth.interceptor';
 import {
   ApplicationConfig,
@@ -36,6 +39,8 @@ registerLocaleData(localeEs);
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideTheming(themeConfig),
+    provideKidaThemeIntegration(),
     provideZoneChangeDetection(),
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: LOCALE_ID, useValue: 'es' },

@@ -4,6 +4,8 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ArcaService, MenuPosition } from 'arca';
 import { of } from 'rxjs';
+import { provideTheming } from '../lib/theming/theme.service';
+import { themeConfig } from '../theme/catalog';
 import { routes } from './app.routes';
 import { appMenu } from './arca-config/app.menu.config';
 import { AuthService } from './auth/auth.service';
@@ -37,20 +39,25 @@ describe('Console navigation', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter(routes),
+        provideTheming(themeConfig),
         { provide: ArcaService, useValue: { panels: {} } },
         { provide: AuthService, useValue: { ...auth, user: signal({ id: 1, username: 'admin' }) } },
       ],
     });
   });
 
-  it.each(pages)('loads the protected page at $path', async ({ path, component }) => {
+  it.each(pages)('loads the protected page at $path', async ({ path, title, component }) => {
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl(path);
     expect(page).toBeInstanceOf(component);
     expect(TestBed.inject(Router).url).toBe(path);
     expect(auth.restore).toHaveBeenCalledOnce();
-    if (component !== Administrators) {
-      expect(harness.routeNativeElement?.textContent).toBe('');
+    if (component === Settings) {
+      expect(harness.routeNativeElement?.querySelectorAll('.theme-option').length).toBe(4);
+      expect(harness.routeNativeElement?.textContent).toContain('Apariencia');
+      expect(auth.accounts).not.toHaveBeenCalled();
+    } else if (component !== Administrators) {
+      expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe(title);
       expect(auth.accounts).not.toHaveBeenCalled();
     }
   });

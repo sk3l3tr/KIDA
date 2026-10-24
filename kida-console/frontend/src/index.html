@@ -1,9 +1,15 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme-pending>
   <head>
     <meta charset="utf-8" />
     <title>KIDA Console</title>
     <base href="/" />
+    <style>
+      html[data-theme-pending] app-root,
+      html[data-identity-pending] app-root {
+        visibility: hidden;
+      }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.png" />
   </head>

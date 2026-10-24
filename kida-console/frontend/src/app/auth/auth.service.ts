@@ -1,7 +1,11 @@
+import { ThemeIdentity } from '../../theme/integration';
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Observable,
+  EMPTY,
+  filter,
+  defer,
   catchError,
   finalize,
   map,
@@ -9,6 +13,7 @@ import {
   of,
   switchMap,
   take,
+  takeUntil,
   tap,
   throwError,
 } from 'rxjs';
@@ -29,27 +34,42 @@ export class AuthService {
   private readonly arcaRx = inject(ArcaRxService);
   private readonly router = inject(Router);
 
+  private readonly themeIdentity = inject(ThemeIdentity);
+
   readonly user = signal<Account | null>(null);
   readonly csrfToken = signal('');
 
   restore(): Observable<boolean> {
-    return this.request<Session>('SESSION').pipe(
-      tap((session) => this.accept(session)),
-      map(() => true),
-      catchError((error) => {
-        if (error.status !== 401) return throwError(() => error);
-        this.clear();
-        return of(false);
-      }),
-    );
+    return defer(() => {
+      const revision = this.themeIdentity.begin();
+      return this.request<Session>('SESSION').pipe(
+        tap((session) => this.themeIdentity.confirm(revision, session.user.id)),
+        tap((session) => this.accept(session)),
+        map(() => true),
+        catchError((error) => {
+          if (!this.themeIdentity.isCurrent(revision)) return EMPTY;
+          if (error.status !== 401) return throwError(() => error);
+          this.themeIdentity.confirm(revision, null);
+          this.clear();
+          return of(false);
+        }),
+      );
+    });
   }
 
   login(username: string, password: string): Observable<Session> {
-    return this.request<{ csrf_token: string }>('CSRF').pipe(
-      tap((value) => this.csrfToken.set(value.csrf_token)),
-      switchMap(() => this.request<Session>('LOGIN', { username, password })),
-      tap((session) => this.accept(session)),
-    );
+    return defer(() => {
+      const revision = this.themeIdentity.begin();
+      return this.request<{ csrf_token: string }>('CSRF').pipe(
+        tap((value) => this.csrfToken.set(value.csrf_token)),
+        switchMap(() => this.request<Session>('LOGIN', { username, password })),
+        tap((session) => this.themeIdentity.confirm(revision, session.user.id)),
+        tap((session) => this.accept(session)),
+        catchError((error) =>
+          this.themeIdentity.isCurrent(revision) ? throwError(() => error) : EMPTY,
+        ),
+      );
+    });
   }
 
   logout(): Observable<void> {
@@ -90,6 +110,7 @@ export class AuthService {
   }
 
   expired(reason = 'expired'): void {
+    this.themeIdentity.clear();
     this.clear();
     // ARCA's second argument is navigation data, not Angular NavigationExtras.
     void this.router.navigate(['/login'], { queryParams: { reason } });
@@ -100,17 +121,31 @@ export class AuthService {
     const response = `${action}_RESPONSE`;
     const error = `${action}_ERROR`;
     return new Observable<T>((subscriber) => {
+      const revision = this.themeIdentity.snapshot();
+      let settling = false;
       // ARCA retains the last payload, so discard previous results before listening.
       this.arca.actions.cleanActions([response, error]);
       const subscription = merge(
         // listenAction filters out null, including successful HTTP 204 responses.
-        this.arcaRx.listen<T>(response),
-        this.arca.actions
-          .listenAction(error)
-          .pipe(switchMap((failure) => throwError(() => failure))),
+        this.arcaRx
+          .listen<T>(response)
+          .pipe(filter((value) => this.themeIdentity.acceptsResult(value, revision))),
+        this.arca.actions.listenAction(error).pipe(
+          filter((failure) => this.themeIdentity.acceptsResult(failure, revision)),
+          switchMap((failure) => throwError(() => failure)),
+        ),
       )
         .pipe(
           take(1),
+          tap({
+            next: () => {
+              settling = true;
+            },
+            error: () => {
+              settling = true;
+            },
+          }),
+          takeUntil(this.themeIdentity.changes.pipe(filter(() => !settling))),
           finalize(() => this.arca.actions.cleanActions([response, error])),
         )
         .subscribe(subscriber);
