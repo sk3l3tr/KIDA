@@ -467,8 +467,8 @@ temporales, TestClient, `httpx.MockTransport` y los casos compartidos de
 
 La vista `/backups` permite consultar configuraciones, seleccionar sus detalles,
 crear una configuración, eliminarla y solicitar su ejecución por ID. Carga al
-entrar y permite actualizar manualmente, sin sondeo periódico. Backup Health e
-Informes todavía están pendientes en el frontend.
+entrar y permite actualizar manualmente, sin sondeo periódico. También incluye
+Health básico; las operaciones de Health y los informes siguen pendientes.
 
 El formulario incluye orígenes y destinos con `required` y `filesystem_uuid`.
 Las opciones avanzadas permiten incluir lifecycle pre/post, parámetros y schedule
@@ -492,6 +492,34 @@ backup. Los datos se limpian al salir o cambiar de sesión.
 La verificación automatizada usa exclusivamente API simulada. Resultados,
 comandos reproducibles y pasos de validación humana en
 [`backups.verification.md`](frontend/src/app/pages/backups/backups.verification.md).
+
+### Health básico en la interfaz
+
+Backup Health permite listar el historial, seleccionar una ejecución por `run_id`
+y consultar su detalle. El historial aporta además procedencia de restauración,
+versión del registro y estado del informe; se muestran separados del detalle.
+La vista expone diagnóstico, evidencias y logs como texto seguro, artefacto,
+servicios, recursos registrados, proyecto, restauración y limpieza. CORE decide
+la limpieza y el diagnóstico técnico requiere validación funcional del administrador.
+Los estados futuros, campos adicionales y nulos permanecen disponibles en JSON;
+se avisa de enteros fuera del rango seguro de JavaScript.
+
+Para crear Health, indicar una ruta de definición existente en el host CORE y
+seleccionar `MANUAL` o `AUTOMATIC`. Console transmite la ruta intacta y no abre
+ese fichero. **Crear no inicia la ejecución, tampoco en modo automático.**
+La respuesta identifica Health mediante `run_id`; no es un `execution_id` de cola.
+No hay controles de inicio, ejecución automática, parada o borrado en este bloque.
+
+La carga es al entrar y bajo actualización manual, sin sondeo. Se conserva la
+última lectura ante errores; el éxito de creación se muestra separado de los
+fallos de actualización. Una creación incierta conserva su aviso y formulario y
+no se repite automáticamente; actualizar el historial no resuelve la incertidumbre.
+Configuraciones y Health comparten el bloqueo de operaciones para evitar
+escrituras simultáneas. Al salir o cambiar de sesión se descartan consumidores
+y se limpian datos y formularios, también en páginas cacheadas de Ionic.
+
+Pruebas y pasos de validación humana, exclusivamente con API simulada, en
+[`health.verification.md`](frontend/src/app/pages/backups/health.verification.md).
 
 ### Contratos del backend
 

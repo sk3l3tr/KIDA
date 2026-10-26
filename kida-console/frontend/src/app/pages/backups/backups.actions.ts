@@ -7,6 +7,9 @@ export const backupActions: IactionDefinition[] = (
     ['CONFIG_CREATE', '/config/create', UrlRequestType.POST],
     ['CONFIG_DELETE', '/config/delete', UrlRequestType.POST],
     ['RUN', '/run', UrlRequestType.POST],
+    ['HEALTH_LIST', '/health', UrlRequestType.GET],
+    ['HEALTH_GET', '/health/get?run_id={run_id}', UrlRequestType.GET],
+    ['HEALTH_CREATE', '/health/create', UrlRequestType.POST],
   ] as const
 ).map(([name, path, method]) => ({
   actionName: `BACKUP_${name}_REQUEST`,

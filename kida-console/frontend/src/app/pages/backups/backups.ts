@@ -19,6 +19,10 @@ import { restoreDialogFocus, trapDialogFocus } from '../../services/dialog-focus
 import { BackupsService } from './backups.service';
 import { BackupJob, PendingBackup, Queued } from './backups.models';
 import { createBody, emptyForm, newCommand, newTarget } from './backups-form';
+import { BackupHealthState } from './health-state';
+import { BackupHealth } from './health';
+import { limitedPrecision } from './backups-presentation';
+export { limitedPrecision } from './backups-presentation';
 import { BackupOptionalField } from './optional-field';
 
 export function backupFailure(failure: unknown, writing = false): string {
@@ -29,16 +33,11 @@ export function backupFailure(failure: unknown, writing = false): string {
     rejected: 'core',
   });
 }
-export function limitedPrecision(value: unknown): boolean {
-  if (typeof value === 'number')
-    return !Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value));
-  if (Array.isArray(value)) return value.some(limitedPrecision);
-  return value !== null && typeof value === 'object' && Object.values(value).some(limitedPrecision);
-}
 
 @Component({
   selector: 'app-backups',
-  imports: [IonContent, FormsModule, DatePipe, JsonPipe, BackupOptionalField],
+  imports: [IonContent, FormsModule, DatePipe, JsonPipe, BackupOptionalField, BackupHealth],
+  providers: [BackupHealthState],
   templateUrl: './backups.html',
   styleUrl: './backups.scss',
 })
@@ -50,6 +49,10 @@ export class Backups implements OnDestroy {
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmation');
   private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
+  readonly health = inject(BackupHealthState);
+  readonly operationsBlocked = computed(
+    () => this.loading() || this.busy() || this.health.occupied(),
+  );
   readonly entries = signal<BackupJob[] | null>(null);
   readonly selectedId = signal<string | null>(null);
   readonly selected = computed(
@@ -79,6 +82,7 @@ export class Backups implements OnDestroy {
     this.reset();
     this.active.set(true);
     this.refresh();
+    this.health.enter(() => this.loading() || this.busy());
   }
   ionViewWillLeave(): void {
     this.reset();
@@ -89,6 +93,7 @@ export class Backups implements OnDestroy {
   }
   private reset(render = true): void {
     this.active.set(false);
+    this.health.reset();
     ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
@@ -110,7 +115,7 @@ export class Backups implements OnDestroy {
     if (render) this.changeDetector.detectChanges();
   }
   private available(): boolean {
-    return this.active() && !this.loading() && !this.busy();
+    return this.active() && !this.operationsBlocked();
   }
   select(id: string): void {
     if (this.available()) this.selectedId.set(id);

@@ -24,7 +24,7 @@ export function emptyForm(): BackupForm {
     protected_restore_points: [],
   };
 }
-function validString(value: string): string {
+export function validString(value: string): string {
   if (/\p{Surrogate}/u.test(value))
     throw new Error('No se permiten caracteres Unicode incompletos.');
   return value;

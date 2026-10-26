@@ -1,5 +1,8 @@
 # Verificación de Backups: bloque 2, Configuraciones
 
+Este documento registra la entrega del bloque 2. La entrega actual, bloque 3,
+está documentada en [health.verification.md](health.verification.md).
+
 Fecha: 26 de octubre de 2026. Node 24.15.0 (`.nvmrc`), Playwright 1.59.1
 con Chromium existente. Validación humana pendiente.
 

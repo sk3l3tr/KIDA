@@ -34,7 +34,7 @@
     >
       <div class="section-header">
         <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
-        <button class="secondary" (click)="refresh()" [disabled]="loading() || busy()">
+        <button class="secondary" (click)="refresh()" [disabled]="operationsBlocked()">
           Actualizar configuraciones
         </button>
       </div>
@@ -65,14 +65,14 @@
                 class="secondary"
                 (click)="select(job.id)"
                 [attr.aria-pressed]="selectedId() === job.id"
-                [disabled]="loading() || busy()"
+                [disabled]="operationsBlocked()"
                 [attr.aria-label]="'Ver configuración ' + job.name"
               >
                 Ver detalles
               </button>
               <button
                 (click)="prepare('run', job)"
-                [disabled]="loading() || busy()"
+                [disabled]="operationsBlocked()"
                 [attr.aria-label]="'Solicitar backup ' + job.name"
               >
                 Solicitar backup
@@ -80,7 +80,7 @@
               <button
                 class="danger"
                 (click)="prepare('delete', job)"
-                [disabled]="loading() || busy()"
+                [disabled]="operationsBlocked()"
                 [attr.aria-label]="'Eliminar configuración ' + job.name"
               >
                 Eliminar
@@ -136,7 +136,7 @@
       <p>CORE valida las reglas de dominio. Las rutas pertenecen al servidor CORE.</p>
       @if (active()) {
         <form (ngSubmit)="create()">
-          <fieldset [disabled]="loading() || busy()">
+          <fieldset [disabled]="operationsBlocked()">
             <legend>Configuración del backup</legend>
             <label for="backup-name">Nombre</label
             ><input
@@ -313,7 +313,17 @@
     <section class="panel" aria-labelledby="backup-health-heading">
       <h2 id="backup-health-heading">Backup Health</h2>
       <p>Consulta y gestiona las comprobaciones de recuperación de las copias de seguridad.</p>
-      <p>Funcionalidad pendiente de implementar.</p>
+      @if (active()) {
+        @defer (on immediate) {
+          <app-backup-health [state]="health" />
+        } @placeholder {
+          <p>Cargando interfaz de Health…</p>
+        } @error {
+          <p class="error" role="alert">
+            No se pudo cargar la interfaz de Health. Vuelve a entrar en Backups.
+          </p>
+        }
+      }
     </section>
     <section class="panel" aria-labelledby="backup-reports-heading">
       <h2 id="backup-reports-heading">Informes</h2>

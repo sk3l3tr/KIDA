@@ -66,6 +66,7 @@ const job = {
             });
           assert.ok(url.pathname.startsWith('/api/backup/'), `Unexpected API: ${url.pathname}`);
           if (request.method() === 'GET') {
+            if (url.pathname === '/api/backup/health') return route.fulfill({ json: [] });
             assert.equal(url.pathname, '/api/backup/config');
             reads.push(url.pathname);
             if (expire) {

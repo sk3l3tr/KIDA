@@ -1,0 +1,203 @@
+@let health = state();
+<p>El diagnóstico técnico requiere validación funcional del administrador.</p>
+@for (message of health.uncertainties(); track $index) {
+  <p class="error" role="alert">{{ message }}</p>
+}
+@if (health.error()) {
+  <p class="error" role="alert">{{ health.error() }}</p>
+}
+@if (health.result(); as response) {
+  <div class="success" role="status">
+    <strong>Health creado. Crear no inicia la ejecución, tampoco en modo AUTOMATIC.</strong>
+    <p>run_id: {{ response.run_id }} · Estado devuelto por CORE: {{ response.state }}</p>
+    @if (limitedPrecision(response)) {
+      <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+    }
+    <details>
+      <summary>Respuesta de creación (JSON)</summary>
+      <pre>{{ response | json }}</pre>
+    </details>
+  </div>
+}
+<section aria-labelledby="health-history-heading" [attr.aria-busy]="health.loading()">
+  <div class="section-header">
+    <h3 id="health-history-heading">Historial de Health</h3>
+    <button
+      type="button"
+      class="secondary"
+      (click)="health.refresh()"
+      [disabled]="health.disabled()"
+    >
+      Actualizar historial Health
+    </button>
+  </div>
+  <div aria-live="polite">
+    @if (health.loading()) {
+      <p>Cargando historial Health…</p>
+    }
+    @if (health.updated()) {
+      <p>
+        Última actualización del historial: {{ health.updated() | date: 'medium' }} (hora local del
+        navegador).
+      </p>
+    }
+    @if (health.listError()) {
+      <p class="error" role="alert">
+        Error de actualización del historial: {{ health.listError() }}
+      </p>
+    }
+    @if (health.entries() !== null && (health.loading() || health.listError())) {
+      <p>Historial anterior, desactualizado; pendiente de actualizar.</p>
+    }
+    @if (health.entries()?.length === 0) {
+      <p>No hay ejecuciones de Health.</p>
+    }
+  </div>
+  <ul class="backup-list health-list">
+    @for (row of health.entries(); track row.run_id) {
+      <li>
+        <h4>{{ row.definition.name }}</h4>
+        <p>run_id: {{ row.run_id }}</p>
+        <p>
+          Modo: {{ row.mode }} · Estado: {{ row.state }} · Diagnóstico: {{ row.diagnosis.result }}
+        </p>
+        <p>Creado: {{ row.created_at }}</p>
+        <button
+          type="button"
+          class="secondary"
+          (click)="health.select(row.run_id)"
+          [attr.aria-label]="'Ver Health ' + row.run_id"
+          [attr.aria-pressed]="health.selectedId() === row.run_id"
+          [disabled]="health.disabled()"
+        >
+          Ver detalle Health
+        </button>
+      </li>
+    }
+  </ul>
+</section>
+@if (health.selectedId() !== null) {
+  <section aria-labelledby="health-detail-heading" [attr.aria-busy]="health.detailLoading()">
+    <h3 id="health-detail-heading">Detalle de Health: {{ health.selectedId() }}</h3>
+    <div aria-live="polite">
+      @if (health.detailLoading()) {
+        <p>Cargando detalle Health…</p>
+      }
+      @if (health.detailError()) {
+        <p class="error" role="alert">Error de detalle Health: {{ health.detailError() }}</p>
+      }
+      @if (
+        health.detail() &&
+        (health.loading() || health.detailLoading() || health.detailError() || health.listError())
+      ) {
+        <p>Detalle anterior, desactualizado; pendiente de actualizar.</p>
+      }
+      @if (health.detailUpdated()) {
+        <p>
+          Última actualización del detalle: {{ health.detailUpdated() | date: 'medium' }} (hora
+          local del navegador).
+        </p>
+      }
+    </div>
+    @if (health.detail(); as run) {
+      <p>run_id: {{ run.run_id }} · Modo: {{ run.mode }} · Estado: {{ run.state }}</p>
+      <p>
+        Definición: {{ run.definition.name }} ({{ run.definition.id }}) · Ruta en CORE:
+        {{ run.definition_path }}
+      </p>
+      <p>
+        Backup: {{ run.definition.backup.reference }} · Versión: {{ run.definition.backup.version }}
+      </p>
+      <p>
+        Creado: {{ run.created_at }} · Inicio:
+        {{ run.started_at === null ? 'null' : run.started_at }} · Fin:
+        {{ run.finished_at === null ? 'null' : run.finished_at }}
+      </p>
+      <h4>Diagnóstico</h4>
+      <p>
+        Resultado: {{ run.diagnosis.result }} · Completo: {{ run.diagnosis.complete ? 'Sí' : 'No' }}
+      </p>
+      <p>{{ run.diagnosis.summary }}</p>
+      <h5>Diagnóstico por servicio</h5>
+      <pre>{{ run.diagnosis.services | json }}</pre>
+      <h5>Anomalías</h5>
+      <pre>{{ run.diagnosis.anomalies | json }}</pre>
+      <h4>Evidencias</h4>
+      @if (run.diagnosis.evidence.length === 0) {
+        <p>Sin evidencias registradas.</p>
+      }
+      @for (evidence of run.diagnosis.evidence; track $index) {
+        <p>
+          {{ evidence.observed_at }} · Servicio:
+          {{ evidence.service === null ? 'null' : evidence.service }} · Contenedor:
+          {{ evidence.container_id === null ? 'null' : evidence.container_id }}
+        </p>
+        <p>{{ evidence.description }}</p>
+        <pre>{{ evidence.logs === null ? 'null' : evidence.logs }}</pre>
+      }
+      <h4>Artefacto</h4>
+      <pre>{{ run.artifact | json }}</pre>
+      <h4>Servicios y recursos registrados</h4>
+      <pre>{{ run.services | json }}</pre>
+      <pre>{{ run.resources | json }}</pre>
+      <h4>Proyecto y restauración</h4>
+      <p>
+        Compose: {{ run.compose_path }} · Checksum:
+        {{ run.compose_checksum === null ? 'null' : run.compose_checksum }}
+      </p>
+      <p>Directorio restaurado: {{ run.restore_dir }}</p>
+      <pre>{{ run.project | json }}</pre>
+      <h4>Limpieza</h4>
+      <p>Estado de limpieza: {{ run.cleanup.state }}</p>
+      <pre>{{ run.cleanup.errors | json }}</pre>
+      <p>
+        CORE decide la limpieza. Revisa los errores y recursos registrados; este detalle no
+        demuestra que se hayan eliminado.
+      </p>
+      <p>Ruta de informe: {{ run.report_path === null ? 'null' : run.report_path }}</p>
+      @if (limitedPrecision(run)) {
+        <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+      }
+      <details>
+        <summary>Ejecución completa (JSON)</summary>
+        <pre>{{ run | json }}</pre>
+      </details>
+    }
+    @if (health.selectedHistory(); as record) {
+      <h4>Procedencia disponible en el historial</h4>
+      <p>
+        Versión del registro: {{ record.record_version }} · Estado del informe:
+        {{ record.report_status }}
+      </p>
+      <pre>{{ record.restore_provenance | json }}</pre>
+      @if (limitedPrecision(record)) {
+        <p>
+          Precisión limitada: el registro contiene enteros fuera del rango seguro de JavaScript.
+        </p>
+      }
+      <details>
+        <summary>Registro de historial completo (JSON)</summary>
+        <pre>{{ record | json }}</pre>
+      </details>
+    } @else {
+      <p>Procedencia del historial no disponible para esta selección.</p>
+    }
+  </section>
+}
+<section aria-labelledby="health-create-heading">
+  <h3 id="health-create-heading">Crear Health</h3>
+  <p>Indica una definición existente en el host CORE. Console no abre ni sube ese fichero.</p>
+  <p>Crear no inicia la ejecución, tampoco en modo AUTOMATIC.</p>
+  <form (ngSubmit)="create()">
+    <fieldset [disabled]="health.disabled()">
+      <label for="health-definition">Ruta de definición en CORE</label>
+      <input id="health-definition" name="definition_path" [(ngModel)]="health.definitionPath" />
+      <label for="health-mode">Modo de Health</label>
+      <select id="health-mode" name="health_mode" [(ngModel)]="health.mode">
+        <option value="MANUAL">MANUAL</option>
+        <option value="AUTOMATIC">AUTOMATIC</option>
+      </select>
+      <button #createButton type="submit">Crear Health</button>
+    </fieldset>
+  </form>
+</section>

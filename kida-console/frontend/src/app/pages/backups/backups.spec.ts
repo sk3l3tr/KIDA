@@ -178,12 +178,15 @@ describe('Backups through real ARCA transport', () => {
     http = setup();
   });
   afterEach(() => http.verify());
-  it('registers four independent channels and preserves open read responses', () => {
+  it('registers seven independent channels and preserves open read responses', () => {
     expect(backupActions.map((a) => a.actionName)).toEqual([
       'BACKUP_CONFIG_LIST_REQUEST',
       'BACKUP_CONFIG_CREATE_REQUEST',
       'BACKUP_CONFIG_DELETE_REQUEST',
       'BACKUP_RUN_REQUEST',
+      'BACKUP_HEALTH_LIST_REQUEST',
+      'BACKUP_HEALTH_GET_REQUEST',
+      'BACKUP_HEALTH_CREATE_REQUEST',
     ]);
     for (const action of backupActions) expect(action.urlRequest?.useLoader).toBe(false);
     const next = vi.fn();
@@ -266,11 +269,15 @@ describe('Backups page', () => {
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
+  function enterPage(view: Backups) {
+    view.ionViewWillEnter();
+    http.expectOne(`${base}/health`).flush([]);
+  }
   function enter(data = [job]) {
     const fixture = TestBed.createComponent(Backups);
     fixture.detectChanges();
     const view = fixture.componentInstance;
-    view.ionViewWillEnter();
+    enterPage(view);
     http.expectOne(`${base}/config`).flush({ backups: data });
     fixture.detectChanges();
     view.form = validForm();
@@ -300,7 +307,7 @@ describe('Backups page', () => {
     const fixture = TestBed.createComponent(Backups);
     fixture.detectChanges();
     const view = fixture.componentInstance;
-    view.ionViewWillEnter();
+    enterPage(view);
     view.refresh();
     const r = http.expectOne(`${base}/config`);
     expect(view.loading()).toBe(true);
@@ -423,7 +430,7 @@ describe('Backups page', () => {
     expect(view.selectedId()).toBeNull();
     expect(view.pending()).toBeNull();
     http.expectNone(`${base}/run`);
-    view.ionViewWillEnter();
+    enterPage(view);
     http.expectOne(`${base}/config`).flush({ backups: [job] });
     view.prepare('delete', job);
     TestBed.inject(ThemeIdentity).clear();
@@ -449,7 +456,7 @@ describe('Backups page', () => {
       send();
       const first = http.expectOne(base + path);
       view.ionViewWillLeave();
-      view.ionViewWillEnter();
+      enterPage(view);
       http.expectOne(`${base}/config`).flush({ backups: [job] });
       view.form = validForm();
       send();
@@ -467,7 +474,7 @@ describe('Backups page', () => {
     view.refresh();
     const first = http.expectOne(`${base}/config`);
     view.ionViewWillLeave();
-    view.ionViewWillEnter();
+    enterPage(view);
     expect(view.listError()).toContain('pendiente');
     first.flush({ backups: [job] });
     expect(view.entries()).toBeNull();
@@ -533,7 +540,7 @@ describe('Backups page', () => {
     view.confirm();
     const first = http.expectOne(`${base}/run`);
     TestBed.inject(ThemeIdentity).begin();
-    view.ionViewWillEnter();
+    enterPage(view);
     http.expectOne(`${base}/config`).flush({ backups: [job] });
     view.prepare('run', job);
     view.confirm();
@@ -562,7 +569,7 @@ describe('Backups page', () => {
     expect(fixture.componentInstance.entries()).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.backup-list li').length).toBe(0);
     expect(fixture.nativeElement.querySelector('#backup-name')).toBeNull();
-    fixture.componentInstance.ionViewWillEnter();
+    enterPage(fixture.componentInstance);
     http.expectOne(`${base}/config`).flush({ backups: [] });
     fixture.changeDetectorRef.detectChanges();
     await fixture.whenStable();
