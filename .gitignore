@@ -29,3 +29,9 @@ kida-console/**/*.sqlite3
 kida-console/**/*.sqlite3-journal
 kida-console/**/*.sqlite3-wal
 kida-console/**/*.sqlite3-shm
+
+# MCPs
+.aws
+.serena
+.agents
+.codex
