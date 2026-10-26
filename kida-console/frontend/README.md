@@ -65,10 +65,36 @@ The root URL and unknown paths redirect to `/dashboard`.
 `/settings` contains the appearance gallery. `/administrators` retains account
 management. `/system` provides equipment information, health/sensors, RTC
 diagnostics and confirmed power actions. `/scheduler` manages CORE schedules;
-dashboard, Docker and backups retain their placeholders. See
+dashboard and backups retain their placeholders. `/docker` provides container listing
+and actions, Compose version, project listing and inspection. See
 [theme registration and validation](src/theme/README.md) and the portable
 [theming engine](src/lib/theming/README.md). Menu entries live in `src/app/arca-config/app.menu.config.ts`;
 route definitions live in `src/app/app.routes.ts`.
+
+## Docker
+
+`/docker` has two sections: containers and Compose. It loads on each Ionic entry;
+refresh buttons update each reading independently, without polling. Failed reads
+retain the last data and mark it stale; an initial failure is distinct from an empty
+inventory. Expand container details for dates, exit code, restarts, policy, ports,
+networks and interpreted JSON, including future fields. Null values remain unknown;
+unsafe JavaScript integers carry a precision warning.
+
+Start sends the full container ID directly. Stop, restart and delete require a
+keyboard-accessible confirmation with a frozen action/name/ID snapshot. Delete is
+irreversible. CORE decides whether an operation is valid regardless of online state
+or Compose membership. Observed Compose projects do not prove KIDA ownership.
+
+Only one write can run at a time. Successful writes show the requested action and
+CORE response separately from refresh failures, then reload containers and projects
+and reinspect the selected project if it still exists. Uncertain writes are never
+retried automatically: actions stay blocked until a container refresh succeeds.
+Leaving the page or changing session closes confirmations, clears state and ignores
+late responses. This does not cancel an operation already sent to CORE.
+
+The eight ARCA actions and typed service live in `src/app/pages/docker`, using the
+shared cookie/CSRF transport. See the [specification](docs/specs/docker-frontend.md)
+and [verification instructions](src/app/pages/docker/docker.verification.md).
 
 ## System
 

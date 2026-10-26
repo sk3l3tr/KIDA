@@ -1,11 +1,13 @@
 import { IactionDefinition, UrlRequestFormat, UrlRequestType } from 'arca';
 import { environment } from '../../environments/environment';
 import { systemActions } from '../pages/system/system.actions';
+import { dockerActions } from '../pages/docker/docker.actions';
 import { schedulerActions } from '../pages/scheduler/scheduler.actions';
 
 export const appActions: IactionDefinition[] = [
   ...systemActions,
   ...schedulerActions,
+  ...dockerActions,
   {
     actionName: 'ACCOUNTS_REQUEST',
     urlRequest: {
