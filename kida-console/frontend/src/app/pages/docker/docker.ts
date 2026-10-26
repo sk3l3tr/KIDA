@@ -1,9 +1,9 @@
+import { trapDialogFocus, restoreDialogFocus } from '../../services/dialog-focus';
 import {
   Component,
   ElementRef,
   Injector,
   OnDestroy,
-  afterNextRender,
   computed,
   inject,
   signal,
@@ -309,34 +309,16 @@ export class Docker implements OnDestroy {
     );
   }
   trapFocus(event: KeyboardEvent): void {
-    if (event.key !== 'Tab') return;
-    const buttons = this.dialog()?.nativeElement.querySelectorAll<HTMLButtonElement>('button');
-    if (!buttons?.length) return;
-    const first = buttons[0],
-      last = buttons[buttons.length - 1];
-    if (event.shiftKey && this.document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && this.document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    trapDialogFocus(event, this.dialog()?.nativeElement, this.document);
   }
   private restoreFocus(): void {
     const generation = this.generation;
     const trigger = this.trigger;
-    afterNextRender(
-      {
-        write: () => {
-          if (!this.active || generation !== this.generation) return;
-          const target =
-            trigger instanceof HTMLElement && trigger.isConnected && !trigger.matches(':disabled')
-              ? trigger
-              : this.heading()?.nativeElement;
-          target?.focus({ preventScroll: true });
-        },
-      },
-      { injector: this.injector },
+    restoreDialogFocus(
+      this.injector,
+      trigger,
+      () => this.heading()?.nativeElement,
+      () => this.active && generation === this.generation,
     );
   }
 }

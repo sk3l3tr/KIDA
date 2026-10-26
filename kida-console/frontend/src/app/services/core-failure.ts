@@ -48,3 +48,34 @@ export function classifyCoreFailure(failure: unknown, writing = false): CoreFail
   if (status === 422) return { kind: 'validation' };
   return { kind: code === 'core_error' ? 'rejected' : 'other', message };
 }
+
+export interface CoreFailureMessages {
+  uncertain: string;
+  validation: string;
+  rejected: 'error' | 'core';
+}
+
+/** Share presentation while keeping page-specific wording explicit. */
+export function formatCoreFailure(
+  failure: unknown,
+  writing: boolean,
+  messages: CoreFailureMessages,
+): string {
+  const { kind, message } = classifyCoreFailure(failure, writing);
+  if (kind === 'rejected' && messages.rejected === 'core')
+    return `CORE rechazó la operación: ${message ?? 'sin detalles'}`;
+  switch (kind) {
+    case 'busy':
+      return message;
+    case 'uncertain':
+      return messages.uncertain;
+    case 'unavailable':
+      return 'Sin conexión con el servidor o CORE.';
+    case 'expired':
+      return 'La sesión ha caducado.';
+    case 'validation':
+      return messages.validation;
+    default:
+      return message === undefined ? 'No se pudo completar la operación.' : `Error: ${message}`;
+  }
+}

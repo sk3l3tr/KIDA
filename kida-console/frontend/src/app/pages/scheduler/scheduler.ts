@@ -1,9 +1,9 @@
+import { trapDialogFocus, restoreDialogFocus } from '../../services/dialog-focus';
 import {
   Component,
   ElementRef,
   Injector,
   OnDestroy,
-  afterNextRender,
   inject,
   signal,
   viewChild,
@@ -147,18 +147,7 @@ export class Scheduler implements OnDestroy {
     }
   }
   trapFocus(event: KeyboardEvent): void {
-    if (event.key !== 'Tab') return;
-    const buttons = this.dialog()?.nativeElement.querySelectorAll<HTMLButtonElement>('button');
-    if (!buttons?.length) return;
-    const first = buttons[0],
-      last = buttons[buttons.length - 1];
-    if (event.shiftKey && this.document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && this.document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    trapDialogFocus(event, this.dialog()?.nativeElement, this.document);
   }
   cancel(): void {
     if (!this.pending()) return;
@@ -175,18 +164,11 @@ export class Scheduler implements OnDestroy {
     if (!this.active) return;
     const generation = this.generation;
     const trigger = this.trigger;
-    afterNextRender(
-      {
-        write: () => {
-          if (!this.active || generation !== this.generation) return;
-          const target =
-            trigger instanceof HTMLElement && trigger.isConnected && !trigger.matches(':disabled')
-              ? trigger
-              : this.listHeading()?.nativeElement;
-          target?.focus({ preventScroll: true });
-        },
-      },
-      { injector: this.injector },
+    restoreDialogFocus(
+      this.injector,
+      trigger,
+      () => this.listHeading()?.nativeElement,
+      () => this.active && generation === this.generation,
     );
   }
   confirm(): void {

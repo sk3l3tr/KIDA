@@ -1,3 +1,4 @@
+import { dockerFailure } from '../pages/docker/docker-presentation';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChannelBusyError } from './arca-request.service';
 import { classifyCoreFailure } from './core-failure';
@@ -51,5 +52,56 @@ describe('Shared CORE failure classification', () => {
     const plain = new HttpErrorResponse({ status: 403, error: { detail: 'CSRF rejected' } });
     expect(systemFailure(plain)).toBe('Error: CSRF rejected');
     expect(schedulerFailure(plain)).toBe('Error: CSRF rejected');
+  });
+});
+
+describe('Exact page failure messages', () => {
+  const pages = [
+    [
+      systemFailure,
+      'Ejecución incierta: no se pudo confirmar el resultado. Comprueba el estado del equipo antes de enviar otra acción.',
+      'Datos rechazados por el servidor. Revisa los parámetros y la hora local de CORE.',
+      'error',
+    ],
+    [
+      dockerFailure,
+      'No se pudo confirmar el resultado. No se reenviará automáticamente. Actualiza contenedores antes de realizar otra acción.',
+      'Validación HTTP: datos rechazados por el servidor.',
+      'core',
+    ],
+    [
+      schedulerFailure,
+      'No se pudo confirmar el resultado. Actualiza el listado antes de repetir',
+      'Validación HTTP: datos rechazados por el servidor. Revisa el formulario.',
+      'core',
+    ],
+  ] as const;
+
+  it.each(pages)('preserves all messages for %s', (format, uncertain, validation, rejection) => {
+    const busy = new ChannelBusyError();
+    expect(format(busy, true)).toBe(busy.message);
+    expect(format(failure(504), true)).toBe(uncertain);
+    expect(format(failure(0))).toBe('Sin conexión con el servidor o CORE.');
+    expect(format(failure(503, 'core_unavailable'), true)).toBe(
+      'Sin conexión con el servidor o CORE.',
+    );
+    expect(format(failure(401))).toBe('La sesión ha caducado.');
+    expect(format(failure(422))).toBe(validation);
+    expect(format({})).toBe('No se pudo completar la operación.');
+    for (const message of [undefined, '', '<b>reason</b>']) {
+      expect(format(failure(502, 'core_error', message), true)).toBe(
+        rejection === 'core'
+          ? `CORE rechazó la operación: ${message ?? 'sin detalles'}`
+          : message === undefined
+            ? 'No se pudo completar la operación.'
+            : `Error: ${message}`,
+      );
+      expect(format(failure(403, undefined, message))).toBe(
+        message === undefined ? 'No se pudo completar la operación.' : `Error: ${message}`,
+      );
+    }
+    expect(format(new HttpErrorResponse({ status: 403, error: { detail: 'CSRF rejected' } }))).toBe(
+      'Error: CSRF rejected',
+    );
   });
 });

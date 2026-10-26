@@ -1,4 +1,4 @@
-import { classifyCoreFailure } from '../../services/core-failure';
+import { formatCoreFailure } from '../../services/core-failure';
 import { OriginFilter, ScheduleRule } from './scheduler.models';
 
 export const originLabels: Record<OriginFilter, string> = {
@@ -32,21 +32,9 @@ export function ruleSummary(rule: ScheduleRule): string {
 }
 
 export function schedulerFailure(failure: unknown, writing = false): string {
-  const { kind, message } = classifyCoreFailure(failure, writing);
-  switch (kind) {
-    case 'busy':
-      return message;
-    case 'uncertain':
-      return 'No se pudo confirmar el resultado. Actualiza el listado antes de repetir';
-    case 'unavailable':
-      return 'Sin conexión con el servidor o CORE.';
-    case 'expired':
-      return 'La sesión ha caducado.';
-    case 'validation':
-      return 'Validación HTTP: datos rechazados por el servidor. Revisa el formulario.';
-    case 'rejected':
-      return `CORE rechazó la operación: ${message ?? 'sin detalles'}`;
-    default:
-      return message === undefined ? 'No se pudo completar la operación.' : `Error: ${message}`;
-  }
+  return formatCoreFailure(failure, writing, {
+    uncertain: 'No se pudo confirmar el resultado. Actualiza el listado antes de repetir',
+    validation: 'Validación HTTP: datos rechazados por el servidor. Revisa el formulario.',
+    rejected: 'core',
+  });
 }

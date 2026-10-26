@@ -1,4 +1,4 @@
-import { classifyCoreFailure } from '../../services/core-failure';
+import { formatCoreFailure } from '../../services/core-failure';
 
 // CORE may extend these objects. Keep unknown fields for presentation.
 export interface CoreFields {
@@ -74,19 +74,9 @@ export function cycleRequest(
 }
 
 export function systemFailure(failure: unknown, action = false): string {
-  const { kind, message } = classifyCoreFailure(failure, action);
-  switch (kind) {
-    case 'busy':
-      return message;
-    case 'uncertain':
-      return 'Ejecución incierta: no se pudo confirmar el resultado. Comprueba el estado del equipo antes de enviar otra acción.';
-    case 'unavailable':
-      return 'Sin conexión con el servidor o CORE.';
-    case 'expired':
-      return 'La sesión ha caducado.';
-    case 'validation':
-      return 'Datos rechazados por el servidor. Revisa los parámetros y la hora local de CORE.';
-    default:
-      return message === undefined ? 'No se pudo completar la operación.' : `Error: ${message}`;
-  }
+  return formatCoreFailure(failure, action, {
+    uncertain: 'Ejecución incierta: no se pudo confirmar el resultado. Comprueba el estado del equipo antes de enviar otra acción.',
+    validation: 'Datos rechazados por el servidor. Revisa los parámetros y la hora local de CORE.',
+    rejected: 'error',
+  });
 }
