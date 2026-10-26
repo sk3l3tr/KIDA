@@ -66,6 +66,7 @@ const job = {
             });
           assert.ok(url.pathname.startsWith('/api/backup/'), `Unexpected API: ${url.pathname}`);
           if (request.method() === 'GET') {
+            if (url.pathname === '/api/backup/health/reports') return route.fulfill({ json: [] });
             if (url.pathname === '/api/backup/health') return route.fulfill({ json: [] });
             assert.equal(url.pathname, '/api/backup/config');
             reads.push(url.pathname);
@@ -108,7 +109,7 @@ const job = {
         page.on('pageerror', (e) => errors.push(e.message));
         await page.goto(`${base}/backups`);
         const view = page.locator('app-backups'),
-          dialog = view.getByRole('dialog');
+          dialog = view.getByRole('dialog', { name: 'Confirmar operación de backup', exact: true });
         const refresh = view.getByRole('button', {
           name: 'Actualizar configuraciones',
           exact: true,

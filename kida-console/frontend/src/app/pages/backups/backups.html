@@ -328,7 +328,17 @@
     <section class="panel" aria-labelledby="backup-reports-heading">
       <h2 id="backup-reports-heading">Informes</h2>
       <p>Consulta los informes de las comprobaciones de Backup Health.</p>
-      <p>Funcionalidad pendiente de implementar.</p>
+      @if (active()) {
+        @defer (on immediate) {
+          <app-backup-reports [state]="reports" />
+        } @placeholder {
+          <p>Cargando interfaz de Informes…</p>
+        } @error {
+          <p class="error" role="alert">
+            No se pudo cargar la interfaz de Informes. Vuelve a entrar en Backups.
+          </p>
+        }
+      }
     </section>
   </div>
   <dialog

@@ -1,0 +1,120 @@
+@for (message of state().uncertainties(); track $index) {
+  <pre class="error" role="alert">{{ message }}</pre>
+}
+@if (state().error()) {
+  <p class="error" role="alert">{{ state().error() }}</p>
+}
+@if (state().result(); as response) {
+  <div class="success" role="status">
+    <strong>{{ state().resultLabel() }}</strong>
+    <pre>run_id: {{ response.run_id }}</pre>
+    <p>deleted: {{ response.deleted }}</p>
+    @if (limitedPrecision(response)) {
+      <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+    }
+    <details>
+      <summary>Respuesta de eliminación (JSON)</summary>
+      <pre>{{ response | json }}</pre>
+    </details>
+  </div>
+}
+<div class="section-header">
+  <h3 #listHeading tabindex="-1" id="backup-report-list-heading">Informes disponibles</h3>
+  <button class="secondary" (click)="state().refresh()" [disabled]="state().disabled()">
+    Actualizar informes
+  </button>
+</div>
+<div aria-live="polite" [attr.aria-busy]="state().loading()">
+  @if (state().loading()) {
+    <p>Cargando informes…</p>
+  }
+  @if (state().updated()) {
+    <p>
+      Última actualización: {{ state().updated() | date: 'medium' }} (hora local del navegador).
+    </p>
+  }
+  @if (state().listError()) {
+    <p class="error" role="alert">Error de actualización de informes: {{ state().listError() }}</p>
+  }
+  @if (state().entries() !== null && (state().loading() || state().listError())) {
+    <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
+  }
+  @if (state().entries()?.length === 0) {
+    <p>No hay informes de Health.</p>
+  }
+</div>
+<ul class="backup-list" aria-labelledby="backup-report-list-heading">
+  @for (id of state().entries(); track $index) {
+    <li>
+      <pre>run_id: {{ id }}</pre>
+      <div class="row-actions">
+        <button
+          class="secondary"
+          (click)="state().select(id)"
+          [disabled]="state().disabled()"
+          [attr.aria-pressed]="state().selectedId() === id"
+          [attr.aria-label]="'Ver informe ' + id"
+        >
+          Ver informe
+        </button>
+        <button
+          class="danger"
+          (click)="prepare(id)"
+          [disabled]="state().disabled()"
+          [attr.aria-label]="'Eliminar informe ' + id"
+        >
+          Eliminar informe
+        </button>
+      </div>
+    </li>
+  }
+</ul>
+@if (state().selectedId() !== null) {
+  <section
+    aria-labelledby="backup-report-detail-heading"
+    [attr.aria-busy]="state().detailLoading()"
+  >
+    <h3 id="backup-report-detail-heading">Informe: {{ state().selectedId() }}</h3>
+    @if (state().detailLoading()) {
+      <p>Cargando informe…</p>
+    }
+    @if (state().detailError()) {
+      <p class="error" role="alert">Error de consulta del informe: {{ state().detailError() }}</p>
+    }
+    @if (state().detail(); as report) {
+      @if (state().detailLoading() || state().detailError() || state().listError()) {
+        <p>Informe anterior, desactualizado; pendiente de actualizar.</p>
+      }
+      <p>
+        Última consulta: {{ state().detailUpdated() | date: 'medium' }} (hora local del navegador).
+      </p>
+      <p>Markdown mostrado como texto literal.</p>
+      <pre data-testid="report-markdown">{{ report.markdown }}</pre>
+      @if (limitedPrecision(report)) {
+        <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+      }
+      <details>
+        <summary>Informe completo (JSON)</summary>
+        <pre>{{ report | json }}</pre>
+      </details>
+    }
+  </section>
+}
+<dialog
+  class="console-dialog"
+  #confirmation
+  aria-labelledby="backup-report-confirm-title"
+  (cancel)="$event.preventDefault(); cancel()"
+  (keydown)="trapFocus($event)"
+>
+  <h2 id="backup-report-confirm-title">Confirmar eliminación de informe</h2>
+  @if (state().pending(); as operation) {
+    <p>Acción: Eliminar informe</p>
+    <pre>run_id: {{ operation.run_id }}</pre>
+    <p>Esta operación solicita a CORE eliminar el informe de Health.</p>
+  }
+  <div class="row-actions">
+    <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
+    <button class="danger" type="button" (click)="confirm()">Confirmar</button>
+  </div>
+</dialog>

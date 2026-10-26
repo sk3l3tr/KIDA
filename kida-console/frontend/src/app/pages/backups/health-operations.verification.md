@@ -1,5 +1,9 @@
 # Verificación de Backups: bloque 4, Operaciones Health
 
+Registro histórico del bloque 4. La entrega posterior de Informes se documenta en
+[`reports.verification.md`](reports.verification.md); sus resultados sustituyen
+el estado pendiente de Informes descrito al cerrar este bloque.
+
 Fecha: 26 de octubre de 2026. Node 24.15.0 (`.nvmrc`), Playwright 1.59.1
 con Chromium existente. Validación exclusivamente con API simulada; aceptación
 humana pendiente y operaciones reales sin verificar.

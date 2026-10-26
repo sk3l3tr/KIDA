@@ -468,7 +468,8 @@ temporales, TestClient, `httpx.MockTransport` y los casos compartidos de
 La vista `/backups` permite consultar configuraciones, seleccionar sus detalles,
 crear una configuración, eliminarla y solicitar su ejecución por ID. Carga al
 entrar y permite actualizar manualmente, sin sondeo periódico. También incluye
-Health con creación, inicio, ejecución automática, parada y eliminación; los informes siguen pendientes.
+Health con creación, inicio, ejecución automática, parada y eliminación, además de
+consulta y eliminación de informes.
 
 El formulario incluye orígenes y destinos con `required` y `filesystem_uuid`.
 Las opciones avanzadas permiten incluir lifecycle pre/post, parámetros y schedule
@@ -529,12 +530,37 @@ fallos de actualización. Las escrituras inciertas conservan avisos con acción 
 destino incluso tras refrescar o escribir después; no se repiten automáticamente.
 Actualizar el historial no resuelve la incertidumbre. El formulario automático
 conserva su ruta al cancelar o fallar y solo la limpia tras éxito confirmado.
-Configuraciones y Health comparten el bloqueo de operaciones para evitar
+Configuraciones, Health e Informes comparten el bloqueo de operaciones para evitar
 escrituras simultáneas, también mientras hay confirmación pendiente. Al salir o cambiar de sesión se descartan consumidores
 y se limpian datos y formularios, también en páginas cacheadas de Ionic.
 
 Pruebas y pasos de validación humana, exclusivamente con API simulada, en
 [`health-operations.verification.md`](frontend/src/app/pages/backups/health-operations.verification.md).
+
+### Informes en la interfaz
+
+La sección Informes lista los `run_id` disponibles al entrar y permite actualizar
+manualmente, consultar un informe y solicitar su eliminación. Markdown se muestra
+como texto literal, conservando espacios y saltos de línea; no se interpreta HTML
+ni se descargan artefactos. El JSON completo conserva campos adicionales y nulos.
+
+Eliminar requiere una confirmación local con el `run_id` exacto congelado antes
+de abrir el diálogo. Cancelar o Escape no envía peticiones. La confirmación y la
+operación bloquean los tres paneles; no se realizan cambios optimistas. La respuesta
+`{run_id,deleted}` se conserva separada del detalle, incluso si el informe desaparece.
+`deleted: false` se muestra sin afirmar que hubo eliminación. Tras una respuesta
+correcta se actualizan Informes y Health, incluido su detalle seleccionado, para
+consultar nuevamente el estado y ruta del informe.
+
+Los errores de lectura conservan los datos anteriores marcados como desactualizados.
+Una lectura correcta limpia la selección si desapareció. El resultado de escritura
+se distingue de fallos posteriores de actualización. La incertidumbre incluye acción
+y destino, persiste tras actualizar o escribir después y nunca produce reenvíos
+automáticos. Al salir o cambiar sesión se limpian datos, selecciones y diálogos,
+también en páginas cacheadas; se ignoran respuestas tardías.
+
+Pruebas, evidencias y pasos de validación humana, exclusivamente con API simulada, en
+[`reports.verification.md`](frontend/src/app/pages/backups/reports.verification.md).
 
 ### Contratos del backend
 

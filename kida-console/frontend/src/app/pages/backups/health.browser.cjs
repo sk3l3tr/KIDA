@@ -96,6 +96,7 @@ const remote = '<img src=x onerror="window.healthInjected=true">';
             }
             if (url.pathname === '/api/backup/config')
               return route.fulfill({ json: { backups: [config] } });
+            if (url.pathname === '/api/backup/health/reports') return route.fulfill({ json: [] });
             if (url.pathname === '/api/backup/health') {
               if (failHistory) {
                 failHistory = false;

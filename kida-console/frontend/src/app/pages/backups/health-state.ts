@@ -99,6 +99,10 @@ export class BackupHealthState {
   refresh(): void {
     if (!this.disabled()) this.loadHistory();
   }
+  /** Refresh affected metadata while Reports still owns the shared write lock. */
+  refreshAfterReportDelete(): void {
+    if (this.active() && !this.occupied()) this.loadHistory();
+  }
   private loadHistory(): void {
     const generation = this.generation;
     const current = () => this.active() && this.generation === generation;

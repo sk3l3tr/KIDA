@@ -21,6 +21,8 @@ import { BackupJob, PendingBackup, Queued } from './backups.models';
 import { createBody, emptyForm, newCommand, newTarget } from './backups-form';
 import { BackupHealthState } from './health-state';
 import { BackupHealth } from './health';
+import { BackupReportsState } from './reports-state';
+import { BackupReports } from './reports';
 import { limitedPrecision } from './backups-presentation';
 export { limitedPrecision } from './backups-presentation';
 import { BackupOptionalField } from './optional-field';
@@ -36,8 +38,16 @@ export function backupFailure(failure: unknown, writing = false): string {
 
 @Component({
   selector: 'app-backups',
-  imports: [IonContent, FormsModule, DatePipe, JsonPipe, BackupOptionalField, BackupHealth],
-  providers: [BackupHealthState],
+  imports: [
+    IonContent,
+    FormsModule,
+    DatePipe,
+    JsonPipe,
+    BackupOptionalField,
+    BackupHealth,
+    BackupReports,
+  ],
+  providers: [BackupHealthState, BackupReportsState],
   templateUrl: './backups.html',
   styleUrl: './backups.scss',
 })
@@ -50,8 +60,9 @@ export class Backups implements OnDestroy {
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmation');
   private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
   readonly health = inject(BackupHealthState);
+  readonly reports = inject(BackupReportsState);
   readonly operationsBlocked = computed(
-    () => this.loading() || this.busy() || this.health.occupied(),
+    () => this.loading() || this.busy() || this.health.occupied() || this.reports.occupied(),
   );
   readonly entries = signal<BackupJob[] | null>(null);
   readonly selectedId = signal<string | null>(null);
@@ -82,7 +93,11 @@ export class Backups implements OnDestroy {
     this.reset();
     this.active.set(true);
     this.refresh();
-    this.health.enter(() => this.loading() || this.busy());
+    this.health.enter(() => this.loading() || this.busy() || this.reports.occupied());
+    this.reports.enter(
+      () => this.loading() || this.busy() || this.health.occupied(),
+      () => this.health.refreshAfterReportDelete(),
+    );
   }
   ionViewWillLeave(): void {
     this.reset();
@@ -94,6 +109,7 @@ export class Backups implements OnDestroy {
   private reset(render = true): void {
     this.active.set(false);
     this.health.reset();
+    this.reports.reset();
     ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();

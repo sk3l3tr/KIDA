@@ -291,6 +291,7 @@ describe('Health basic state and page integration', () => {
     const fixture = TestBed.createComponent(Backups);
     fixture.detectChanges();
     fixture.componentInstance.ionViewWillEnter();
+    http.expectOne(`${base}/health/reports`).flush([]);
     http.expectOne(`${base}/config`).flush({ backups: [] });
     http.expectOne(`${base}/health`).flush(rows);
     return fixture;
@@ -304,6 +305,7 @@ describe('Health basic state and page integration', () => {
       page = fixture.componentInstance;
     fixture.detectChanges();
     page.ionViewWillEnter();
+    http.expectOne(`${base}/health/reports`).flush([]);
     page.health.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [] });
     expect(page.health.loading()).toBe(true);
@@ -502,6 +504,7 @@ describe('Health basic state and page integration', () => {
       const old = http.expectOne(url);
       page.ionViewWillLeave();
       page.ionViewWillEnter();
+      http.expectOne(`${base}/health/reports`).flush([]);
       http.expectOne(`${base}/config`).flush({ backups: [] });
       if (operation !== 'list') {
         http.expectOne(`${base}/health`).flush([record]);
@@ -526,6 +529,7 @@ describe('Health basic state and page integration', () => {
     const old = http.expectOne(`${base}/health/create`);
     TestBed.inject(ThemeIdentity).begin();
     page.ionViewWillEnter();
+    http.expectOne(`${base}/health/reports`).flush([]);
     http.expectOne(`${base}/config`).flush({ backups: [] });
     http.expectOne(`${base}/health`).flush([]);
     health.create();
@@ -758,6 +762,7 @@ describe('Health basic state and page integration', () => {
       const old = http.expectOne(`${base}/health/${action}`);
       page.ionViewWillLeave();
       page.ionViewWillEnter();
+      http.expectOne(`${base}/health/reports`).flush([]);
       http.expectOne(`${base}/config`).flush({ backups: [] });
       http.expectOne(`${base}/health`).flush([record]);
       selection(page);
@@ -766,6 +771,7 @@ describe('Health basic state and page integration', () => {
       http.expectNone(`${base}/health/${action}`);
       TestBed.inject(ThemeIdentity).begin();
       page.ionViewWillEnter();
+      http.expectOne(`${base}/health/reports`).flush([]);
       http.expectOne(`${base}/config`).flush({ backups: [] });
       http.expectOne(`${base}/health`).flush([record]);
       selection(page);
