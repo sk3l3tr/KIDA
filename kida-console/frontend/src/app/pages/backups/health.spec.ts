@@ -13,7 +13,7 @@ import { BackupsService } from './backups.service';
 import { Backups } from './backups';
 import { BackupHealth } from './health';
 import { healthBody, healthFailure } from './health-state';
-import { HealthExecution, HealthHistoryRecord } from './health.models';
+import { HealthAction, HealthExecution, HealthHistoryRecord } from './health.models';
 import { Observable } from 'rxjs';
 
 const base = `${environment.apiBaseUrl}/backup`;
@@ -70,6 +70,16 @@ const record: HealthHistoryRecord = {
   },
   report_status: 'FUTURE_REPORT',
 };
+const operations = ['start', 'run', 'stop', 'delete'] as const;
+const admitted = {
+  run_id: run.run_id,
+  state: 'FUTURE_QUEUED',
+  execution_id: 'queue-id',
+  cleanup: null,
+  future: null,
+};
+const operationResponse = (action: HealthAction) =>
+  action === 'start' || action === 'run' ? admitted : run;
 const getUrl = (id = run.run_id) => `${base}/health/get?run_id=${encodeURIComponent(id)}`;
 function setup() {
   TestBed.configureTestingModule({
@@ -174,6 +184,72 @@ describe('Health basic contracts through ARCA', () => {
       expect(fresh).not.toHaveBeenCalled();
       second.flush(data);
       expect(fresh).toHaveBeenCalledWith(data);
+    },
+  );
+  it.each(operations)(
+    'sends %s with exact body, cookie/CSRF and an open response on an independent channel',
+    (action) => {
+      TestBed.inject(AuthService).csrfToken.set('operations-csrf');
+      const service = TestBed.inject(BackupsService);
+      const send = (): Observable<unknown> =>
+        action === 'run'
+          ? service.healthRun(' ./health/../automatic.toml ')
+          : action === 'start'
+            ? service.healthStart(run.run_id)
+            : action === 'stop'
+              ? service.healthStop(run.run_id)
+              : service.healthDelete(run.run_id);
+      const next = vi.fn();
+      send().subscribe(next);
+      const request = http.expectOne(`${base}/health/${action}`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.withCredentials).toBe(true);
+      expect(request.request.headers.get('X-CSRF-Token')).toBe('operations-csrf');
+      expect(request.request.body).toEqual(
+        action === 'run'
+          ? { definition_path: ' ./health/../automatic.toml ' }
+          : { run_id: run.run_id },
+      );
+      const data = operationResponse(action);
+      request.flush(data);
+      expect(next).toHaveBeenCalledWith(data);
+      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
+        expect(
+          TestBed.inject(ArcaActionsService).getDataSnapshot(
+            `BACKUP_HEALTH_${action.toUpperCase()}_${suffix}`,
+          ),
+        ).toBe('undefined');
+    },
+  );
+  it.each(operations)(
+    'drains abandoned %s, rejects busy reuse and isolates new sessions',
+    (action) => {
+      const service = TestBed.inject(BackupsService);
+      const send = (): Observable<unknown> =>
+        action === 'run'
+          ? service.healthRun('/a')
+          : action === 'start'
+            ? service.healthStart(run.run_id)
+            : action === 'stop'
+              ? service.healthStop(run.run_id)
+              : service.healthDelete(run.run_id);
+      const old = vi.fn(),
+        fresh = vi.fn(),
+        error = vi.fn();
+      const subscription = send().subscribe(old);
+      const first = http.expectOne(`${base}/health/${action}`);
+      subscription.unsubscribe();
+      send().subscribe({ error });
+      expect(error.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
+      http.expectNone(`${base}/health/${action}`);
+      TestBed.inject(ThemeIdentity).begin();
+      send().subscribe(fresh);
+      const second = http.expectOne(`${base}/health/${action}`);
+      first.flush(operationResponse(action));
+      expect(old).not.toHaveBeenCalled();
+      expect(fresh).not.toHaveBeenCalled();
+      second.flush(operationResponse(action));
+      expect(fresh).toHaveBeenCalledWith(operationResponse(action));
     },
   );
   it('validates mode and Unicode without interpreting host paths', () => {
@@ -462,6 +538,328 @@ describe('Health basic state and page integration', () => {
     http.expectOne(getUrl()).flush(run);
     expect(health.result()).toEqual(run);
   });
+  async function healthView() {
+    const page = enter().componentInstance;
+    selection(page);
+    const fixture = TestBed.createComponent(BackupHealth);
+    fixture.componentRef.setInput('state', page.health);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    return { page, health: page.health, fixture, component: fixture.componentInstance };
+  }
+  it.each(operations)(
+    'freezes %s, locks both panels, cancels, confirms once and refreshes',
+    async (action) => {
+      const { page, health, fixture, component } = await healthView();
+      health.automaticPath = ' ./exact/../automatic.toml ';
+      component.prepare(action);
+      fixture.detectChanges();
+      const pending = health.pending();
+      expect(Object.isFrozen(pending)).toBe(true);
+      expect(pending?.target).toBe(
+        action === 'run' ? health.automaticPath : `${run.definition.name} (${run.run_id})`,
+      );
+      expect(health.disabled()).toBe(true);
+      page.prepare('run', { id: 'b', name: 'b' } as never);
+      page.create();
+      page.refresh();
+      health.create();
+      health.refresh();
+      health.select('other');
+      expect(page.pending()).toBeNull();
+      http.expectNone(`${base}/config/create`);
+      http.expectNone(`${base}/config`);
+      http.expectNone(`${base}/health/create`);
+      http.expectNone(`${base}/health`);
+      const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+      const event = new Event('cancel', { cancelable: true });
+      dialog.dispatchEvent(event);
+      fixture.detectChanges();
+      expect(event.defaultPrevented).toBe(true);
+      expect(dialog.open).toBe(false);
+      expect(health.pending()).toBeNull();
+      expect(health.automaticPath).toBe(' ./exact/../automatic.toml ');
+      http.expectNone(`${base}/health/${action}`);
+      component.prepare(action);
+      // Form/detail mutation after opening cannot change the captured target.
+      health.automaticPath = '/changed';
+      health.detail.set({
+        ...run,
+        run_id: 'changed',
+        definition: { ...run.definition, name: 'changed' },
+      });
+      fixture.detectChanges();
+      expect(dialog.textContent).toContain(pending!.target);
+      component.confirm();
+      component.confirm();
+      health.confirm();
+      const request = http.expectOne(`${base}/health/${action}`);
+      expect(request.request.body).toEqual(
+        action === 'run'
+          ? { definition_path: ' ./exact/../automatic.toml ' }
+          : { run_id: run.run_id },
+      );
+      expect(dialog.open).toBe(false);
+      request.flush(operationResponse(action));
+      expect(health.result()).toEqual(operationResponse(action));
+      if (action === 'run') expect(health.automaticPath).toBe('');
+      http.expectOne(`${base}/health`).flush([record]);
+      http.expectOne(getUrl()).flush(run);
+      expect(health.selectedId()).toBe(run.run_id);
+      expect(health.occupied()).toBe(false);
+      fixture.detectChanges();
+      const status = fixture.nativeElement.querySelector('[role="status"]').textContent;
+      expect(status).toContain(
+        action === 'start' || action === 'run' ? 'solicitud admitida' : 'Revisa cleanup',
+      );
+      if (action === 'start' || action === 'run') {
+        expect(status).toContain('queue-id');
+        expect(status).toContain('FUTURE_QUEUED');
+      }
+    },
+  );
+  it.each(operations)('fails closed when the %s dialog cannot open', async (action) => {
+    const { health, fixture, component } = await healthView();
+    vi.spyOn(fixture.nativeElement.querySelector('dialog'), 'showModal').mockImplementation(() => {
+      throw new Error();
+    });
+    health.automaticPath = '/keep';
+    component.prepare(action);
+    component.confirm();
+    expect(health.pending()).toBeNull();
+    expect(health.disabled()).toBe(false);
+    expect(health.error()).toContain('abrir la confirmación');
+    expect(health.automaticPath).toBe('/keep');
+    http.expectNone(`${base}/health/${action}`);
+  });
+  it.each(
+    operations.flatMap((action) =>
+      [422, 502, 503, 504, 0].map((status) => [action, status] as const),
+    ),
+  )(
+    'handles %s failure %s and preserves target, path and uncertainty through later writes',
+    async (action, status) => {
+      const { health, component } = await healthView();
+      health.automaticPath = ' /keep ';
+      component.prepare(action);
+      component.confirm();
+      const request = http.expectOne(`${base}/health/${action}`);
+      if (status === 0) request.error(new ProgressEvent('error'));
+      else
+        request.flush(
+          {
+            detail: {
+              code:
+                status === 502
+                  ? 'core_error'
+                  : status === 503
+                    ? 'core_unavailable'
+                    : status === 504
+                      ? 'core_timeout'
+                      : undefined,
+            },
+          },
+          { status, statusText: 'Failed' },
+        );
+      expect(health.automaticPath).toBe(' /keep ');
+      expect(health.result()).toBeNull();
+      expect(health.writing()).toBe(false);
+      expect(health.error() + health.uncertainties().join()).toContain(
+        status === 422
+          ? 'Validación'
+          : status === 502
+            ? 'CORE rechazó'
+            : status === 503
+              ? 'Sin conexión'
+              : 'No se pudo confirmar',
+      );
+      if (status === 504 || status === 0) {
+        const warning = health.uncertainties()[0];
+        expect(warning).toContain(
+          action === 'run' ? ' /keep ' : `${run.definition.name} (${run.run_id})`,
+        );
+        expect(warning).toContain(
+          action === 'run'
+            ? 'Ejecutar Health automático'
+            : action === 'start'
+              ? 'Iniciar Health'
+              : action === 'stop'
+                ? 'Detener Health'
+                : 'Eliminar Health',
+        );
+        health.refresh();
+        http.expectOne(`${base}/health`).flush([record]);
+        http.expectOne(getUrl()).flush(run);
+        health.create();
+        http.expectOne(`${base}/health/create`).flush(run);
+        http.expectOne(`${base}/health`).flush([record]);
+        http.expectOne(getUrl()).flush(run);
+        expect(health.uncertainties()).toEqual([warning]);
+      }
+      http.expectNone(`${base}/health/${action}`);
+    },
+  );
+  it.each(['start', 'run'] as const)(
+    'selects the returned %s ID independently from the queued execution ID',
+    async (action) => {
+      const { health, component } = await healthView();
+      component.prepare(action);
+      component.confirm();
+      http
+        .expectOne(`${base}/health/${action}`)
+        .flush({ ...admitted, run_id: 'returned-health', execution_id: 'different-queue-id' });
+      expect(health.selectedId()).toBe('returned-health');
+      expect(health.detail()).toBeNull();
+      http.expectOne(`${base}/health`).flush([{ ...record, run_id: 'returned-health' }]);
+      http.expectOne(getUrl('returned-health')).flush({ ...run, run_id: 'returned-health' });
+      expect(health.detail()?.run_id).toBe('returned-health');
+      expect(health.queuedResult()?.execution_id).toBe('different-queue-id');
+    },
+  );
+  it('keeps deletion response and cleanup after successful history removes selection', async () => {
+    const { health, fixture, component } = await healthView();
+    component.prepare('delete');
+    component.confirm();
+    http.expectOne(`${base}/health/delete`).flush(run);
+    http.expectOne(`${base}/health`).flush([]);
+    expect(health.selectedId()).toBeNull();
+    expect(health.detail()).toBeNull();
+    expect(health.result()).toEqual(run);
+    fixture.detectChanges();
+    const status = fixture.nativeElement.querySelector('[role="status"]').textContent;
+    expect(status).toContain('resource retained');
+    expect(status).toContain('kept-volume');
+    expect(status).toContain('ERROR');
+  });
+  it.each(operations)(
+    'keeps %s write success independent of a failed history read',
+    async (action) => {
+      const { health, component } = await healthView();
+      component.prepare(action);
+      component.confirm();
+      http.expectOne(`${base}/health/${action}`).flush(operationResponse(action));
+      http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
+      expect(health.result()).toEqual(operationResponse(action));
+      expect(health.listError()).not.toBe('');
+      expect(health.selectedId()).toBe(run.run_id);
+    },
+  );
+  it.each(operations)(
+    'ignores late %s across exit, busy re-entry and new session',
+    async (action) => {
+      const { page, health, component } = await healthView();
+      const send = () => {
+        health.prepare(action);
+        health.confirm();
+      };
+      component.prepare(action);
+      component.confirm();
+      const old = http.expectOne(`${base}/health/${action}`);
+      page.ionViewWillLeave();
+      page.ionViewWillEnter();
+      http.expectOne(`${base}/config`).flush({ backups: [] });
+      http.expectOne(`${base}/health`).flush([record]);
+      selection(page);
+      send();
+      expect(health.error()).toContain('pendiente');
+      http.expectNone(`${base}/health/${action}`);
+      TestBed.inject(ThemeIdentity).begin();
+      page.ionViewWillEnter();
+      http.expectOne(`${base}/config`).flush({ backups: [] });
+      http.expectOne(`${base}/health`).flush([record]);
+      selection(page);
+      send();
+      const fresh = http.expectOne(`${base}/health/${action}`);
+      old.flush(operationResponse(action));
+      expect(health.result()).toBeNull();
+      expect(health.writing()).toBe(true);
+      fresh.flush(operationResponse(action));
+      http.expectOne(`${base}/health`).flush([record]);
+      http.expectOne(getUrl()).flush(run);
+      expect(health.result()).toEqual(operationResponse(action));
+    },
+  );
+  it.each(['leave', 'session'] as const)(
+    'clears open confirmation on %s and never dispatches it later',
+    async (reason) => {
+      const { page, health, fixture, component } = await healthView();
+      health.automaticPath = '/private';
+      component.prepare('run');
+      fixture.detectChanges();
+      const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+      if (reason === 'leave') page.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).clear();
+      fixture.detectChanges();
+      expect(dialog.open).toBe(false);
+      expect(dialog.textContent).not.toContain('/private');
+      expect(health.pending()).toBeNull();
+      expect(health.automaticPath).toBe('');
+      component.confirm();
+      http.expectNone(`${base}/health/run`);
+    },
+  );
+  it('rejects invalid automatic Unicode without opening or dispatching', async () => {
+    const { health, fixture, component } = await healthView();
+    health.automaticPath = '\ud800';
+    component.prepare('run');
+    component.confirm();
+    expect(health.error()).toContain('Unicode');
+    expect(fixture.nativeElement.querySelector('dialog').open).toBe(false);
+    http.expectNone(`${base}/health/run`);
+  });
+  it.each([200, 502, 504])(
+    'traps dialog keyboard and restores operation focus after %s',
+    async (status) => {
+      const { health, fixture, component } = await healthView();
+      const trigger = [...fixture.nativeElement.querySelectorAll('button')].find(
+        (b: any) => b.textContent.trim() === 'Iniciar Health',
+      ) as HTMLButtonElement;
+      trigger.focus();
+      component.prepare('start');
+      fixture.detectChanges();
+      const buttons = fixture.nativeElement.querySelectorAll('dialog button');
+      expect(document.activeElement).toBe(buttons[0]);
+      buttons[0].dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      expect(document.activeElement).toBe(buttons[1]);
+      buttons[1].dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+      );
+      expect(document.activeElement).toBe(buttons[0]);
+      component.cancel();
+      TestBed.tick();
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(trigger);
+      component.prepare('start');
+      component.confirm();
+      fixture.detectChanges();
+      const request = http.expectOne(`${base}/health/start`);
+      if (status === 200) {
+        request.flush(admitted);
+        fixture.detectChanges();
+        http.expectOne(`${base}/health`).flush([record]);
+        http.expectOne(getUrl()).flush(run);
+      } else
+        request.flush(
+          { detail: { code: status === 502 ? 'core_error' : 'core_timeout' } },
+          { status, statusText: 'Failed' },
+        );
+      TestBed.tick();
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(
+        status === 200 ? fixture.nativeElement.querySelector('button[type="submit"]') : trigger,
+      );
+      expect(health.disabled()).toBe(false);
+    },
+  );
   it('renders safe details, cleanup, provenance and full JSON including future fields', async () => {
     const page = enter().componentInstance;
     selection(page);
@@ -537,6 +935,13 @@ describe('Health basic state and page integration', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await fixture.whenStable();
     expect(page.health.definitionPath).toBe(' cached health ');
+    page.health.automaticPath = '/cached/automatic';
+    const healthComponent = fixture.debugElement.query(
+      (element) => element.componentInstance instanceof BackupHealth,
+    ).componentInstance as BackupHealth;
+    healthComponent.prepare('run');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-backup-health dialog').open).toBe(true);
     fixture.changeDetectorRef.detach();
     TestBed.inject(ThemeIdentity).clear();
     await fixture.whenStable();
@@ -544,6 +949,8 @@ describe('Health basic state and page integration', () => {
     expect(page.health.detail()).toBeNull();
     expect(page.health.selectedId()).toBeNull();
     expect(page.health.definitionPath).toBe('');
+    expect(page.health.automaticPath).toBe('');
+    expect(page.health.pending()).toBeNull();
     expect(fixture.nativeElement.querySelector('app-backup-health')).toBeNull();
   });
 });

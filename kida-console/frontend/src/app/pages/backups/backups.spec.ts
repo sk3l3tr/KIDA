@@ -178,7 +178,7 @@ describe('Backups through real ARCA transport', () => {
     http = setup();
   });
   afterEach(() => http.verify());
-  it('registers seven independent channels and preserves open read responses', () => {
+  it('registers eleven independent channels and preserves open read responses', () => {
     expect(backupActions.map((a) => a.actionName)).toEqual([
       'BACKUP_CONFIG_LIST_REQUEST',
       'BACKUP_CONFIG_CREATE_REQUEST',
@@ -187,6 +187,10 @@ describe('Backups through real ARCA transport', () => {
       'BACKUP_HEALTH_LIST_REQUEST',
       'BACKUP_HEALTH_GET_REQUEST',
       'BACKUP_HEALTH_CREATE_REQUEST',
+      'BACKUP_HEALTH_START_REQUEST',
+      'BACKUP_HEALTH_RUN_REQUEST',
+      'BACKUP_HEALTH_STOP_REQUEST',
+      'BACKUP_HEALTH_DELETE_REQUEST',
     ]);
     for (const action of backupActions) expect(action.urlRequest?.useLoader).toBe(false);
     const next = vi.fn();

@@ -8,13 +8,27 @@
 }
 @if (health.result(); as response) {
   <div class="success" role="status">
-    <strong>Health creado. Crear no inicia la ejecución, tampoco en modo AUTOMATIC.</strong>
+    <strong>{{ health.resultLabel() }}</strong>
     <p>run_id: {{ response.run_id }} · Estado devuelto por CORE: {{ response.state }}</p>
+    @if (health.queuedResult(); as admission) {
+      <p>execution_id (ejecución en cola): {{ admission.execution_id }}</p>
+      <p>run_id identifica Health; execution_id identifica la ejecución en cola.</p>
+    }
+    @if (health.cleanupResult(); as execution) {
+      <h4>Limpieza devuelta por CORE</h4>
+      <p>Estado de limpieza: {{ execution.cleanup.state }}</p>
+      <pre>{{ execution.cleanup.errors | json }}</pre>
+      <h4>Recursos registrados en la respuesta</h4>
+      <pre>{{ execution.resources | json }}</pre>
+      <p>
+        Revisa los errores y recursos registrados; la respuesta no demuestra que se hayan eliminado.
+      </p>
+    }
     @if (limitedPrecision(response)) {
       <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
     }
     <details>
-      <summary>Respuesta de creación (JSON)</summary>
+      <summary>Respuesta de escritura (JSON)</summary>
       <pre>{{ response | json }}</pre>
     </details>
   </div>
@@ -113,6 +127,28 @@
         {{ run.started_at === null ? 'null' : run.started_at }} · Fin:
         {{ run.finished_at === null ? 'null' : run.finished_at }}
       </p>
+      <div class="row-actions">
+        <button type="button" (click)="prepare('start')" [disabled]="health.disabled()">
+          Iniciar Health
+        </button>
+        <button
+          type="button"
+          class="secondary"
+          (click)="prepare('stop')"
+          [disabled]="health.disabled()"
+        >
+          Detener Health
+        </button>
+        <button
+          type="button"
+          class="danger"
+          (click)="prepare('delete')"
+          [disabled]="health.disabled()"
+        >
+          Eliminar Health
+        </button>
+      </div>
+      <p>CORE decide si la operación es válida para esta ejecución.</p>
       <h4>Diagnóstico</h4>
       <p>
         Resultado: {{ run.diagnosis.result }} · Completo: {{ run.diagnosis.complete ? 'Sí' : 'No' }}
@@ -201,3 +237,53 @@
     </fieldset>
   </form>
 </section>
+
+<section aria-labelledby="health-run-heading">
+  <h3 id="health-run-heading">Ejecutar Health automático</h3>
+  <p>
+    Solicita el flujo automático desde una definición existente en CORE. La admisión no confirma
+    finalización.
+  </p>
+  <form (ngSubmit)="prepare('run')">
+    <fieldset [disabled]="health.disabled()">
+      <label for="health-automatic-definition"
+        >Ruta de definición para ejecución automática en CORE</label
+      >
+      <input
+        id="health-automatic-definition"
+        name="automatic_definition_path"
+        [(ngModel)]="health.automaticPath"
+      />
+      <button type="submit">Ejecutar Health automático</button>
+    </fieldset>
+  </form>
+</section>
+<dialog
+  class="console-dialog"
+  #confirmation
+  aria-labelledby="health-confirm-title"
+  (cancel)="$event.preventDefault(); cancel()"
+  (keydown)="trapFocus($event)"
+>
+  <h2 id="health-confirm-title">Confirmar operación de Health</h2>
+  @if (health.pending(); as operation) {
+    <p>Acción: {{ operation.label }}</p>
+    <p>{{ operation.action === 'run' ? 'Ruta exacta en CORE' : 'Nombre y run_id' }}:</p>
+    <pre>{{ operation.target }}</pre>
+    @if (operation.action === 'start' || operation.action === 'run') {
+      <p>La admisión no confirma inicio ni finalización. run_id y execution_id son distintos.</p>
+    } @else {
+      <p>CORE decide la limpieza. Revisa cleanup, errores y recursos en la respuesta.</p>
+    }
+  }
+  <div class="row-actions">
+    <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
+    <button
+      type="button"
+      [class.danger]="health.pending()?.action === 'delete'"
+      (click)="confirm()"
+    >
+      Confirmar
+    </button>
+  </div>
+</dialog>

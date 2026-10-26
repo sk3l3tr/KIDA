@@ -117,10 +117,18 @@ const remote = '<img src=x onerror="window.healthInjected=true">';
             return route.fulfill({ json: details.get(id) });
           }
           assert.equal(request.method(), 'POST');
-          assert.equal(url.pathname, '/api/backup/health/create');
+          const action = url.pathname.split('/').at(-1);
+          assert.ok(['create', 'start', 'run', 'stop', 'delete'].includes(action));
           assert.equal(request.headers()['x-csrf-token'], 'health-csrf');
           const body = request.postDataJSON();
-          assert.deepEqual(Object.keys(body).sort(), ['definition_path', 'mode']);
+          assert.deepEqual(
+            Object.keys(body).sort(),
+            action === 'create'
+              ? ['definition_path', 'mode']
+              : action === 'run'
+                ? ['definition_path']
+                : ['run_id'],
+          );
           writes.push({ path: url.pathname, body });
           if (holdCreate) {
             holdCreate = false;
@@ -137,6 +145,41 @@ const remote = '<img src=x onerror="window.healthInjected=true">';
                 detail: { code: status === 502 ? 'core_error' : 'core_timeout', message: remote },
               },
             });
+          }
+          if (action !== 'create') {
+            const id = action === 'run' ? `automatic-${writes.length}` : body.run_id;
+            if (action === 'run') {
+              const automatic = {
+                ...structuredClone(run),
+                run_id: id,
+                definition_path: body.definition_path,
+                mode: 'AUTOMATIC',
+              };
+              details.set(id, automatic);
+              rows.push({
+                ...automatic,
+                record_version: 1,
+                report_status: 'PENDING',
+                restore_provenance: null,
+              });
+            }
+            assert.ok(details.has(id));
+            if (action === 'start' || action === 'run')
+              return route.fulfill({
+                json: {
+                  run_id: id,
+                  state: 'FUTURE_QUEUED',
+                  cleanup: null,
+                  execution_id: `queue-${writes.length}`,
+                  future: null,
+                },
+              });
+            const response = {
+              ...details.get(id),
+              cleanup: { state: 'ERROR', errors: ['resource retained'] },
+            };
+            if (action === 'delete') rows = rows.filter((row) => row.run_id !== id);
+            return route.fulfill({ json: response });
           }
           const created = {
             ...structuredClone(fixture.created),
@@ -225,7 +268,10 @@ const remote = '<img src=x onerror="window.healthInjected=true">';
         });
         // Snapshot, keyboard and theme changes in the existing configuration dialog.
         await view.getByRole('button', { name: 'Solicitar backup backup', exact: true }).click();
-        const dialog = view.getByRole('dialog');
+        const dialog = view.getByRole('dialog', {
+          name: 'Confirmar operación de backup',
+          exact: true,
+        });
         await dialog.waitFor();
         assert.ok(await submit.isDisabled());
         assert.equal(
@@ -346,6 +392,136 @@ const remote = '<img src=x onerror="window.healthInjected=true">';
         await idle();
         assert.ok(await warning.isVisible());
         assert.equal(writes.length, 5);
+        // Four Health operations: separate dialog, exact targets, future admission and retained cleanup.
+        const healthDialog = health.getByRole('dialog', {
+          name: 'Confirmar operación de Health',
+          exact: true,
+        });
+        const automaticInput = health.getByLabel(
+          'Ruta de definición para ejecución automática en CORE',
+          { exact: true },
+        );
+        const automaticSubmit = health.getByRole('button', {
+          name: 'Ejecutar Health automático',
+          exact: true,
+        });
+        const status = health.getByRole('status');
+        await select.click();
+        await idle();
+        const start = health.getByRole('button', { name: 'Iniciar Health', exact: true });
+        await start.click();
+        await healthDialog.waitFor();
+        assert.ok((await healthDialog.innerText()).includes(run.run_id));
+        assert.ok((await healthDialog.innerText()).includes(remote));
+        assert.ok(await configRefresh.isDisabled());
+        assert.ok(await automaticSubmit.isDisabled());
+        assert.equal(
+          await page.evaluate(() => document.activeElement?.textContent.trim()),
+          'Cancelar',
+        );
+        await page.keyboard.press('Shift+Tab');
+        assert.equal(
+          await page.evaluate(() => document.activeElement?.textContent.trim()),
+          'Confirmar',
+        );
+        await page.keyboard.press('Tab');
+        assert.equal(
+          await page.evaluate(() => document.activeElement?.textContent.trim()),
+          'Cancelar',
+        );
+        const dialogOverflow = await healthDialog.evaluate((d) => d.scrollWidth <= d.clientWidth);
+        assert.ok(dialogOverflow);
+        await page.screenshot({
+          path: `${output}/${theme}-${mode}-${mobile ? 'mobile' : 'desktop'}-health-dialog.png`,
+        });
+        await page.keyboard.press('Escape');
+        assert.equal(writes.length, 5);
+        await page.waitForFunction(
+          () => document.activeElement?.textContent.trim() === 'Iniciar Health',
+        );
+        await start.click();
+        holdCreate = true;
+        await healthDialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
+        await page.waitForFunction(
+          () => document.querySelector('app-backup-health .section-header button')?.disabled,
+        );
+        assert.ok(await configRefresh.isDisabled());
+        for (let attempt = 0; !releaseCreate && attempt < 100; attempt++)
+          await page.waitForTimeout(10);
+        assert.ok(releaseCreate);
+        releaseCreate();
+        releaseCreate = null;
+        await idle();
+        assert.deepEqual(writes[5], {
+          path: '/api/backup/health/start',
+          body: { run_id: run.run_id },
+        });
+        assert.ok((await status.innerText()).includes('solicitud admitida'));
+        assert.ok((await status.innerText()).includes('queue-6'));
+        assert.ok((await status.innerText()).includes('FUTURE_QUEUED'));
+        await automaticInput.fill(' ./health/../run.toml ');
+        await automaticSubmit.click();
+        await healthDialog.waitFor();
+        assert.ok((await healthDialog.innerText()).includes(' ./health/../run.toml '));
+        await healthDialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+        assert.equal(await automaticInput.inputValue(), ' ./health/../run.toml ');
+        assert.equal(writes.length, 6);
+        await automaticSubmit.click();
+        await healthDialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
+        await idle();
+        assert.deepEqual(writes[6], {
+          path: '/api/backup/health/run',
+          body: { definition_path: ' ./health/../run.toml ' },
+        });
+        assert.equal(await automaticInput.inputValue(), '');
+        assert.ok((await status.innerText()).includes('automatic-7'));
+        assert.ok((await status.innerText()).includes('queue-7'));
+        const stop = health.getByRole('button', { name: 'Detener Health', exact: true });
+        // Rejected and uncertain operations preserve the automatic form and never retry.
+        await automaticInput.fill(' /keep/failed.toml ');
+        for (const failure of [502, 504]) {
+          createFailure = failure;
+          await automaticSubmit.click();
+          await healthDialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
+          await idle();
+          assert.equal(await automaticInput.inputValue(), ' /keep/failed.toml ');
+          await health
+            .getByRole('alert')
+            .filter({
+              hasText:
+                failure === 502 ? 'CORE rechazó' : 'No se pudo confirmar el resultado de Health',
+            })
+            .waitFor();
+        }
+        const operationWarning = health
+          .getByRole('alert')
+          .filter({ hasText: 'No se pudo confirmar el resultado de Health' });
+        assert.ok(
+          (await operationWarning.textContent()).includes(
+            'Ejecutar Health automático:  /keep/failed.toml ',
+          ),
+        );
+        await stop.click();
+        await healthDialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
+        await idle();
+        assert.deepEqual(writes[9], {
+          path: '/api/backup/health/stop',
+          body: { run_id: 'automatic-7' },
+        });
+        assert.ok((await status.innerText()).includes('resource retained'));
+        await health.getByRole('button', { name: 'Eliminar Health', exact: true }).click();
+        await healthDialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
+        await idle();
+        assert.deepEqual(writes[10], {
+          path: '/api/backup/health/delete',
+          body: { run_id: 'automatic-7' },
+        });
+        assert.equal(await health.getByRole('heading', { name: /^Detalle de Health:/ }).count(), 0);
+        assert.ok((await status.innerText()).includes('resource retained'));
+        assert.ok((await status.innerText()).includes('retained-resource'));
+        assert.ok(await operationWarning.isVisible());
+        assert.ok(await warning.isVisible());
+        assert.equal(writes.length, 11);
         // Selection disappearance only clears on a successful fresh history response.
         rows = [];
         await refresh.click();

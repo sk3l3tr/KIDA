@@ -1,5 +1,8 @@
 # Verificación de Backups: bloque 3, Health básico
 
+Registro histórico del bloque 3. La entrega actual del bloque 4 está en
+[health-operations.verification.md](health-operations.verification.md).
+
 Fecha: 26 de octubre de 2026. Node 24.15.0 (`.nvmrc`), Playwright 1.59.1
 con Chromium existente. Validación humana pendiente.
 

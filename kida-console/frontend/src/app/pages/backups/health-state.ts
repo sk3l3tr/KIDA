@@ -1,9 +1,17 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Subscription, finalize } from 'rxjs';
+import { Observable, Subscription, finalize } from 'rxjs';
 import { classifyCoreFailure, formatCoreFailure } from '../../services/core-failure';
 import { BackupsService } from './backups.service';
 import { validString } from './backups-form';
-import { CreateHealth, HealthExecution, HealthHistoryRecord, HealthMode } from './health.models';
+import {
+  CreateHealth,
+  HealthExecution,
+  HealthHistoryRecord,
+  HealthMode,
+  HealthAction,
+  HealthQueued,
+  PendingHealth,
+} from './health.models';
 
 export function healthFailure(failure: unknown, writing = false): string {
   return formatCoreFailure(failure, writing, {
@@ -31,7 +39,9 @@ export class BackupHealthState {
   readonly loading = signal(false);
   readonly detailLoading = signal(false);
   readonly writing = signal(false);
-  readonly occupied = computed(() => this.loading() || this.detailLoading() || this.writing());
+  readonly occupied = computed(
+    () => this.loading() || this.detailLoading() || this.writing() || this.pending() !== null,
+  );
   readonly disabled = computed(() => !this.active() || this.occupied() || this.blocked());
   readonly listError = signal('');
   readonly detailError = signal('');
@@ -39,7 +49,12 @@ export class BackupHealthState {
   readonly uncertainties = signal<string[]>([]);
   readonly updated = signal<Date | null>(null);
   readonly detailUpdated = signal<Date | null>(null);
-  readonly result = signal<HealthExecution | null>(null);
+  readonly pending = signal<PendingHealth | null>(null);
+  readonly result = signal<HealthExecution | HealthQueued | null>(null);
+  readonly resultLabel = signal('');
+  readonly cleanupResult = signal<HealthExecution | null>(null);
+  readonly queuedResult = signal<HealthQueued | null>(null);
+  automaticPath = '';
   definitionPath = '';
   mode: HealthMode = 'MANUAL';
   private readonly active = signal(false);
@@ -68,6 +83,11 @@ export class BackupHealthState {
     this.uncertainties.set([]);
     this.updated.set(null);
     this.result.set(null);
+    this.cleanupResult.set(null);
+    this.queuedResult.set(null);
+    this.resultLabel.set('');
+    this.pending.set(null);
+    this.automaticPath = '';
     this.definitionPath = '';
     this.mode = 'MANUAL';
   }
@@ -153,37 +173,122 @@ export class BackupHealthState {
       this.error.set(failure instanceof Error ? failure.message : 'Formulario no válido.');
       return;
     }
+    this.write(
+      this.service.healthCreate(body),
+      'Crear Health',
+      `${body.definition_path} (${body.mode})`,
+      (result) => {
+        this.cleanupResult.set(result as HealthExecution);
+        this.definitionPath = '';
+        this.mode = 'MANUAL';
+        this.resultLabel.set(
+          'Health creado. Crear no inicia la ejecución, tampoco en modo AUTOMATIC.',
+        );
+        this.selectedId.set(result.run_id);
+        this.detail.set(result as HealthExecution);
+        this.detailUpdated.set(new Date());
+        this.detailError.set('');
+      },
+    );
+  }
+  prepare(action: HealthAction): boolean {
+    if (this.disabled()) return false;
+    this.error.set('');
+    const labels = {
+      start: 'Iniciar Health',
+      run: 'Ejecutar Health automático',
+      stop: 'Detener Health',
+      delete: 'Eliminar Health',
+    };
+    try {
+      const run = this.detail();
+      if (action !== 'run' && (!run || run.run_id !== this.selectedId())) return false;
+      const value = validString(action === 'run' ? this.automaticPath : run!.run_id);
+      this.pending.set(
+        Object.freeze({
+          action,
+          label: labels[action],
+          value,
+          target: action === 'run' ? value : `${run!.definition.name} (${value})`,
+        }),
+      );
+      return true;
+    } catch (failure) {
+      this.error.set(failure instanceof Error ? failure.message : 'Formulario no válido.');
+      return false;
+    }
+  }
+  cancel(): void {
+    this.pending.set(null);
+  }
+  confirm(): void {
+    const pending = this.pending();
+    if (!this.active() || !pending) return;
+    this.pending.set(null);
+    const { action, label, value, target } = pending;
+    const request =
+      action === 'run'
+        ? this.service.healthRun(value)
+        : action === 'start'
+          ? this.service.healthStart(value)
+          : action === 'stop'
+            ? this.service.healthStop(value)
+            : this.service.healthDelete(value);
+    this.write(request, label, target, (result) => {
+      if (action === 'start' || action === 'run') {
+        this.queuedResult.set(result as HealthQueued);
+        this.resultLabel.set(`${label}: solicitud admitida; no confirma inicio ni finalización.`);
+        if (action === 'run') this.automaticPath = '';
+        this.selectedId.set(result.run_id);
+        this.clearDetail();
+      } else {
+        this.cleanupResult.set(result as HealthExecution);
+        this.resultLabel.set(
+          `${label}: respuesta de CORE. Revisa cleanup, errores y recursos registrados.`,
+        );
+        this.selectedId.set(value);
+      }
+    });
+  }
+  private write(
+    request: Observable<HealthExecution | HealthQueued>,
+    action: string,
+    target: string,
+    onSuccess: (result: HealthExecution | HealthQueued) => void,
+  ): void {
     const generation = this.generation;
     const current = () => this.active() && this.generation === generation;
     this.writing.set(true);
+    this.error.set('');
     this.result.set(null);
+    this.cleanupResult.set(null);
+    this.queuedResult.set(null);
+    this.resultLabel.set('');
     this.subscriptions.add(
-      this.service
-        .healthCreate(body)
+      request
         .pipe(
           finalize(() => {
             if (current()) this.writing.set(false);
           }),
         )
         .subscribe({
-          next: (detail) => {
+          next: (result) => {
             if (!current()) return;
-            this.result.set(detail);
-            this.definitionPath = '';
-            this.mode = 'MANUAL';
-            this.selectedId.set(detail.run_id);
-            this.detail.set(detail);
-            this.detailUpdated.set(new Date());
-            this.detailError.set('');
+            this.result.set(result);
+            onSuccess(result);
             this.loadHistory();
           },
           error: (failure) => {
             if (!current()) return;
-            const message = healthFailure(failure, true);
-            if (classifyCoreFailure(failure, true).kind === 'uncertain')
+            const uncertain = classifyCoreFailure(failure, true).kind === 'uncertain';
+            const message =
+              action === 'Crear Health' || !uncertain
+                ? healthFailure(failure, true)
+                : 'No se pudo confirmar el resultado de Health. No se reenviará automáticamente. Actualizar el historial no resuelve esta incertidumbre.';
+            if (uncertain)
               this.uncertainties.update((previous) => [
                 ...previous,
-                `Crear Health: ${body.definition_path} (${body.mode}). ${message}`,
+                `${action}: ${target}. ${message}`,
               ]);
             else this.error.set(message);
           },

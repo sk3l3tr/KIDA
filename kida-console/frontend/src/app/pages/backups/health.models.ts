@@ -2,6 +2,18 @@
 interface CoreData {
   [key: string]: unknown;
 }
+export interface HealthQueued extends CoreData {
+  run_id: string;
+  state: string;
+  execution_id: string;
+}
+export type HealthAction = 'start' | 'run' | 'stop' | 'delete';
+export interface PendingHealth {
+  readonly action: HealthAction;
+  readonly label: string;
+  readonly value: string;
+  readonly target: string;
+}
 export type HealthMode = 'AUTOMATIC' | 'MANUAL';
 export interface CreateHealth {
   definition_path: string;

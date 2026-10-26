@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { ArcaRequestService } from '../../services/arca-request.service';
-import { CreateHealth, HealthExecution, HealthHistoryRecord } from './health.models';
+import { CreateHealth, HealthExecution, HealthHistoryRecord, HealthQueued } from './health.models';
 import { BackupJob, BackupsResponse, CreateBackup, Queued } from './backups.models';
 
 @Injectable({ providedIn: 'root' })
@@ -16,6 +16,18 @@ export class BackupsService {
   }
   healthCreate(body: CreateHealth) {
     return this.requests.request<HealthExecution>('BACKUP_HEALTH_CREATE', body);
+  }
+  healthStart(run_id: string) {
+    return this.requests.request<HealthQueued>('BACKUP_HEALTH_START', { run_id });
+  }
+  healthRun(definition_path: string) {
+    return this.requests.request<HealthQueued>('BACKUP_HEALTH_RUN', { definition_path });
+  }
+  healthStop(run_id: string) {
+    return this.requests.request<HealthExecution>('BACKUP_HEALTH_STOP', { run_id });
+  }
+  healthDelete(run_id: string) {
+    return this.requests.request<HealthExecution>('BACKUP_HEALTH_DELETE', { run_id });
   }
   list() {
     return this.requests.request<BackupsResponse>('BACKUP_CONFIG_LIST');

@@ -468,7 +468,7 @@ temporales, TestClient, `httpx.MockTransport` y los casos compartidos de
 La vista `/backups` permite consultar configuraciones, seleccionar sus detalles,
 crear una configuración, eliminarla y solicitar su ejecución por ID. Carga al
 entrar y permite actualizar manualmente, sin sondeo periódico. También incluye
-Health básico; las operaciones de Health y los informes siguen pendientes.
+Health con creación, inicio, ejecución automática, parada y eliminación; los informes siguen pendientes.
 
 El formulario incluye orígenes y destinos con `required` y `filesystem_uuid`.
 Las opciones avanzadas permiten incluir lifecycle pre/post, parámetros y schedule
@@ -493,7 +493,7 @@ La verificación automatizada usa exclusivamente API simulada. Resultados,
 comandos reproducibles y pasos de validación humana en
 [`backups.verification.md`](frontend/src/app/pages/backups/backups.verification.md).
 
-### Health básico en la interfaz
+### Health en la interfaz
 
 Backup Health permite listar el historial, seleccionar una ejecución por `run_id`
 y consultar su detalle. El historial aporta además procedencia de restauración,
@@ -508,18 +508,33 @@ Para crear Health, indicar una ruta de definición existente en el host CORE y
 seleccionar `MANUAL` o `AUTOMATIC`. Console transmite la ruta intacta y no abre
 ese fichero. **Crear no inicia la ejecución, tampoco en modo automático.**
 La respuesta identifica Health mediante `run_id`; no es un `execution_id` de cola.
-No hay controles de inicio, ejecución automática, parada o borrado en este bloque.
+El detalle permite **Iniciar Health**, **Detener Health** y **Eliminar Health**,
+sin restringirlos por estados conocidos: CORE decide su validez. El formulario
+separado **Ejecutar Health automático** envía únicamente `definition_path`, sin
+modo. Ambos formularios usan su propia ruta en CORE y conservan espacios y
+componentes de la ruta sin normalizarlos.
+
+Las cuatro operaciones requieren confirmación local de una instantánea de
+acción y destino: nombre/`run_id` o ruta exacta. Cancelar o Escape no envía nada.
+Iniciar y ejecutar devuelven admisión `{run_id,state,execution_id}`; se distinguen
+los identificadores y no se afirma inicio ni finalización. Tras éxito se refrescan
+historial y detalle, seleccionando el `run_id` devuelto para inicio/ejecución.
+Una lectura correcta limpia la selección si ya no existe. Detener/eliminar
+conservan su respuesta completa, `cleanup`, errores y recursos registrados aunque
+la ejecución desaparezca del historial; la respuesta no prueba limpieza efectiva.
 
 La carga es al entrar y bajo actualización manual, sin sondeo. Se conserva la
 última lectura ante errores; el éxito de creación se muestra separado de los
-fallos de actualización. Una creación incierta conserva su aviso y formulario y
-no se repite automáticamente; actualizar el historial no resuelve la incertidumbre.
+fallos de actualización. Las escrituras inciertas conservan avisos con acción y
+destino incluso tras refrescar o escribir después; no se repiten automáticamente.
+Actualizar el historial no resuelve la incertidumbre. El formulario automático
+conserva su ruta al cancelar o fallar y solo la limpia tras éxito confirmado.
 Configuraciones y Health comparten el bloqueo de operaciones para evitar
-escrituras simultáneas. Al salir o cambiar de sesión se descartan consumidores
+escrituras simultáneas, también mientras hay confirmación pendiente. Al salir o cambiar de sesión se descartan consumidores
 y se limpian datos y formularios, también en páginas cacheadas de Ionic.
 
 Pruebas y pasos de validación humana, exclusivamente con API simulada, en
-[`health.verification.md`](frontend/src/app/pages/backups/health.verification.md).
+[`health-operations.verification.md`](frontend/src/app/pages/backups/health-operations.verification.md).
 
 ### Contratos del backend
 
