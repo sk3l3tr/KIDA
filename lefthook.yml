@@ -1,0 +1,25 @@
+min_version: 2.2.2
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: security
+      script: gitleaks.sh
+      runner: bash
+      use_stdin: true
+
+    - name: format
+      files: git ls-files -- Cargo.toml
+      run: test -f {files} && cargo fmt --all -- --check
+
+    - name: rust-quality
+      group:
+        piped: true
+        jobs:
+          - name: clippy
+            files: git ls-files -- Cargo.toml
+            run: test -f {files} && cargo clippy --workspace --all-targets --locked -- -D warnings
+
+          - name: tests
+            files: git ls-files -- Cargo.toml
+            run: test -f {files} && cargo test --workspace --locked
