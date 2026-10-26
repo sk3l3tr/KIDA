@@ -1,3 +1,5 @@
+@use './theme/controls';
+
 :root {
   font-family: var(--kida-font);
   color: var(--ion-text-color);
@@ -52,8 +54,7 @@ app-root arca-core > arca-footer.footer {
     box-shadow: inset 3px 0 var(--ion-color-primary);
   }
 }
-button,
-input {
+button {
   font: inherit;
 }
 h1 {
@@ -98,14 +99,7 @@ button.danger {
   color: var(--ion-color-danger-contrast);
 }
 input {
-  display: block;
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--ion-border-color);
-  border-radius: 0.4rem;
-  padding: 0.65rem;
-  background: var(--ion-item-background);
-  color: var(--ion-text-color);
+  @include controls.native-control;
 }
 input:focus-visible,
 button:focus-visible,
@@ -251,7 +245,7 @@ h2,
 h3 {
   font-family: var(--kida-heading-font);
 }
-:is(button, input, fieldset, .panel, .login-card, .confirmation) {
+:is(button, fieldset, .panel, .login-card, .confirmation) {
   border-radius: var(--kida-radius);
   border-width: var(--kida-border-width);
 }

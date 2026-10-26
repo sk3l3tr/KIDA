@@ -1,7 +1,9 @@
 import { IactionDefinition, UrlRequestFormat, UrlRequestType } from 'arca';
 import { environment } from '../../environments/environment';
+import { schedulerActions } from '../pages/scheduler/scheduler.actions';
 
 export const appActions: IactionDefinition[] = [
+  ...schedulerActions,
   {
     actionName: 'ACCOUNTS_REQUEST',
     urlRequest: {

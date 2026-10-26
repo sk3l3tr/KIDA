@@ -62,10 +62,70 @@ opened with the header menu button. Each entry loads its standalone page lazily:
 The root URL and unknown paths redirect to `/dashboard`.
 
 `/settings` contains the appearance gallery. `/administrators` retains account
-management; the remaining pages keep their existing placeholders. See
+management. `/scheduler` manages CORE schedules; the other pages retain their
+existing placeholders. See
 [theme registration and validation](src/theme/README.md) and the portable
 [theming engine](src/lib/theming/README.md). Menu entries live in `src/app/arca-config/app.menu.config.ts`;
 route definitions live in `src/app/app.routes.ts`.
+
+## Scheduler
+
+`/scheduler` lets every authenticated administrator list, create and delete CORE
+schedules through three ARCA channels and `SchedulerService`. It loads on entry,
+refreshes manually and starts with the User origin filter. Failed refreshes keep
+stale entries and their original filter label. Unknown origins and future fields
+remain visible in text details; only `USER` entries offer deletion.
+`next_enqueue_at` means the next queue admission attempt, not execution or completion.
+
+Creation accepts an unmodified command and any JSON value, including null, arrays
+and scalars. Choose a browser-local date/time (seconds supported), positive integer
+interval, or cron expression plus IANA zone (initially UTC). Once dates are sent
+as RFC3339 UTC; nonexistent DST times are rejected, and repeated times use the
+first occurrence. Confirmation shows the local offset and UTC equivalent.
+CORE validates command eligibility, execution parameters, cron, zones and timing.
+
+Intervals are limited to `1..9007199254740991`, the JavaScript safe integer range,
+whereas the backend supports u64. JSON parameters use JavaScript numbers: non-finite
+values and unsafe integers are rejected; fractional values can round. No arbitrary
+precision library is used. Inputs are not silently trimmed or normalized.
+
+A native modal dialog renders a frozen independent snapshot through text bindings.
+Cancel sends nothing; confirm sends once. Writes are blocked during confirmation
+or another write, and while the list is loading. Deleting does not cancel already
+queued commands. A successful write remains successful if its refresh fails.
+Timeouts or lost write responses require refreshing the list before repeating;
+there are no automatic retries. Leaving or changing session clears form, data and
+confirmation. Already sent requests can continue; the shared adapter drains them.
+Forms and parameters are never persisted.
+
+The feature keeps API types in `scheduler.models.ts`, form validation and request
+snapshots in `scheduler-form.ts`, and labels, date formatting and error wording in
+`scheduler-presentation.ts`. The component consumes only `SchedulerService` for
+transport. `services/core-failure.ts` classifies the shared HTTP/CORE envelope for
+Scheduler and System while each page retains its own messages. ARCA channel
+registration and late-response draining are unchanged.
+
+Native controls and the modal surface reuse the app theme's `.console-control`
+and `.console-dialog` styles; layout stays in the page. Opening failures clear the
+confirmation lock without sending a write. After a write, focus is restored after
+the list refresh; if deletion removed the original button, focus moves to the list
+heading. Leaving or changing session invalidates scheduled focus restoration.
+
+Validation: `pnpm exec ng test --watch=false` and
+`pnpm exec ng build --configuration production`. Browser verification must use
+isolated mocked responses, never schedules against the regular CORE. The repeatable
+Playwright script is `src/app/pages/scheduler/scheduler.browser.cjs`. With a dev server
+on `http://127.0.0.1:4226`, run:
+
+```bash
+PLAYWRIGHT_MODULE=/path/to/existing/playwright CHROMIUM_PATH=/path/to/chromium \
+  node src/app/pages/scheduler/scheduler.browser.cjs
+```
+
+Both paths refer to existing installations; this adds no frontend dependencies.
+`SCHEDULER_TEST_URL` overrides the dev URL, and `SCHEDULER_TEST_OUTPUT` overrides
+`/tmp/kida-scheduler-evidence`. The script mocks every API request before navigation.
+See [recorded validation](src/app/pages/scheduler/scheduler.verification.md).
 
 ## Code scaffolding
 

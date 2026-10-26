@@ -1,5 +1,6 @@
 @use 'sass:color';
 @use 'sass:list';
+@use 'components';
 
 // Each palette is the single source for the app, Ionic and preview colours.
 $palettes: (
@@ -156,6 +157,7 @@ html[data-theme],
   --kida-radius: 0.75rem;
   --kida-border-width: 1px;
   --kida-space: 1.5rem;
+  --kida-overlay-backdrop: rgb(0 0 0 / 55%);
   --kida-shadow: 0 12px 40px #00000014;
   // Effects are composed into a shadow list, where `none` is invalid.
   --kida-effect: 0 0 0 0 transparent;

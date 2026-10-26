@@ -328,6 +328,34 @@ sesión. Las pruebas Docker usan TestClient, sesiones temporales y
 
 ## API SCHEDULER
 
+La página `/scheduler` permite a cualquier administrador autenticado listar, crear
+y eliminar programaciones con estas tres rutas. Carga al entrar y ofrece
+actualización manual; empieza por «Usuario», con filtros «Interno» y «Todos».
+Los fallos de actualización conservan los datos anteriores, marcados como
+desactualizados y con su filtro original. Solo `origin === 'USER'` ofrece borrado;
+los orígenes desconocidos y campos futuros se conservan en detalles de texto.
+
+La creación usa comando y editor JSON genéricos. Admite modalidad puntual con
+fecha local del navegador y segundos, intervalo positivo, o cron con zona IANA
+inicial `UTC`. La fecha puntual se convierte a RFC3339 UTC: se rechazan horas
+inexistentes por cambio horario y se usa la primera ocurrencia de horas repetidas.
+El diálogo muestra hora local, offset y UTC antes de confirmar. CORE conserva
+la validación de comandos programables, parámetros, cron, zonas y fechas.
+
+La UI limita intervalos a `1..9007199254740991`, frente al u64 del backend. Los
+parámetros aceptan cualquier JSON con números JavaScript: rechaza no finitos y
+enteros no seguros; los decimales pueden redondearse. No recorta ni normaliza
+comando, parámetros o cron. Crear y borrar requieren confirmación de una copia
+independiente e inmutable, renderizada como texto seguro. Cancelar no envía nada;
+confirmar envía una sola petición. No hay reintentos automáticos.
+
+Al salir o cambiar de sesión se descartan formulario, datos y confirmaciones,
+sin persistir parámetros; una petición enviada puede continuar. Un timeout o
+pérdida de respuesta indica «No se pudo confirmar el resultado. Actualiza el
+listado antes de repetir». El éxito de una escritura se conserva aunque falle
+su actualización posterior. No hay edición, ejecución inmediata, historial,
+formularios por comando ni sondeo periódico.
+
 El backend mapea los tres comandos públicos del scheduler al mismo CORE HTTP
 configurado para SYSTEM y DOCKER. Todos los administradores pueden utilizarlos;
 los POST requieren Origin permitido y el token CSRF vigente. Console no ejecuta

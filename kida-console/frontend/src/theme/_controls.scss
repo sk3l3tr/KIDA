@@ -1,0 +1,12 @@
+// Shared native form controls. Geometry and colours follow the active app theme.
+@mixin native-control {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem;
+  font: inherit;
+  color: var(--ion-text-color);
+  background: var(--ion-item-background);
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+}

@@ -52,6 +52,19 @@ from moving the scroll anchor; no route/component is recreated on selection.
 The only future extraction candidate is `src/lib/theming`. Catalog, CSS, previews,
 identity wiring, Ionic class adaptation and Settings remain application concerns.
 
+## Shared native controls and dialogs
+
+`_controls.scss` defines the native control mixin used by the application's existing
+inputs and by the opt-in `.console-control` class for selects and textareas.
+`_components.scss`, loaded by `themes.scss`, provides that class and the
+`.console-dialog` surface. Components keep their layout, widths and scrolling
+rules locally. These are application styles; the portable engine is unchanged.
+
+Both classes consume the existing Ionic/KIDA colour, typography, border, spacing
+and shadow tokens. Native dialog backdrops use `--kida-overlay-backdrop`, defined
+with the other structural theme tokens. Scheduler uses these classes; adding a new
+theme does not require editing its page stylesheet.
+
 ## Verification
 
 Use the Node version pinned by `.nvmrc`:

@@ -1,0 +1,21 @@
+@use 'controls';
+
+// Opt-in classes keep app presentation out of the portable theming engine.
+.console-control {
+  @include controls.native-control;
+}
+textarea.console-control {
+  resize: vertical;
+}
+.console-dialog {
+  padding: var(--kida-space);
+  font-family: var(--kida-font);
+  background: var(--ion-item-background);
+  color: var(--ion-text-color);
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  box-shadow: var(--kida-shadow), var(--kida-effect);
+}
+.console-dialog::backdrop {
+  background: var(--kida-overlay-backdrop);
+}

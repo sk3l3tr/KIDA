@@ -1,0 +1,52 @@
+.scheduler-layout {
+  padding-bottom: 3rem;
+}
+.section-header,
+.dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.section-header h2 {
+  margin: 0;
+}
+.schedule-list {
+  list-style: none;
+  padding: 0;
+}
+.schedule-list li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--ion-border-color);
+}
+.schedule-list button {
+  margin-top: 1rem;
+}
+p,
+h3,
+pre,
+summary {
+  overflow-wrap: anywhere;
+}
+pre {
+  white-space: pre-wrap;
+  max-height: 22rem;
+  overflow: auto;
+  font-size: 0.85rem;
+}
+summary {
+  cursor: pointer;
+  padding: 0.75rem 0;
+}
+form {
+  max-width: none;
+}
+fieldset {
+  margin-top: 0;
+}
+dialog {
+  width: min(36rem, 92vw);
+  max-height: 85dvh;
+  overflow: auto;
+}

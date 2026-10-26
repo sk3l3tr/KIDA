@@ -1,0 +1,221 @@
+<ion-content class="console-content">
+  <div class="console-layout scheduler-layout">
+    <div>
+      <span class="eyebrow">PROGRAMACIONES DE CORE</span>
+      <h1>Scheduler</h1>
+      <p>
+        Consulta, crea y elimina programaciones. Actualización al entrar y manual, sin sondeo
+        periódico.
+      </p>
+      <p>
+        Fechas locales del navegador: {{ zone }}. El próximo intento de admisión no garantiza el
+        inicio ni la finalización del comando.
+      </p>
+    </div>
+    <section class="panel" aria-label="Programaciones" [attr.aria-busy]="loading()">
+      <div class="section-header">
+        <h2 #listHeading tabindex="-1">Programaciones</h2>
+        <button class="secondary" (click)="refresh()" [disabled]="loading() || busy()">
+          Actualizar listado
+        </button>
+      </div>
+      <label for="scheduler-origin">Filtro de origen</label>
+      <select
+        class="console-control"
+        id="scheduler-origin"
+        [ngModel]="origin"
+        (ngModelChange)="selectOrigin($event)"
+        [attr.disabled]="loading() || busy() ? '' : null"
+      >
+        <option value="USER">Usuario</option>
+        <option value="INTERNAL">Interno</option>
+        <option value="ALL">Todos</option>
+      </select>
+      <div aria-live="polite">
+        @if (loading()) {
+          <p>Cargando…</p>
+        }
+        @if (updated()) {
+          <small
+            >Última actualización: {{ updated() | date: 'medium' }} ({{ zone }}). Instantánea; puede
+            estar desactualizada.</small
+          >
+        } @else {
+          <small>Sin actualización disponible.</small>
+        }
+        @if (listError()) {
+          <p class="error" role="alert">Error de actualización: {{ listError() }}</p>
+        }
+        @if (entries() !== null) {
+          <p>Origen de los datos visibles: {{ originLabels[visibleOrigin()!] }}.</p>
+          @if (listError() || loading()) {
+            <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
+          }
+          @if (entries()!.length === 0) {
+            <p>No hay programaciones para este filtro.</p>
+          }
+        }
+      </div>
+      <ul class="schedule-list">
+        @for (entry of entries(); track entry.id) {
+          <li>
+            <h3>{{ entry.command }}</h3>
+            <p>Identificador: {{ entry.id }}</p>
+            <p>
+              Origen:
+              {{
+                entry.origin === 'USER'
+                  ? 'Usuario'
+                  : entry.origin === 'INTERNAL'
+                    ? 'Interno'
+                    : entry.origin + ' (desconocido)'
+              }}
+            </p>
+            <p>{{ ruleSummary(entry.schedule) }}</p>
+            <p>Próximo intento de admisión: {{ localDate(entry.next_enqueue_at) }} · {{ zone }}</p>
+            <details>
+              <summary>Parámetros y datos originales</summary>
+              <pre>{{ entry | json }}</pre>
+            </details>
+            @if (entry.origin === 'USER') {
+              <button
+                class="danger"
+                (click)="prepareDelete(entry)"
+                [disabled]="busy() || loading()"
+                [attr.aria-label]="'Eliminar programación ' + entry.id"
+              >
+                Eliminar
+              </button>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+    <section class="panel" aria-label="Crear programación">
+      <h2>Crear programación</h2>
+      <p>
+        CORE valida si el comando es programable, sus parámetros, cron, zonas y restricciones
+        temporales.
+      </p>
+      <form (ngSubmit)="prepareAdd()">
+        <fieldset [disabled]="busy()">
+          <legend>Comando y programación</legend>
+          <label for="scheduler-command">Comando</label>
+          <input id="scheduler-command" name="command" [(ngModel)]="form.command" required />
+          <label for="scheduler-params">Parámetros JSON</label>
+          <textarea
+            class="console-control"
+            id="scheduler-params"
+            name="params"
+            [(ngModel)]="form.params"
+            rows="6"
+            required
+            spellcheck="false"
+            aria-describedby="json-help"
+          ></textarea>
+          <small id="json-help"
+            >Objetos, arrays, escalares o null. Números JavaScript: se rechazan valores no finitos y
+            enteros no seguros; los decimales pueden redondearse.</small
+          >
+          <label for="scheduler-mode">Modalidad</label>
+          <select class="console-control" id="scheduler-mode" name="mode" [(ngModel)]="form.mode">
+            <option value="once">Puntual</option>
+            <option value="interval">Intervalo</option>
+            <option value="cron">Cron</option>
+          </select>
+          @switch (form.mode) {
+            @case ('once') {
+              <label for="scheduler-local">Fecha y hora local ({{ zone }})</label>
+              <input
+                id="scheduler-local"
+                name="local"
+                type="datetime-local"
+                step="1"
+                [(ngModel)]="form.local"
+                required
+                aria-describedby="date-help"
+              />
+              <small id="date-help"
+                >Se envía en UTC. En horas repetidas se usa la primera ocurrencia; verás el offset
+                antes de confirmar. Las horas inexistentes por cambio horario se rechazan.</small
+              >
+            }
+            @case ('interval') {
+              <label for="scheduler-seconds">Intervalo en segundos</label>
+              <input
+                id="scheduler-seconds"
+                name="seconds"
+                [(ngModel)]="form.seconds"
+                inputmode="numeric"
+                required
+                aria-describedby="seconds-help"
+              />
+              <small id="seconds-help"
+                >Entero entre 1 y 9007199254740991. Esta página admite enteros seguros de
+                JavaScript; el backend acepta u64.</small
+              >
+            }
+            @case ('cron') {
+              <label for="scheduler-expression">Expresión cron</label>
+              <input
+                id="scheduler-expression"
+                name="expression"
+                [(ngModel)]="form.expression"
+                required
+              />
+              <label for="scheduler-timezone">Zona IANA</label>
+              <input id="scheduler-timezone" name="timezone" [(ngModel)]="form.timezone" required />
+            }
+          }
+        </fieldset>
+        <button type="submit" [disabled]="busy() || loading()">Crear programación</button>
+      </form>
+      <p>
+        Salir o cambiar de sesión descarta el formulario y las confirmaciones. Una petición enviada
+        puede seguir ejecutándose.
+      </p>
+      <div aria-live="polite">
+        @if (busy()) {
+          <p>Confirmación o acción pendiente…</p>
+        }
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+        @if (result() !== null) {
+          <h3 class="success">{{ resultLabel() }}</h3>
+          <details>
+            <summary>Resultado de CORE</summary>
+            <pre>{{ result() | json }}</pre>
+          </details>
+        }
+      </div>
+    </section>
+  </div>
+  <dialog
+    class="console-dialog"
+    #confirmation
+    aria-labelledby="scheduler-confirm-title"
+    (cancel)="$event.preventDefault(); cancel()"
+    (keydown)="trapFocus($event)"
+  >
+    <h2 id="scheduler-confirm-title">Confirmar programación</h2>
+    @if (pending(); as action) {
+      @if (action.action === 'add') {
+        <p>Crear: {{ action.body.command }}</p>
+        <pre>{{ action.body.params | json }}</pre>
+        <p>{{ ruleSummary(action.body.schedule) }}</p>
+      } @else {
+        <p>Eliminar: {{ action.entry.command }}</p>
+        <p>Identificador: {{ action.body.id }}</p>
+        <pre>{{ action.entry.params | json }}</pre>
+        <p>{{ ruleSummary(action.entry.schedule) }}</p>
+        <p>Eliminar la programación no cancela comandos ya encolados.</p>
+      }
+      <p>Zona local del navegador: {{ zone }}.</p>
+    }
+    <div class="dialog-buttons">
+      <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
+      <button type="button" (click)="confirm()">Confirmar</button>
+    </div>
+  </dialog>
+</ion-content>
