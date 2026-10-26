@@ -40,8 +40,9 @@ at `http://127.0.0.1:8000/api`. FastAPI allows CORS requests from
 API configuration lives in `src/environments/environment.ts` (production) and
 `src/environments/environment.development.ts` (development). Production uses `/api`
 as `apiBaseUrl`; development uses `http://127.0.0.1:8000/api`. Change the development
-base URL if the backend address changes. Add each new endpoint path, starting with `/`, to the `endpoints`
-catalog in both files, without repeating `/api`. Keep the base URL without a trailing `/`.
+base URL if the backend address changes. Keep the base URL without a trailing `/`.
+Authentication paths live in the `endpoints` catalog; System defines its paths
+in `src/app/pages/system/system.actions.ts`, registered in the central ARCA action list.
 Services import `environment` from `environment.ts`; Angular replaces it for development.
 
 `HealthService.getHealth()` returns an observable for `GET /api/health` with a
@@ -62,11 +63,40 @@ opened with the header menu button. Each entry loads its standalone page lazily:
 The root URL and unknown paths redirect to `/dashboard`.
 
 `/settings` contains the appearance gallery. `/administrators` retains account
-management. `/scheduler` manages CORE schedules; the other pages retain their
-existing placeholders. See
+management. `/system` provides equipment information, health/sensors, RTC
+diagnostics and confirmed power actions. `/scheduler` manages CORE schedules;
+dashboard, Docker and backups retain their placeholders. See
 [theme registration and validation](src/theme/README.md) and the portable
 [theming engine](src/lib/theming/README.md). Menu entries live in `src/app/arca-config/app.menu.config.ts`;
 route definitions live in `src/app/app.routes.ts`.
+
+## System
+
+The page loads its three queries on each Ionic entry and refreshes sections
+individually on demand. Each section keeps its own loading, error and last-update
+state. Values are snapshots; failed refreshes retain visibly stale data. Nulls,
+empty lists and future CORE fields remain visible. RTC diagnostics do not prove
+physical S5 wake support.
+
+Shutdown and reboot start at `+1` and accept `now`, `+N` minutes or a valid 24-hour
+time. Power cycle selects exactly one wake mode: `HH:MM` or an integer of at least
+120 seconds, plus optional shutdown `HH:MM`. The browser accepts only safe integer
+seconds (up to `9007199254740991`); FastAPI supports the wider u64 range. CORE
+validates server-local dates, margins and the relationship between shutdown and wake.
+
+An Ionic dialog freezes and summarizes the parameters before sending one action.
+Cancellation sends nothing. Lost responses/timeouts are shown as uncertain
+execution and never retried automatically. Check the machine before repeating.
+Leaving the page or changing session clears local results and confirmations;
+it does not cancel an action already sent to CORE.
+
+`SystemService` owns typed System calls; the page never handles ARCA channels.
+The shared `ArcaRequestService` also serves authentication, cleans retained
+payloads (including credentials), preserves null HTTP results and rejects
+simultaneous requests on one channel/session. Abandoned exchanges keep draining
+until their result arrives so a late response cannot satisfy a newer request.
+If reentry finds a pending channel, wait for completion and refresh manually.
+An HTTP exchange that never completes keeps that channel busy until session change.
 
 ## Scheduler
 

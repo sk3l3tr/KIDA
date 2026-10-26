@@ -1,0 +1,146 @@
+<ion-content class="console-content">
+  <main class="console-layout system-layout">
+    <div>
+      <span class="eyebrow">CONTROL DEL EQUIPO</span>
+      <h1>System</h1>
+      <p>Información y energía del servidor CORE. Actualización manual, sin sondeo periódico.</p>
+    </div>
+    @for (state of sections; track state.title) {
+      <section class="panel" [attr.aria-label]="state.title" [attr.aria-busy]="state.loading()">
+        <div class="section-header">
+          <h2>{{ state.title }}</h2>
+          <button class="secondary" (click)="refresh(state)" [disabled]="state.loading()">
+            Actualizar {{ state.title }}
+          </button>
+        </div>
+        <div aria-live="polite">
+          @if (state.loading()) {
+            <p>Cargando…</p>
+          }
+          @if (state.updated()) {
+            <small
+              >Última actualización: {{ state.updated() | date: 'medium' }}. Instantánea; puede
+              estar desactualizada.</small
+            >
+          } @else {
+            <small>Sin actualización disponible.</small>
+          }
+          @if (state.error()) {
+            <p class="error" role="alert">{{ state.error() }}</p>
+          }
+          @if (state.data() !== null) {
+            @if (state.error() || state.loading()) {
+              <p>Datos anteriores; pendientes de actualizar.</p>
+            }
+            <app-system-data [value]="state.data()" />
+          }
+        </div>
+        @if (state === wake) {
+          <p>
+            El diagnóstico RTC no demuestra que el hardware pueda encender desde S5. El encendido
+            físico debe verificarse en el equipo.
+          </p>
+        }
+      </section>
+    }
+    <section class="panel power-panel" aria-label="Energía">
+      <h2>Energía</h2>
+      <p>Las horas corresponden al servidor CORE. CORE validará las restricciones temporales.</p>
+      <p>
+        Salir de esta página descarta los resultados locales; una operación enviada puede seguir
+        ejecutándose.
+      </p>
+      <form (ngSubmit)="confirm('shutdown')">
+        <label for="power-when">Apagado o reinicio: cuándo</label>
+        <input
+          id="power-when"
+          name="when"
+          [(ngModel)]="when"
+          required
+          aria-describedby="when-help"
+        />
+        <small id="when-help"
+          >now, +N minutos o una hora válida de 24 horas. Valor inicial: +1.</small
+        >
+        @if (!validWhen(when)) {
+          <p class="error">Introduce now, +N o una hora válida.</p>
+        }
+        <div class="power-buttons">
+          <button class="danger" type="submit" [disabled]="busy() || !validWhen(when)">
+            Apagar
+          </button>
+          <button
+            class="secondary"
+            type="button"
+            (click)="confirm('reboot')"
+            [disabled]="busy() || !validWhen(when)"
+          >
+            Reiniciar
+          </button>
+        </div>
+      </form>
+      <form (ngSubmit)="confirm('powerCycle')">
+        <h3>Ciclo de energía</h3>
+        <fieldset>
+          <legend>Encendido: selecciona una modalidad</legend>
+          <label class="radio-label"
+            ><input type="radio" name="wakeMode" value="time" [(ngModel)]="wakeMode" /> Hora de
+            encendido</label
+          >
+          <label class="radio-label"
+            ><input type="radio" name="wakeMode" value="seconds" [(ngModel)]="wakeMode" /> Segundos
+            desde la ejecución</label
+          >
+        </fieldset>
+        @if (wakeMode === 'time') {
+          <label for="wake-time">Hora de encendido (HH:MM)</label>
+          <input
+            id="wake-time"
+            name="wakeTime"
+            [(ngModel)]="wakeTime"
+            placeholder="06:00"
+            inputmode="numeric"
+          />
+        } @else {
+          <label for="wake-seconds">Segundos hasta el encendido (mínimo 120)</label>
+          <input
+            id="wake-seconds"
+            name="wakeSeconds"
+            [(ngModel)]="wakeSeconds"
+            inputmode="numeric"
+          />
+        }
+        <label for="shutdown-time">Hora de apagado opcional (HH:MM)</label>
+        <input
+          id="shutdown-time"
+          name="shutdownTime"
+          [(ngModel)]="shutdownTime"
+          placeholder="23:00"
+          inputmode="numeric"
+        />
+        <small
+          >Sin hora de apagado se usa +1. El intervalo mínimo de encendido es de 120 segundos; CORE
+          valida la relación con el apagado.</small
+        >
+        @if (!cycleBody()) {
+          <p>Completa el encendido y, si la indicas, una hora de apagado válida.</p>
+        }
+        <button class="danger" type="submit" [disabled]="busy() || !cycleBody()">
+          Ciclo de energía
+        </button>
+      </form>
+      <div aria-live="polite">
+        @if (busy()) {
+          <p>Confirmación o acción pendiente…</p>
+        }
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        }
+        @if (result() !== null) {
+          <h3>Resultado: {{ resultLabel() }}</h3>
+          <app-system-data [value]="result()" />
+        }
+      </div>
+    </section>
+  </main>
+</ion-content>

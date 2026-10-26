@@ -177,6 +177,26 @@ CSRF, límites de intentos, unicidad, cambios propios, revocación y eliminació
 concurrente. La aceptación en contenedor debe usar recursos desechables y
 comprobar también persistencia al recrearlo. No requiere operar sobre CORE.
 
+## Página System
+
+`/system` consulta equipo, memoria, discos, gráficos, salud/sensores y capacidades
+RTC al entrar. Cada sección tiene actualización manual, error y fecha propios;
+no hay sondeo periódico. Los datos anteriores se conservan al fallar una
+actualización y se identifican como desactualizados. Se muestran nulos, listas
+vacías y campos nuevos; el diagnóstico RTC no demuestra encendido físico desde S5.
+
+Apagado y reinicio admiten `now`, `+N` minutos u hora válida, con `+1` inicial.
+El ciclo de energía permite elegir hora `HH:MM` o segundos desde la ejecución
+(mínimo 120), y hora de apagado opcional. El frontal limita los segundos a enteros
+seguros de JavaScript; CORE valida fechas, zona horaria y márgenes del servidor.
+Cada acción exige un diálogo con parámetros congelados. Cancelar no envía nada;
+confirmar envía una sola petición. No se reintentan automáticamente las acciones.
+Ante ejecución incierta, comprobar el equipo antes de repetir.
+
+Salir descarta consumidores/resultados locales y cambiar de sesión invalida
+también las confirmaciones; una acción enviada puede seguir ejecutándose en CORE.
+Si al volver queda una consulta anterior pendiente, esperar y actualizar la sección.
+
 ## API SYSTEM
 
 El backend actúa como puente HTTP a un único CORE por despliegue. No ejecuta el

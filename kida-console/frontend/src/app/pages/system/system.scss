@@ -1,0 +1,27 @@
+.section-header,
+.power-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.section-header {
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.section-header h2 {
+  margin: 0;
+}
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.radio-label input {
+  width: 22px;
+  min-height: 22px;
+  accent-color: var(--ion-color-primary);
+}
+.system-layout {
+  padding-bottom: 3rem;
+}

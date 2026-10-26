@@ -1,23 +1,8 @@
 import { ThemeIdentity } from '../../theme/integration';
 import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import {
-  Observable,
-  EMPTY,
-  filter,
-  defer,
-  catchError,
-  finalize,
-  map,
-  merge,
-  of,
-  switchMap,
-  take,
-  takeUntil,
-  tap,
-  throwError,
-} from 'rxjs';
-import { ArcaRxService, ArcaService } from 'arca';
+import { Observable, EMPTY, defer, catchError, map, of, switchMap, tap, throwError } from 'rxjs';
+import { ArcaRequestService } from '../services/arca-request.service';
 
 export interface Account {
   id: number;
@@ -30,8 +15,7 @@ interface Session {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly arca = inject(ArcaService);
-  private readonly arcaRx = inject(ArcaRxService);
+  private readonly requests = inject(ArcaRequestService);
   private readonly router = inject(Router);
 
   private readonly themeIdentity = inject(ThemeIdentity);
@@ -117,46 +101,7 @@ export class AuthService {
   }
 
   private request<T>(action: string, body = {}): Observable<T> {
-    const request = `${action}_REQUEST`;
-    const response = `${action}_RESPONSE`;
-    const error = `${action}_ERROR`;
-    return new Observable<T>((subscriber) => {
-      const revision = this.themeIdentity.snapshot();
-      let settling = false;
-      // ARCA retains the last payload, so discard previous results before listening.
-      this.arca.actions.cleanActions([response, error]);
-      const subscription = merge(
-        // listenAction filters out null, including successful HTTP 204 responses.
-        this.arcaRx
-          .listen<T>(response)
-          .pipe(filter((value) => this.themeIdentity.acceptsResult(value, revision))),
-        this.arca.actions.listenAction(error).pipe(
-          filter((failure) => this.themeIdentity.acceptsResult(failure, revision)),
-          switchMap((failure) => throwError(() => failure)),
-        ),
-      )
-        .pipe(
-          take(1),
-          tap({
-            next: () => {
-              settling = true;
-            },
-            error: () => {
-              settling = true;
-            },
-          }),
-          takeUntil(this.themeIdentity.changes.pipe(filter(() => !settling))),
-          finalize(() => this.arca.actions.cleanActions([response, error])),
-        )
-        .subscribe(subscriber);
-      try {
-        this.arca.actions.dispatchAction(request, body);
-      } finally {
-        // Do not retain credentials in ARCA's action store.
-        this.arca.actions.cleanActions([request]);
-      }
-      return subscription;
-    });
+    return this.requests.request<T>(action, body);
   }
 
   private clear(): void {

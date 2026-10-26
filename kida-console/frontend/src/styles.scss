@@ -349,3 +349,26 @@ td {
 ion-content::part(scroll) {
   overflow-anchor: none;
 }
+
+ion-alert.system-confirmation {
+  --background: var(--ion-item-background);
+  --max-width: min(32rem, 92vw);
+  color: var(--ion-text-color);
+  font-family: var(--kida-font);
+  .alert-wrapper {
+    border: var(--kida-border-width) solid var(--ion-border-color);
+    border-radius: var(--kida-radius);
+    box-shadow: var(--kida-shadow), var(--kida-effect);
+  }
+  .alert-title,
+  .alert-message {
+    color: var(--ion-text-color);
+  }
+  .alert-button {
+    color: var(--ion-color-primary);
+    min-height: 44px;
+  }
+  .alert-button-role-confirm {
+    color: var(--ion-color-danger);
+  }
+}
