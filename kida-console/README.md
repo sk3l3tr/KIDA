@@ -463,6 +463,38 @@ temporales, TestClient, `httpx.MockTransport` y los casos compartidos de
 
 ## API BACKUPS
 
+### Configuraciones en la interfaz
+
+La vista `/backups` permite consultar configuraciones, seleccionar sus detalles,
+crear una configuración, eliminarla y solicitar su ejecución por ID. Carga al
+entrar y permite actualizar manualmente, sin sondeo periódico. Backup Health e
+Informes todavía están pendientes en el frontend.
+
+El formulario incluye orígenes y destinos con `required` y `filesystem_uuid`.
+Las opciones avanzadas permiten incluir lifecycle pre/post, parámetros y schedule
+en JSON y retention. Los campos anulables distinguen **Omitir**, **Valor** y
+**null explícito**. No se recortan las cadenas; CORE valida las reglas de dominio.
+Los JSON de entrada rechazan números no finitos y enteros fuera del rango seguro
+de JavaScript. Los detalles conservan campos futuros y nulos; si una respuesta
+contiene enteros fuera de ese rango, se avisa de precisión limitada.
+
+Solicitar un backup y eliminar una configuración requieren confirmación con
+nombre e ID. Eliminar una configuración no elimina archivos. `QUEUED` indica
+admisión y muestra `execution_id`; no confirma el inicio ni la finalización.
+Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.
+
+Ante una actualización fallida se conserva la última lectura y se marca como
+desactualizada. Un éxito de escritura se muestra separado de un fallo posterior
+de actualización. Un resultado incierto se conserva al refrescar y no se reenvía
+automáticamente: volver a listar configuraciones no confirma si se admitió un
+backup. Los datos se limpian al salir o cambiar de sesión.
+
+La verificación automatizada usa exclusivamente API simulada. Resultados,
+comandos reproducibles y pasos de validación humana en
+[`backups.verification.md`](frontend/src/app/pages/backups/backups.verification.md).
+
+### Contratos del backend
+
 Las 14 operaciones públicas de Backups utilizan el mismo puente HTTP y CORE
 configurado para SYSTEM. Todos los administradores pueden utilizarlas con sesión;
 los POST requieren Origin permitido y CSRF. Console no ejecuta el CLI ni abre,

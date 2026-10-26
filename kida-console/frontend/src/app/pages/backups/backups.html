@@ -3,13 +3,312 @@
     <div>
       <span class="eyebrow">COPIAS DE SEGURIDAD DE CORE</span>
       <h1>Backups</h1>
-      <p>Configuraciones, comprobaciones de recuperación e informes de copias de seguridad.</p>
-      <p>Esta vista está en preparación. Todavía no consulta datos ni permite realizar operaciones.</p>
+      <p>Consulta, crea y elimina configuraciones y solicita copias de seguridad en CORE.</p>
+      <p>Una solicitud admitida no confirma el inicio ni la finalización del backup.</p>
     </div>
-    <section class="panel" aria-labelledby="backup-configurations-heading">
-      <h2 id="backup-configurations-heading">Configuraciones</h2>
-      <p>Define los orígenes y destinos de las copias de seguridad y solicita su ejecución en CORE.</p>
-      <p>Funcionalidad pendiente de implementar.</p>
+    @for (message of uncertainties(); track $index) {
+      <div class="error" role="alert">{{ message }}</div>
+    }
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+    @if (result(); as response) {
+      <div class="success" role="status">
+        <strong>{{ resultLabel() }}</strong>
+        @if ('execution_id' in response) {
+          <p>execution_id: {{ response.execution_id }}</p>
+        }
+        @if (limitedPrecision(response)) {
+          <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+        }
+        <details>
+          <summary>Respuesta de CORE</summary>
+          <pre>{{ response | json }}</pre>
+        </details>
+      </div>
+    }
+    <section
+      class="panel"
+      aria-labelledby="backup-configurations-heading"
+      [attr.aria-busy]="loading()"
+    >
+      <div class="section-header">
+        <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
+        <button class="secondary" (click)="refresh()" [disabled]="loading() || busy()">
+          Actualizar configuraciones
+        </button>
+      </div>
+      <div aria-live="polite">
+        @if (loading()) {
+          <p>Cargando configuraciones…</p>
+        }
+        @if (updated()) {
+          <p>Última actualización: {{ updated() | date: 'medium' }} (hora local del navegador).</p>
+        }
+        @if (listError()) {
+          <p class="error" role="alert">Error de actualización: {{ listError() }}</p>
+        }
+        @if (entries() !== null && (loading() || listError())) {
+          <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
+        }
+        @if (entries()?.length === 0) {
+          <p>No hay configuraciones de backup.</p>
+        }
+      </div>
+      <ul class="backup-list">
+        @for (job of entries(); track job.id) {
+          <li>
+            <h3>{{ job.name }}</h3>
+            <p>ID: {{ job.id }}</p>
+            <div class="row-actions">
+              <button
+                class="secondary"
+                (click)="select(job.id)"
+                [attr.aria-pressed]="selectedId() === job.id"
+                [disabled]="loading() || busy()"
+                [attr.aria-label]="'Ver configuración ' + job.name"
+              >
+                Ver detalles
+              </button>
+              <button
+                (click)="prepare('run', job)"
+                [disabled]="loading() || busy()"
+                [attr.aria-label]="'Solicitar backup ' + job.name"
+              >
+                Solicitar backup
+              </button>
+              <button
+                class="danger"
+                (click)="prepare('delete', job)"
+                [disabled]="loading() || busy()"
+                [attr.aria-label]="'Eliminar configuración ' + job.name"
+              >
+                Eliminar
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+      @if (selected(); as job) {
+        <section aria-labelledby="backup-detail-heading">
+          <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
+          <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
+          <h4>Orígenes</h4>
+          <ul>
+            @for (source of job.sources; track $index) {
+              <li>{{ source }}</li>
+            }
+          </ul>
+          <h4>Destinos</h4>
+          <ul>
+            @for (target of job.targets; track $index) {
+              <li>
+                {{ target.path }} · Obligatorio: {{ target.required ? 'Sí' : 'No' }} · UUID:
+                {{
+                  target.filesystem_uuid === null
+                    ? 'null'
+                    : target.filesystem_uuid === undefined
+                      ? 'Omitido'
+                      : target.filesystem_uuid
+                }}
+              </li>
+            }
+          </ul>
+          <h4>Lifecycle</h4>
+          <pre>{{ job.lifecycle | json }}</pre>
+          <h4>Schedule</h4>
+          <pre>{{ job.schedule === undefined ? 'Omitido' : (job.schedule | json) }}</pre>
+          <h4>Retention</h4>
+          <pre>{{ job.retention === undefined ? 'Omitido' : (job.retention | json) }}</pre>
+          <p>Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.</p>
+          @if (limitedPrecision(job)) {
+            <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+          }
+          <details>
+            <summary>Configuración completa (JSON)</summary>
+            <pre>{{ job | json }}</pre>
+          </details>
+        </section>
+      }
+    </section>
+    <section class="panel" aria-labelledby="backup-create-heading">
+      <h2 id="backup-create-heading">Crear configuración</h2>
+      <p>CORE valida las reglas de dominio. Las rutas pertenecen al servidor CORE.</p>
+      @if (active()) {
+        <form (ngSubmit)="create()">
+          <fieldset [disabled]="loading() || busy()">
+            <legend>Configuración del backup</legend>
+            <label for="backup-name">Nombre</label
+            ><input
+              class="console-control"
+              id="backup-name"
+              name="backup-name"
+              [(ngModel)]="form.name"
+            />
+            <fieldset>
+              <legend>Orígenes</legend>
+              @for (source of form.sources; track source; let i = $index) {
+                <label
+                  >Origen {{ i + 1
+                  }}<input
+                    class="console-control"
+                    [(ngModel)]="source.path"
+                    [ngModelOptions]="{ standalone: true }"
+                /></label>
+                <button
+                  class="secondary"
+                  type="button"
+                  (click)="form.sources.splice(i, 1)"
+                  [attr.aria-label]="'Quitar origen ' + (i + 1)"
+                >
+                  Quitar origen
+                </button>
+              }
+              <button class="secondary" type="button" (click)="form.sources.push({ path: '' })">
+                Añadir origen
+              </button>
+            </fieldset>
+            <fieldset>
+              <legend>Destinos</legend>
+              @for (target of form.targets; track target; let i = $index) {
+                <fieldset>
+                  <legend>Destino {{ i + 1 }}</legend>
+                  <label
+                    >Ruta destino {{ i + 1
+                    }}<input
+                      class="console-control"
+                      [(ngModel)]="target.path"
+                      [ngModelOptions]="{ standalone: true }"
+                  /></label>
+                  <label
+                    ><input
+                      type="checkbox"
+                      [(ngModel)]="target.required"
+                      [ngModelOptions]="{ standalone: true }"
+                    />
+                    Destino {{ i + 1 }} obligatorio</label
+                  >
+                  <app-backup-optional-field
+                    [field]="target.filesystem_uuid"
+                    [label]="'UUID destino ' + (i + 1)"
+                  />
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="form.targets.splice(i, 1)"
+                    [attr.aria-label]="'Quitar destino ' + (i + 1)"
+                  >
+                    Quitar destino
+                  </button>
+                </fieldset>
+              }
+              <button class="secondary" type="button" (click)="form.targets.push(newTarget())">
+                Añadir destino
+              </button>
+            </fieldset>
+            <p>Compresión: tar_zstd.</p>
+            <details>
+              <summary>Opciones avanzadas</summary>
+              <label
+                ><input
+                  type="checkbox"
+                  [(ngModel)]="form.lifecycleEnabled"
+                  name="backup-lifecycle"
+                />
+                Incluir lifecycle</label
+              >
+              @if (form.lifecycleEnabled) {
+                @for (phase of phases; track phase) {
+                  <fieldset>
+                    <legend>{{ phase }}</legend>
+                    @for (command of form[phase]; track command; let i = $index) {
+                      <label
+                        >Comando {{ phase }} {{ i + 1
+                        }}<input
+                          class="console-control"
+                          [(ngModel)]="command.command"
+                          [ngModelOptions]="{ standalone: true }"
+                      /></label>
+                      <app-backup-optional-field
+                        [field]="command.params"
+                        [label]="'Parámetros ' + phase + ' ' + (i + 1)"
+                        [json]="true"
+                      />
+                      <button
+                        class="secondary"
+                        type="button"
+                        (click)="form[phase].splice(i, 1)"
+                        [attr.aria-label]="'Quitar comando ' + phase + ' ' + (i + 1)"
+                      >
+                        Quitar comando
+                      </button>
+                    }
+                    <button
+                      class="secondary"
+                      type="button"
+                      (click)="form[phase].push(newCommand())"
+                    >
+                      Añadir comando {{ phase }}
+                    </button>
+                  </fieldset>
+                }
+              }
+              <app-backup-optional-field
+                [field]="form.schedule"
+                label="Schedule (JSON)"
+                [json]="true"
+              />
+              <p>
+                Schedule y retention son metadatos. Esta configuración no crea una programación ni
+                ejecuta limpieza.
+              </p>
+              <label
+                >Retention: modo<select
+                  class="console-control"
+                  [(ngModel)]="form.retention"
+                  name="backup-retention"
+                >
+                  <option value="omit">Omitir</option>
+                  <option value="value">Valor</option>
+                  <option value="null">null explícito</option>
+                </select></label
+              >
+              @if (form.retention === 'value') {
+                <app-backup-optional-field [field]="form.max_age" label="max_age" />
+                <app-backup-optional-field [field]="form.keep_last" label="keep_last" />
+                <fieldset>
+                  <legend>Puntos de restauración protegidos</legend>
+                  @for (point of form.protected_restore_points; track point; let i = $index) {
+                    <label
+                      >Punto protegido {{ i + 1
+                      }}<input
+                        class="console-control"
+                        [(ngModel)]="point.path"
+                        [ngModelOptions]="{ standalone: true }"
+                    /></label>
+                    <button
+                      class="secondary"
+                      type="button"
+                      (click)="form.protected_restore_points.splice(i, 1)"
+                      [attr.aria-label]="'Quitar punto protegido ' + (i + 1)"
+                    >
+                      Quitar punto
+                    </button>
+                  }
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="form.protected_restore_points.push({ path: '' })"
+                  >
+                    Añadir punto protegido
+                  </button>
+                </fieldset>
+              }
+            </details>
+            <button type="submit">Crear configuración</button>
+          </fieldset>
+        </form>
+      }
     </section>
     <section class="panel" aria-labelledby="backup-health-heading">
       <h2 id="backup-health-heading">Backup Health</h2>
@@ -22,4 +321,31 @@
       <p>Funcionalidad pendiente de implementar.</p>
     </section>
   </div>
+  <dialog
+    class="console-dialog"
+    #confirmation
+    aria-labelledby="backup-confirm-title"
+    (cancel)="$event.preventDefault(); cancel()"
+    (keydown)="trapFocus($event)"
+  >
+    <h2 id="backup-confirm-title">Confirmar operación de backup</h2>
+    @if (pending(); as operation) {
+      <p>
+        Acción: {{ operation.action === 'delete' ? 'Eliminar configuración' : 'Solicitar backup' }}
+      </p>
+      <p>Nombre: {{ operation.name }}</p>
+      <p>ID: {{ operation.id }}</p>
+      @if (operation.action === 'delete') {
+        <p>Eliminar la configuración no elimina sus archivos de backup.</p>
+      } @else {
+        <p>La admisión en cola no confirma el inicio ni la finalización del backup.</p>
+      }
+    }
+    <div class="row-actions">
+      <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
+      <button type="button" [class.danger]="pending()?.action === 'delete'" (click)="confirm()">
+        Confirmar
+      </button>
+    </div>
+  </dialog>
 </ion-content>
