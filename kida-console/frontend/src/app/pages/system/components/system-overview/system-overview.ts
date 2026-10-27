@@ -2,24 +2,29 @@ import { Component, computed, inject } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
 import { SystemFacade } from '../../system.facade';
 import { SystemSectionView } from '../system-section/system-section';
-import { SystemData } from '../system-data/system-data';
-import { SystemSensorCard } from '../system-sensor-card/system-sensor-card';
 import { SystemStorageCard, storageDevices } from '../system-storage-card/system-storage-card';
 import { SystemFanRow } from '../system-fan-row/system-fan-row';
 import { SystemProcessorPanel } from '../system-processor-panel/system-processor-panel';
-import { fields, healthExtras, isCore } from '../system-sensor-card/system-sensors';
+import { fields, healthExtras } from '../system-sensor-card/system-sensors';
 import { SystemIndicator } from '../system-indicator/system-indicator';
 import { displaySystemValue } from '../../system-format';
 
 @Component({
   selector: 'app-system-overview',
-  imports: [IonContent, SystemSectionView, SystemData, SystemSensorCard, SystemStorageCard, SystemFanRow, SystemProcessorPanel, SystemIndicator],
+  imports: [IonContent, SystemSectionView, SystemStorageCard, SystemFanRow, SystemProcessorPanel, SystemIndicator],
   templateUrl: './system-overview.html',
   styleUrl: '../../system.scss',
 })
 export class SystemOverview {
   readonly state = inject(SystemFacade);
-  readonly isCore = isCore;
+  readonly otherName = (device: unknown, label: unknown): string => {
+    if (typeof device === 'string') {
+      if (/^iwlwifi/i.test(device)) return 'Wi-Fi';
+      const zone = /^acpitz_(\d+)$/i.exec(device);
+      if (zone) return `Zona térmica ACPI ${zone[1]}`;
+    }
+    return displaySystemValue(label);
+  };
   readonly display = displaySystemValue;
   readonly storageDevices = storageDevices;
   readonly packages = computed(() =>

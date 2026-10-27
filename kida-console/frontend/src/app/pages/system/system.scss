@@ -12,6 +12,35 @@
 .section-header h2 {
   margin: 0;
 }
+.section-header h2:has(.other-icon) {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.other-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+}
+.other-icon svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+.other-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: var(--kida-border-width) solid var(--ion-border-color);
+}
+.other-row:last-child { border-bottom: 0; }
+.other-details { display: grid; gap: 0.2rem; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.other-details small { color: var(--kida-muted); }
+.other-value { text-align: right; font-weight: 600; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@media (max-width: 400px) {
+  .other-row { flex-wrap: wrap; }
+  .other-value { flex-basis: 100%; }
+}
 .radio-label {
   display: flex;
   align-items: center;

@@ -224,4 +224,34 @@ describe('System sensor interpretation', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(3);
   });
+  it('renders other readings in order with original identifiers and explicit unknowns', () => {
+    const data = signal<unknown>({ sensors: [
+      { type: 'temperature', device: 'iwlwifi_1', label: 'temp1', value: 33, unit: 'C', status: 'hidden', critical: 99 },
+      { type: 'temperature', device: 'acpitz_02', label: 'temp2', value: 0, unit: 'K' },
+      { type: 'future', device: 'other', label: 'duplicate', value: null, unit: null },
+      { type: 'future', device: 'other', label: 'duplicate', value: 2, unit: 'V' },
+      {},
+    ] });
+    const sensors = () => sensorReadings(data());
+    TestBed.configureTestingModule({ providers: [{ provide: SystemFacade, useValue: {
+      health: { title: 'Salud', data, loading: signal(false), updated: signal(null), error: signal('') },
+      sensorsAvailable: () => true, sensors, groups: () => sensorGroups(sensors()),
+    } }] });
+    const fixture = TestBed.createComponent(SystemOverview);
+    fixture.detectChanges();
+    const panel = fixture.nativeElement.querySelector('[aria-label="Otros sensores"]');
+    const rows = [...panel.querySelectorAll('.other-row')] as HTMLElement[];
+    expect(rows).toHaveLength(5);
+    expect(panel.textContent).toContain('5 lecturas');
+    expect(rows.map(row => row.querySelector('strong')?.textContent)).toEqual(['Wi-Fi', 'Zona térmica ACPI 02', 'duplicate', 'duplicate', 'Desconocido']);
+    expect(rows[0].textContent).toContain('Dispositivo: iwlwifi_1 · Etiqueta: temp1');
+    expect(rows[0].textContent).not.toContain('hidden');
+    expect(rows[0].textContent).not.toContain('99');
+    expect(rows[2].textContent).toContain('Desconocido Desconocido');
+    expect(rows[4].textContent).toContain('Etiqueta: Desconocido');
+    data.set({ sensors: [] });
+    fixture.detectChanges();
+    expect(panel.textContent).toContain('0 lecturas');
+    expect(panel.textContent).toContain('Sin lecturas disponibles.');
+  });
 });

@@ -11,13 +11,13 @@ import { ThemeIdentity } from '../../../theme/integration';
 import { ArcaRequestService, ChannelBusyError } from '../../services/arca-request.service';
 import { SystemService } from './system.service';
 import { SystemFacade } from './system.facade';
-import { SystemOverview } from './system-overview';
-import { SystemEnergy } from './system-energy';
-import { SystemInspector } from './system-inspector';
+import { SystemOverview } from './components/system-overview/system-overview';
+import { SystemEnergy } from './components/system-energy/system-energy';
+import { SystemInspector } from './components/system-inspector/system-inspector';
 
 @Component({
-  imports: [SystemOverview, SystemEnergy],
-  template: '<app-system-overview /><app-system-energy />',
+  imports: [SystemOverview, SystemEnergy, SystemInspector],
+  template: '<app-system-overview /><app-system-energy /><app-system-inspector />',
 })
 class SystemHarness {
   readonly state = inject(SystemFacade);
@@ -256,13 +256,14 @@ describe('System page', () => {
     for (const expected of [
       'Desconocido',
       'Sin lecturas disponibles',
-      'future',
-      'visible',
       'Sin verificar',
       'no demuestra',
       'Instantánea',
     ])
       expect(text).toContain(expected);
+    const inspector = fixture.nativeElement.querySelector('app-system-inspector');
+    expect(inspector.textContent).toContain('future');
+    expect(inspector.textContent).toContain('visible');
   });
   it('retains partial/stale data with independent errors and update timestamps', () => {
     const fixture = enter(),

@@ -62,7 +62,7 @@ const health = {
     temperature('acpitz_1', 'temp1', 49),
     {
       type: 'voltage',
-      device: 'future',
+      device: 'future-' + 'x'.repeat(100),
       label: 'duplicate',
       value: 0,
       unit: 'V',
@@ -169,7 +169,15 @@ const wake = {
         await page.waitForURL('**/system/overview');
         const overview = page.locator('app-system-overview');
         await overview.locator('app-system-fan-row').filter({ hasText: 'fan1' }).waitFor();
-        assert.equal(await overview.locator('app-system-sensor-card').count(), 20);
+        assert.equal(await overview.locator('app-system-sensor-card').count(), 15);
+        const other = overview.locator('[aria-label="Otros sensores"]');
+        const otherRows = other.locator('.other-row');
+        assert.equal(await otherRows.count(), 5);
+        assert.match(await other.innerText(), /5 lecturas/);
+        assert.deepEqual(await otherRows.locator('strong').allTextContents(), ['Wi-Fi', 'Zona térmica ACPI 0', 'Zona térmica ACPI 1', 'duplicate', 'duplicate']);
+        assert.match(await otherRows.first().innerText(), /iwlwifi_1_5.*temp1/);
+        assert.doesNotMatch(await otherRows.first().innerText(), /Estado|Alarma|Crítico/);
+        assert.ok(await other.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
         const storage = overview.locator('app-system-storage-card');
         assert.equal(await storage.count(), 1);
         assert.match(await storage.nth(0).innerText(), /Composite/);
@@ -227,6 +235,9 @@ const wake = {
         const inspector = page.locator('app-system-inspector');
         await inspector.locator('#sensor-search').fill('search-me');
         assert.equal(await inspector.locator('tbody tr').count(), 1);
+        await inspector.locator('tbody details summary').click();
+        for (const field of ['voltage', 'duplicate', '0', 'V', 'FUTURE', 'search-me'])
+          assert.ok((await inspector.locator('tbody tr').innerText()).includes(field));
         await inspector.locator('#sensor-search').fill('duplicate');
         assert.equal(await inspector.locator('tbody tr').count(), 2);
         await inspector.locator('#sensor-search').fill('');
@@ -305,7 +316,7 @@ const wake = {
         failHealth = true;
         await overview.getByRole('button', { name: 'Actualizar Salud y sensores' }).click();
         await overview.getByText('Datos anteriores', { exact: false }).waitFor();
-        assert.equal(await overview.locator('app-system-sensor-card').count(), 20);
+        assert.equal(await overview.locator('app-system-sensor-card').count(), 15);
         failHealth = false;
         emptyHealth = true;
         await overview.getByRole('button', { name: 'Actualizar Salud y sensores' }).click();
@@ -314,6 +325,8 @@ const wake = {
             document.querySelectorAll('app-system-overview app-system-sensor-card').length === 0,
         );
         assert.equal(await storage.count(), 0);
+        assert.match(await other.innerText(), /0 lecturas/);
+        assert.match(await other.innerText(), /Sin lecturas disponibles/);
         assert.match(await overview.locator('[aria-label="Almacenamiento"]').innerText(), /Sin lecturas disponibles/);
         assert.equal(reads.wake, 1);
         // Direct route reload exercises parent/child lifecycle order without tab history.
