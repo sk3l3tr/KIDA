@@ -251,6 +251,11 @@ describe('System page', () => {
   }
   it('renders unknown values, empty lists, extended fields and the S5 limitation', () => {
     const fixture = enter();
+    const masonry = fixture.nativeElement.querySelector('app-system-overview app-masonry');
+    expect(masonry.querySelectorAll(':scope > [appMasonryItem]')).toHaveLength(4);
+    expect(masonry.querySelector('.indicators')).toBeNull();
+    expect(masonry.querySelector('app-system-section')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('app-masonry')).toHaveLength(1);
     expect(fixture.nativeElement.querySelector('app-system-equipment')).toBeNull();
     const text = fixture.nativeElement.textContent;
     for (const expected of [

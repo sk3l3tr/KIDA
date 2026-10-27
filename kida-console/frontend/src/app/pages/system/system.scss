@@ -83,10 +83,8 @@ h3 {
   gap: var(--kida-space);
 }
 .sensor-panels {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--kida-space);
-  align-items: start;
+  --masonry-columns: 2;
+  --masonry-gap: var(--kida-space);
 }
 .sensor-grid {
   display: grid;
@@ -169,7 +167,7 @@ td app-system-data {
 }
 @media (max-width: 1100px) {
   .sensor-panels {
-    grid-template-columns: minmax(0, 1fr);
+    --masonry-columns: 1;
   }
 }
 @media (max-width: 700px) {

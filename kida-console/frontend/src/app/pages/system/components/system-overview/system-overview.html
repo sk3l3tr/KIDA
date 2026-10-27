@@ -26,12 +26,12 @@
         [value]="state.sensorsAvailable() ? alarms() + ' / ' + faults() : 'Desconocido'"
       />
     </section>
-    <div class="sensor-panels">
+    <app-masonry class="sensor-panels">
       @for (group of state.groups(); track group.key) {
         @if (group.key === 'processor') {
-          <app-system-processor-panel [readings]="group.readings" [packages]="packages()" />
+          <app-system-processor-panel appMasonryItem [readings]="group.readings" [packages]="packages()" />
         } @else {
-          <section class="panel sensor-group" [attr.aria-label]="group.title">
+          <section appMasonryItem class="panel sensor-group" [attr.aria-label]="group.title">
             <div class="section-header">
               <h2>@if (group.key === 'other') {<span class="system-icon other-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg></span>}{{ group.title }}</h2>
               <small>{{ group.readings.length }} lecturas</small>
@@ -70,7 +70,7 @@
           </section>
         }
       }
-    </div>
+    </app-masonry>
     <!-- @if (state.health.data() !== null) {
       <details class="panel">
         <summary>Datos adicionales</summary>

@@ -8,10 +8,11 @@ import { SystemProcessorPanel } from '../system-processor-panel/system-processor
 import { fields, healthExtras } from '../system-sensor-card/system-sensors';
 import { SystemIndicator } from '../system-indicator/system-indicator';
 import { displaySystemValue } from '../../system-format';
+import { Masonry, MasonryItem } from '../../../../components/masonry/masonry';
 
 @Component({
   selector: 'app-system-overview',
-  imports: [IonContent, SystemSectionView, SystemStorageCard, SystemFanRow, SystemProcessorPanel, SystemIndicator],
+  imports: [IonContent, SystemSectionView, SystemStorageCard, SystemFanRow, SystemProcessorPanel, SystemIndicator, Masonry, MasonryItem],
   templateUrl: './system-overview.html',
   styleUrl: '../../system.scss',
 })
