@@ -6,15 +6,7 @@
       <p>Diagnóstico y operaciones del servidor CORE.</p>
     </header>
     <section class="panel rtc-panel" aria-label="Capacidades RTC">
-      <app-system-section [state]="state.wake" (refresh)="state.refresh(state.wake)" />
-      @if (state.wake.data() !== null) {
-        <app-system-data [value]="state.wake.data()" />
-      }
-      <p>
-        El diagnóstico RTC no demuestra que el hardware pueda encender desde S5. El encendido físico
-        debe verificarse en el equipo.
-      </p>
-      <strong>Verificación física S5 pendiente.</strong>
+      <app-system-rtc-card [state]="state.wake" (refresh)="state.refresh(state.wake)" />
     </section>
     <section class="panel power-panel" aria-label="Energía">
       <h2>Energía</h2>

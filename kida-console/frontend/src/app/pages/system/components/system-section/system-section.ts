@@ -1,10 +1,10 @@
 import { Component, input, output } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { SystemSectionStatus } from '../system-section-status/system-section-status';
 import { SystemSection } from '../../system.facade';
 
 @Component({
   selector: 'app-system-section',
-  imports: [DatePipe],
+  imports: [SystemSectionStatus],
   templateUrl: './system-section.html',
   styles: `
     .section-header {

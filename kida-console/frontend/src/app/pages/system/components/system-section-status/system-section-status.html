@@ -1,0 +1,20 @@
+@if (timestampOnly()) {
+  <ng-container *ngTemplateOutlet="timestamp" />
+} @else {
+  <div aria-live="polite" [attr.aria-busy]="state().loading()">
+    @if (state().loading()) { <p>Cargando…</p> }
+    @if (!hideTimestamp()) { <ng-container *ngTemplateOutlet="timestamp" /> }
+    @if (state().error()) { <p class="error" role="alert">{{ state().error() }}</p> }
+    @if (state().data() !== null && (state().error() || state().loading())) {
+      <p>Datos anteriores; pendientes de actualizar.</p>
+    }
+    @if (state().data() === null && !state().loading()) { <p>Sin datos disponibles.</p> }
+  </div>
+}
+<ng-template #timestamp>
+  @if (state().updated()) {
+    <small>Última actualización: {{ state().updated() | date: 'medium' }}. Instantánea; puede estar desactualizada.</small>
+  } @else {
+    <small>Sin actualización disponible.</small>
+  }
+</ng-template>

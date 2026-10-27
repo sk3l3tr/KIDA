@@ -283,6 +283,36 @@ describe('System page', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Datos anteriores');
   });
+  it('renders RTC values, ordered warnings and future fields through refresh and failure', () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state;
+    const card = fixture.nativeElement.querySelector('app-system-rtc-card');
+    state.refresh(state.wake);
+    fixture.detectChanges();
+    expect(card.textContent).toContain('Cargando');
+    expect(card.textContent).toContain('Datos anteriores');
+    http.expectOne(`${base}/wake-capabilities`).flush({
+      rtc_device: 'rtc0', rtcwake_available: false, rtc_alarm_available: null,
+      s5_wake_status: 'future_status', warnings: ['Primer aviso', 'Segundo aviso'],
+      future: { extra: 'dato nuevo' },
+    });
+    fixture.detectChanges();
+    const text = card.textContent;
+    for (const expected of ['rtc0', 'No', 'Desconocido', 'future_status', 'Diagnóstico parcial', 'dato nuevo', 'Instantánea'])
+      expect(text).toContain(expected);
+    const notices = card.querySelectorAll('.warnings li');
+    expect(Array.from(notices, (item: any) => item.textContent.trim())).toEqual(['Primer aviso', 'Segundo aviso']);
+    card.querySelector('button').click();
+    http.expectOne(`${base}/wake-capabilities`).error(new ProgressEvent('error'));
+    fixture.detectChanges();
+    expect(card.textContent).toContain('Datos anteriores');
+    expect(card.querySelector('[role="alert"]')).not.toBeNull();
+    expect(card.textContent).toContain('rtc0');
+    state.refresh(state.wake);
+    http.expectOne(`${base}/wake-capabilities`).flush(null);
+    fixture.detectChanges();
+    expect(card.textContent).toContain('Sin datos disponibles');
+  });
   it('cancels without sending an action and freezes confirmed parameters, blocking duplicates', async () => {
     const view = enter().componentInstance.state;
     const cancel = view.confirm('shutdown');

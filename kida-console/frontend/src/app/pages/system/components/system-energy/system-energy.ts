@@ -2,12 +2,12 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonContent } from '@ionic/angular/standalone';
 import { SystemData } from '../system-data/system-data';
-import { SystemSectionView } from '../system-section/system-section';
+import { SystemRtcCard } from '../system-rtc-card/system-rtc-card';
 import { SystemFacade } from '../../system.facade';
 
 @Component({
   selector: 'app-system-energy',
-  imports: [IonContent, FormsModule, SystemData, SystemSectionView],
+  imports: [IonContent, FormsModule, SystemData, SystemRtcCard],
   templateUrl: './system-energy.html',
   styleUrl: '../../system.scss',
 })
