@@ -1,0 +1,127 @@
+<ion-content class="console-content">
+  <main class="system-page energy-grid">
+    <header class="page-heading">
+      <span class="eyebrow">CONTROL DEL EQUIPO</span>
+      <h1>RTC y energía</h1>
+      <p>Diagnóstico y operaciones del servidor CORE.</p>
+    </header>
+    <section class="panel rtc-panel" aria-label="Capacidades RTC">
+      <app-system-section [state]="state.wake" (refresh)="state.refresh(state.wake)" />
+      @if (state.wake.data() !== null) {
+        <app-system-data [value]="state.wake.data()" />
+      }
+      <p>
+        El diagnóstico RTC no demuestra que el hardware pueda encender desde S5. El encendido físico
+        debe verificarse en el equipo.
+      </p>
+      <strong>Verificación física S5 pendiente.</strong>
+    </section>
+    <section class="panel power-panel" aria-label="Energía">
+      <h2>Energía</h2>
+      <p>Las horas corresponden al servidor CORE. CORE validará las restricciones temporales.</p>
+      <p>
+        Al abandonar System se descartan los resultados locales; una operación enviada puede seguir
+        ejecutándose.
+      </p>
+      <form (ngSubmit)="state.confirm('shutdown')">
+        <label for="power-when">Apagado o reinicio: cuándo</label>
+        <input
+          id="power-when"
+          name="when"
+          [(ngModel)]="state.when"
+          required
+          aria-describedby="when-help"
+        />
+        <small id="when-help"
+          >now, +N minutos o una hora válida de 24 horas. Valor inicial: +1.</small
+        >
+        @if (!state.validWhen(state.when)) {
+          <p class="error">Introduce now, +N o una hora válida.</p>
+        }
+        <div class="power-buttons">
+          <button
+            class="danger"
+            type="submit"
+            [disabled]="state.busy() || !state.validWhen(state.when)"
+          >
+            Apagar
+          </button>
+          <button
+            class="secondary"
+            type="button"
+            (click)="state.confirm('reboot')"
+            [disabled]="state.busy() || !state.validWhen(state.when)"
+          >
+            Reiniciar
+          </button>
+        </div>
+      </form>
+    </section>
+    <section class="panel power-panel" aria-label="Ciclo de energía">
+      <form (ngSubmit)="state.confirm('powerCycle')">
+        <h3>Ciclo de energía</h3>
+        <fieldset>
+          <legend>Encendido: selecciona una modalidad</legend>
+          <label class="radio-label"
+            ><input type="radio" name="wakeMode" value="time" [(ngModel)]="state.wakeMode" /> Hora
+            de encendido</label
+          >
+          <label class="radio-label"
+            ><input type="radio" name="wakeMode" value="seconds" [(ngModel)]="state.wakeMode" />
+            Segundos desde la ejecución</label
+          >
+        </fieldset>
+        @if (state.wakeMode === 'time') {
+          <label for="wake-time">Hora de encendido (HH:MM)</label>
+          <input
+            id="wake-time"
+            name="wakeTime"
+            [(ngModel)]="state.wakeTime"
+            placeholder="06:00"
+            inputmode="numeric"
+          />
+        } @else {
+          <label for="wake-seconds">Segundos hasta el encendido (mínimo 120)</label>
+          <input
+            id="wake-seconds"
+            name="wakeSeconds"
+            [(ngModel)]="state.wakeSeconds"
+            inputmode="numeric"
+          />
+        }
+        <label for="shutdown-time">Hora de apagado opcional (HH:MM)</label>
+        <input
+          id="shutdown-time"
+          name="shutdownTime"
+          [(ngModel)]="state.shutdownTime"
+          placeholder="23:00"
+          inputmode="numeric"
+        />
+        <small
+          >Sin hora de apagado se usa +1. El intervalo mínimo de encendido es de 120 segundos; CORE
+          valida la relación con el apagado.</small
+        >
+        @if (!state.cycleBody()) {
+          <p>Completa el encendido y, si la indicas, una hora de apagado válida.</p>
+        }
+        <button class="danger" type="submit" [disabled]="state.busy() || !state.cycleBody()">
+          Ciclo de energía
+        </button>
+      </form>
+    </section>
+    <section class="panel action-result" aria-label="Estado de la operación">
+      <div aria-live="polite">
+        @if (state.busy()) {
+          <p>Confirmación o acción pendiente…</p>
+        }
+        @if (state.error()) {
+          <p class="error" role="alert">{{ state.error() }}</p>
+        }
+        @if (state.result() !== null) {
+          <h3>Resultado: {{ state.resultLabel() }}</h3>
+          <app-system-data [value]="state.result()" />
+        }
+      </div>
+    </section>
+  </main>
+</ion-content>

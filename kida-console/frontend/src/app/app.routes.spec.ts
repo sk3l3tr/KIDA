@@ -50,12 +50,17 @@ describe('Console navigation', () => {
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl(path);
     expect(page).toBeInstanceOf(component);
-    expect(TestBed.inject(Router).url).toBe(path);
+    expect(TestBed.inject(Router).url).toBe(path === '/system' ? '/system/overview' : path);
     expect(auth.restore).toHaveBeenCalledOnce();
     if (component === Settings) {
       expect(harness.routeNativeElement?.querySelectorAll('.theme-option').length).toBe(4);
       expect(harness.routeNativeElement?.textContent).toContain('Apariencia');
       expect(auth.accounts).not.toHaveBeenCalled();
+    } else if (component === System) {
+      expect(harness.routeNativeElement?.querySelectorAll('ion-tab-button').length).toBe(3);
+      expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe(
+        'top',
+      );
     } else if (component !== Administrators) {
       expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe(title);
       expect(auth.accounts).not.toHaveBeenCalled();
@@ -69,6 +74,20 @@ describe('Console navigation', () => {
     expect(TestBed.inject(Router).url).toBe('/login');
     expect(auth.accounts).not.toHaveBeenCalled();
   });
+
+  it.each(['/system/overview', '/system/energy', '/system/sensors'])(
+    'protects and resolves direct System child route %s',
+    async (path) => {
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl(path, System);
+      expect(TestBed.inject(Router).url).toBe(path);
+      expect(auth.restore).toHaveBeenCalledOnce();
+      auth.restore.mockReturnValue(of(false));
+      await harness.navigateByUrl('/login');
+      await harness.navigateByUrl(path, Login);
+      expect(TestBed.inject(Router).url).toBe('/login');
+    },
+  );
 
   it.each(['/', '/unknown', '/unknown/nested'])('redirects %s to Dashboard', async (path) => {
     const harness = await RouterTestingHarness.create();

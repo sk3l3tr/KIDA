@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
@@ -10,7 +10,18 @@ import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
 import { ArcaRequestService, ChannelBusyError } from '../../services/arca-request.service';
 import { SystemService } from './system.service';
-import { System } from './system';
+import { SystemFacade } from './system.facade';
+import { SystemOverview } from './system-overview';
+import { SystemEnergy } from './system-energy';
+import { SystemInspector } from './system-inspector';
+
+@Component({
+  imports: [SystemOverview, SystemEnergy],
+  template: '<app-system-overview /><app-system-energy />',
+})
+class SystemHarness {
+  readonly state = inject(SystemFacade);
+}
 import { cycleRequest, systemFailure, validWhen } from './system.models';
 import { systemActions } from './system.actions';
 
@@ -23,7 +34,7 @@ const info = {
   disks: [],
   future: { extra: 'visible' },
 };
-const health = { overall: 'unknown', sensors: [] };
+const health = { overall: 'unknown', sensors: [], future: { extra: 'visible' } };
 const wake = {
   rtc_device: null,
   rtcwake_available: true,
@@ -34,9 +45,10 @@ const wake = {
 
 function setup() {
   TestBed.configureTestingModule({
-    imports: [System],
+    imports: [SystemHarness],
     providers: [
       ...appConfig.providers,
+      SystemFacade,
       provideHttpClientTesting(),
       {
         provide: ArcaService,
@@ -224,9 +236,10 @@ describe('System page', () => {
   });
   afterEach(() => http.verify());
   function enter() {
-    const fixture = TestBed.createComponent(System);
-    fixture.componentInstance.ionViewWillEnter();
-    http.expectOne(`${base}/info`).flush(info);
+    const fixture = TestBed.createComponent(SystemHarness);
+    fixture.componentInstance.state.ionViewWillEnter();
+    fixture.componentInstance.state.enterEnergy();
+    http.expectNone(`${base}/info`);
     http.expectOne(`${base}/health`).flush(health);
     http.expectOne(`${base}/wake-capabilities`).flush(wake);
     fixture.detectChanges();
@@ -238,10 +251,11 @@ describe('System page', () => {
   }
   it('renders unknown values, empty lists, extended fields and the S5 limitation', () => {
     const fixture = enter();
+    expect(fixture.nativeElement.querySelector('app-system-equipment')).toBeNull();
     const text = fixture.nativeElement.textContent;
     for (const expected of [
       'Desconocido',
-      'Sin elementos',
+      'Sin lecturas disponibles',
       'future',
       'visible',
       'Sin verificar',
@@ -252,19 +266,19 @@ describe('System page', () => {
   });
   it('retains partial/stale data with independent errors and update timestamps', () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
-    const timestamp = view.info.updated();
-    view.refresh(view.info);
-    http.expectOne(`${base}/info`).error(new ProgressEvent('error'));
-    expect(view.info.data()).toEqual(info);
-    expect(view.info.updated()).toBe(timestamp);
-    expect(view.info.error()).toContain('Sin conexión');
-    expect(view.health.error()).toBe('');
+      view = fixture.componentInstance.state;
+    const timestamp = view.health.updated();
+    view.refresh(view.health);
+    http.expectOne(`${base}/health`).error(new ProgressEvent('error'));
+    expect(view.health.data()).toEqual(health);
+    expect(view.health.updated()).toBe(timestamp);
+    expect(view.health.error()).toContain('Sin conexión');
+    expect(view.wake.error()).toBe('');
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Datos anteriores');
   });
   it('cancels without sending an action and freezes confirmed parameters, blocking duplicates', async () => {
-    const view = enter().componentInstance;
+    const view = enter().componentInstance.state;
     const cancel = view.confirm('shutdown');
     await ready();
     dismiss({ role: 'cancel' });
@@ -287,7 +301,7 @@ describe('System page', () => {
     expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
   });
   it('invalidates confirmation on leave and session transitions, including async creation', async () => {
-    const view = enter().componentInstance;
+    const view = enter().componentInstance.state;
     const leaving = view.confirm('shutdown');
     await ready();
     view.ionViewWillLeave();
@@ -296,7 +310,8 @@ describe('System page', () => {
     http.expectNone(`${base}/shutdown`);
     expect(dialog.dismiss).toHaveBeenCalled();
     view.ionViewWillEnter();
-    http.expectOne(`${base}/info`).flush(info);
+    view.enterEnergy();
+    http.expectNone(`${base}/info`);
     http.expectOne(`${base}/health`).flush(health);
     http.expectOne(`${base}/wake-capabilities`).flush(wake);
     const session = view.confirm('reboot');
@@ -304,11 +319,47 @@ describe('System page', () => {
     await session;
     expect(dialog.remove).toHaveBeenCalled();
     http.expectNone(`${base}/reboot`);
-    expect(view.info.data()).toBeNull();
+    expect(view.health.data()).toBeNull();
     expect(view.result()).toBeNull();
   });
+  it('invalidates pending confirmation on tab leave, even after returning to Energy', async () => {
+    const view = enter().componentInstance.state;
+    const pending = view.confirm('shutdown');
+    await ready();
+    view.leaveEnergy();
+    view.enterEnergy();
+    dismiss({ role: 'confirm' });
+    await pending;
+    http.expectNone(`${base}/shutdown`);
+    expect(view.busy()).toBe(false);
+    expect(view.health.data()).toEqual(health);
+    expect(dialog.dismiss).toHaveBeenCalled();
+  });
+  it('invalidates asynchronous dialog creation on tab leave and keeps a sent request blocked across tabs', async () => {
+    const view = enter().componentInstance.state;
+    const pending = view.confirm('reboot');
+    view.leaveEnergy();
+    view.enterEnergy();
+    await pending;
+    expect(dialog.remove).toHaveBeenCalled();
+    http.expectNone(`${base}/reboot`);
+    const sent = view.confirm('reboot');
+    await ready();
+    dismiss({ role: 'confirm' });
+    await sent;
+    const action = http.expectOne(`${base}/reboot`);
+    view.leaveEnergy();
+    expect(view.busy()).toBe(true);
+    view.enterEnergy();
+    await view.confirm('shutdown');
+    http.expectNone(`${base}/shutdown`);
+    action.error(new ProgressEvent('error'));
+    expect(view.busy()).toBe(false);
+    expect(view.error()).toContain('incierta');
+    expect(view.health.data()).toEqual(health);
+  });
   it('discards late results on leave, reloads on entry and shows uncertain execution', async () => {
-    const view = enter().componentInstance;
+    const view = enter().componentInstance.state;
     const operation = view.confirm('reboot');
     await ready();
     dismiss({ role: 'confirm' });
@@ -318,7 +369,8 @@ describe('System page', () => {
     action.flush({ scheduled: true, when: '+1' });
     expect(view.result()).toBeNull();
     view.ionViewWillEnter();
-    http.expectOne(`${base}/info`).flush(info);
+    view.enterEnergy();
+    http.expectNone(`${base}/info`);
     http.expectOne(`${base}/health`).flush(health);
     http.expectOne(`${base}/wake-capabilities`).flush(wake);
     const uncertain = view.confirm('reboot');
@@ -329,5 +381,67 @@ describe('System page', () => {
     expect(view.error()).toContain('incierta');
     expect(view.busy()).toBe(false);
     http.expectNone(`${base}/reboot`);
+  });
+});
+
+describe('System shared tab state', () => {
+  let http: HttpTestingController;
+  beforeEach(() => {
+    http = setup();
+  });
+  afterEach(() => http.verify());
+
+  it('shares the same snapshots across tabs, loads once and refreshes only the requested section', () => {
+    const overview = TestBed.createComponent(SystemOverview).componentInstance;
+    const energy = TestBed.createComponent(SystemEnergy).componentInstance;
+    expect(overview.state).toBe(energy.state);
+    const state = overview.state;
+    state.ionViewWillEnter();
+    const firstHealth = http.expectOne(`${base}/health`);
+    const firstWake = http.expectOne(`${base}/wake-capabilities`);
+    expect(state.health.loading()).toBe(true);
+    firstHealth.flush(health);
+    expect(state.wake.loading()).toBe(true);
+    firstWake.flush(wake);
+    energy.ionViewWillEnter();
+    energy.ionViewWillLeave();
+    state.ionViewWillEnter();
+    expect(state.health.data()).toEqual(health);
+    expect(state.wake.data()).toEqual(wake);
+    http.expectNone(`${base}/health`);
+    http.expectNone(`${base}/wake-capabilities`);
+    state.refresh(state.wake);
+    http.expectNone(`${base}/health`);
+    http.expectOne(`${base}/wake-capabilities`).flush(null);
+    expect(state.wake.data()).toBeNull();
+    expect(state.health.data()).toEqual(health);
+  });
+
+  it('reactivates the shared facade when Ionic reuses a cached child after leaving System', () => {
+    const overview = TestBed.createComponent(SystemOverview).componentInstance;
+    const energy = TestBed.createComponent(SystemEnergy).componentInstance;
+    const inspector = TestBed.createComponent(SystemInspector).componentInstance;
+    for (const page of [overview, energy, inspector]) {
+      page.ionViewWillEnter();
+      http.expectOne(`${base}/health`).flush(health);
+      http.expectOne(`${base}/wake-capabilities`).flush(wake);
+      expect(page.state.health.data()).toEqual(health);
+      expect(page.state.wake.data()).toEqual(wake);
+      page.state.ionViewWillLeave();
+      expect(page.state.health.data()).toBeNull();
+    }
+  });
+
+  it('clears session data and drains a late Health response without repopulating the facade', () => {
+    const state = TestBed.inject(SystemFacade);
+    state.ionViewWillEnter();
+    const old = http.expectOne(`${base}/health`);
+    http.expectOne(`${base}/wake-capabilities`).flush(wake);
+    TestBed.inject(ThemeIdentity).clear();
+    old.flush(health);
+    expect(state.health.data()).toBeNull();
+    expect(state.wake.data()).toBeNull();
+    expect(state.sensors()).toEqual([]);
+    expect(state.health.updated()).toBeNull();
   });
 });

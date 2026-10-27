@@ -1,3 +1,4 @@
+import type { SystemSensor } from './system-sensors';
 import { formatCoreFailure } from '../../services/core-failure';
 
 // CORE may extend these objects. Keep unknown fields for presentation.
@@ -17,7 +18,7 @@ export interface SystemInfo extends CoreFields {
 }
 export interface SystemHealth extends CoreFields {
   overall: string;
-  sensors: CoreFields[];
+  sensors: SystemSensor[];
 }
 export interface WakeCapabilities extends CoreFields {
   rtc_device: string | null;
@@ -75,7 +76,8 @@ export function cycleRequest(
 
 export function systemFailure(failure: unknown, action = false): string {
   return formatCoreFailure(failure, action, {
-    uncertain: 'Ejecución incierta: no se pudo confirmar el resultado. Comprueba el estado del equipo antes de enviar otra acción.',
+    uncertain:
+      'Ejecución incierta: no se pudo confirmar el resultado. Comprueba el estado del equipo antes de enviar otra acción.',
     validation: 'Datos rechazados por el servidor. Revisa los parámetros y la hora local de CORE.',
     rejected: 'error',
   });

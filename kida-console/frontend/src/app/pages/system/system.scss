@@ -22,6 +22,145 @@
   min-height: 22px;
   accent-color: var(--ion-color-primary);
 }
-.system-layout {
-  padding-bottom: 3rem;
+:host {
+  font-family: var(--kida-font);
+}
+.system-page {
+  max-width: 92rem;
+  margin: auto;
+  padding: var(--kida-space);
+  display: grid;
+  gap: var(--kida-space);
+}
+.page-heading h1,
+h2,
+h3 {
+  font-family: var(--kida-heading-font);
+}
+.page-heading p {
+  margin-bottom: 0;
+  color: var(--kida-muted);
+}
+.panel {
+  padding: var(--kida-space);
+  border-width: var(--kida-border-width);
+  border-radius: var(--kida-radius);
+  box-shadow: var(--kida-shadow), var(--kida-effect);
+  overflow-wrap: anywhere;
+}
+.indicators {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--kida-space);
+}
+.sensor-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kida-space);
+  align-items: start;
+}
+.sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+dt {
+  font-size: 0.8rem;
+  color: var(--kida-muted);
+}
+dd {
+  margin: 0.25rem 0 0;
+}
+.core-statistics {
+  border-bottom: 1px solid var(--ion-border-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+details {
+  margin-top: 0.75rem;
+}
+summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 0.6rem;
+  color: var(--ion-color-primary);
+  font-weight: 600;
+}
+summary:focus-visible,
+.table-wrap:focus-visible {
+  outline: 3px solid var(--ion-color-primary);
+  outline-offset: 3px;
+}
+.table-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+caption {
+  text-align: left;
+  padding-block: 1rem;
+  color: var(--kida-muted);
+}
+th,
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--ion-border-color);
+  vertical-align: top;
+  min-width: 7rem;
+}
+td app-system-data {
+  min-width: 14rem;
+}
+.energy-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.energy-grid .page-heading,
+.action-result {
+  grid-column: 1 / -1;
+}
+.rtc-panel {
+  grid-row: span 2;
+}
+.power-panel form {
+  max-width: none;
+}
+@media (max-width: 1100px) {
+  .sensor-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .system-page {
+    padding: 1rem;
+  }
+  .indicators {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .energy-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rtc-panel {
+    grid-row: auto;
+  }
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.core-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+
+.package-reading {
+  grid-column: 1 / -1;
 }
