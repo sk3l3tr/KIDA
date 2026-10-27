@@ -24,8 +24,8 @@ const pages = [
   { path: '/docker', title: 'Docker', component: Docker },
   { path: '/backups', title: 'Backups', component: Backups },
   { path: '/scheduler', title: 'Scheduler', component: Scheduler },
-  { path: '/settings', title: 'Settings', component: Settings },
   { path: '/administrators', title: 'Administradores', component: Administrators },
+  { path: '/settings', title: 'Settings', component: Settings },
 ];
 
 describe('Console navigation', () => {

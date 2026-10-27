@@ -24,8 +24,8 @@ describe('App', () => {
       'Docker',
       'Backups',
       'Scheduler',
-      'Settings',
       'Administradores',
+      'Settings',
     ]);
     expect(fixture.nativeElement.textContent).not.toContain('Congratulations');
   });

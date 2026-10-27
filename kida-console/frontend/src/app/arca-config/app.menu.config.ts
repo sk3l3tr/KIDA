@@ -11,7 +11,7 @@ export const appMenu: MenuConfig = {
     { id: 'docker', title: 'Docker', path: '/docker' },
     { id: 'backups', title: 'Backups', path: '/backups' },
     { id: 'scheduler', title: 'Scheduler', path: '/scheduler' },
-    { id: 'settings', title: 'Settings', path: '/settings' },
     { id: 'administrators', title: 'Administradores', path: '/administrators' },
+    { id: 'settings', title: 'Settings', path: '/settings' },
   ],
 };

@@ -1,0 +1,54 @@
+<div
+  class="table-wrap"
+  tabindex="0"
+  role="region"
+  aria-label="Tabla de sensores, desplazamiento horizontal"
+>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Dispositivo</th>
+        <th scope="col">Etiqueta</th>
+        <th scope="col">Tipo</th>
+        <th scope="col">Valor</th>
+        <th scope="col">Estado</th>
+        <th scope="col">Crítico</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (reading of readings(); track reading.index) {
+        <tr>
+          <td>
+            {{ display(reading.fields['device']) }}
+          </td>
+          <td>{{ display(reading.fields['label']) }}</td>
+          <td>{{ display(reading.fields['type']) }}</td>
+          <td>
+            {{ display(reading.fields['value']) }}
+            {{ unit(reading.fields['unit'], reading.fields['type']) }}
+          </td>
+          <td>
+            <span
+              [class.ok]="reading.fields['status'] === 'OK'"
+              [class.warning]="reading.fields['status'] === 'WARNING'"
+              [class.alert]="reading.fields['status'] === 'CRITICAL'"
+              >{{ display(reading.fields['status']) }}</span
+            >
+          </td>
+          <td>
+            @if (reading.fields['critical'] == null || reading.fields['critical'] === '') {
+              <span aria-label="Crítico desconocido">—</span>
+            } @else {
+              {{ display(reading.fields['critical']) }}
+              {{ unit(reading.fields['unit'], reading.fields['type']) }}
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="6">Sin sensores coincidentes o disponibles.</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

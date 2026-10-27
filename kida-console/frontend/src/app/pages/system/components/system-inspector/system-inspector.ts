@@ -3,15 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { IonContent } from '@ionic/angular/standalone';
 import { SystemFacade } from '../../system.facade';
 import { SystemSectionView } from '../system-section/system-section';
-import { SystemData } from '../system-data/system-data';
+import { SystemSensorTable } from '../system-sensor-table/system-sensor-table';
 import { matchesSensor } from '../system-sensor-card/system-sensors';
-import { displaySystemValue } from '../../system-format';
 
 @Component({
   selector: 'app-system-inspector',
-  imports: [IonContent, FormsModule, SystemSectionView, SystemData],
+  imports: [IonContent, FormsModule, SystemSectionView, SystemSensorTable],
   templateUrl: './system-inspector.html',
-  styleUrl: '../../system.scss',
+  styleUrls: ['../../system.scss', './system-inspector.scss'],
 })
 export class SystemInspector {
   readonly state = inject(SystemFacade);
@@ -19,7 +18,6 @@ export class SystemInspector {
   readonly readings = computed(() =>
     this.state.sensors().filter((r) => matchesSensor(r, this.query())),
   );
-  readonly display = displaySystemValue;
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();
   }

@@ -249,7 +249,7 @@ describe('System page', () => {
     await Promise.resolve();
     await Promise.resolve();
   }
-  it('renders unknown values, empty lists, extended fields and the S5 limitation', () => {
+  it('renders unknown values, empty lists and the S5 limitation', () => {
     const fixture = enter();
     const masonry = fixture.nativeElement.querySelector('app-system-overview app-masonry');
     expect(masonry.querySelectorAll(':scope > [appMasonryItem]')).toHaveLength(4);
@@ -267,8 +267,7 @@ describe('System page', () => {
     ])
       expect(text).toContain(expected);
     const inspector = fixture.nativeElement.querySelector('app-system-inspector');
-    expect(inspector.textContent).toContain('future');
-    expect(inspector.textContent).toContain('visible');
+    expect(inspector.textContent).toContain('0 sensores');
   });
   it('retains partial/stale data with independent errors and update timestamps', () => {
     const fixture = enter(),

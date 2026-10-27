@@ -235,8 +235,7 @@ const wake = {
         const inspector = page.locator('app-system-inspector');
         await inspector.locator('#sensor-search').fill('search-me');
         assert.equal(await inspector.locator('tbody tr').count(), 1);
-        await inspector.locator('tbody details summary').click();
-        for (const field of ['voltage', 'duplicate', '0', 'V', 'FUTURE', 'search-me'])
+        for (const field of ['voltage', 'duplicate', '0', 'V', 'FUTURE'])
           assert.ok((await inspector.locator('tbody tr').innerText()).includes(field));
         await inspector.locator('#sensor-search').fill('duplicate');
         assert.equal(await inspector.locator('tbody tr').count(), 2);

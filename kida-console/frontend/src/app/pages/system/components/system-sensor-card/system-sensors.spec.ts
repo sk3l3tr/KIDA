@@ -216,13 +216,35 @@ describe('System sensor interpretation', () => {
     fixture.componentInstance.query.set('visible');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(1);
-    expect(fixture.nativeElement.textContent).toContain('visible');
+    expect(fixture.nativeElement.querySelector('tbody tr').textContent).toContain('Desconocido');
     fixture.componentInstance.query.set('absent');
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Sin sensores coincidentes');
     fixture.componentInstance.query.set('');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(3);
+  });
+  it('shows the total while filtering and formats sensor units and missing critical values', () => {
+    const data = signal<unknown>({ sensors: [
+      { device: 'cpu', label: 'core', type: 'temperature', value: 33, unit: 'C', status: 'OK', critical: 105 },
+      { device: 'fan', type: 'fan', value: 0, unit: 'RPM', status: 'WARNING', critical: null, fault: true },
+    ] });
+    TestBed.configureTestingModule({ providers: [{ provide: SystemFacade, useValue: {
+      health: { title: 'Salud', data, loading: signal(false), updated: signal(null), error: signal('') },
+      sensorsAvailable: () => true,
+      sensors: () => sensorReadings(data()),
+    } }] });
+    const fixture = TestBed.createComponent(SystemInspector);
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.textContent).toContain('33 °C');
+    expect(element.textContent).toContain('105 °C');
+    expect(element.querySelector('[aria-label="Crítico desconocido"]')?.textContent).toContain('—');
+    expect(element.querySelector('.warning')?.textContent).toContain('WARNING');
+    fixture.componentInstance.query.set('cpu');
+    fixture.detectChanges();
+    expect(element.querySelector('.sensor-count')?.textContent).toContain('2 sensores');
+    expect(element.querySelectorAll('tbody tr')).toHaveLength(1);
   });
   it('renders other readings in order with original identifiers and explicit unknowns', () => {
     const data = signal<unknown>({ sensors: [
