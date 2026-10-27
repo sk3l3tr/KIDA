@@ -12,7 +12,11 @@ import { AlertController } from '@ionic/angular';
 import { Observable, Subscription, finalize } from 'rxjs';
 import { ThemeIdentity } from '../../../theme/integration';
 import { SystemService } from './system.service';
-import { fields, sensorGroups, sensorReadings } from './system-sensors';
+import {
+  fields,
+  sensorGroups,
+  sensorReadings,
+} from './components/system-sensor-card/system-sensors';
 import {
   PendingAction,
   PowerAction,

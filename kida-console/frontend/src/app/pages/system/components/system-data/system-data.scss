@@ -1,0 +1,22 @@
+:host {
+  display: block;
+  overflow-wrap: anywhere;
+}
+dl {
+  margin: 0;
+}
+dt {
+  color: var(--kida-muted);
+  font-size: 0.9rem;
+  margin-top: 0.65rem;
+}
+dd {
+  margin: 0.15rem 0 0.5rem 0.75rem;
+}
+ul {
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
+li + li {
+  margin-top: 0.75rem;
+}

@@ -1,0 +1,23 @@
+@if (array(value()); as items) {
+  @if (!items.length) {
+    <span>Sin elementos</span>
+  } @else {
+    <ul>
+      @for (item of items; track $index) {
+        <li><app-system-data [value]="item" /></li>
+      }
+    </ul>
+  }
+} @else if (object(value()); as entries) {
+  @if (!entries.length) {
+    <span>Sin campos</span>
+  }
+  <dl>
+    @for (entry of entries; track entry[0]) {
+      <dt>{{ label(entry[0]) }}</dt>
+      <dd><app-system-data [value]="entry[1]" [field]="entry[0]" /></dd>
+    }
+  </dl>
+} @else {
+  <span>{{ display(value()) }}</span>
+}

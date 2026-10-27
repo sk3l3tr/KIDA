@@ -18,7 +18,7 @@ import {
   extraEquipmentFields,
   systemFields,
 } from './equipment-data';
-import { SystemData } from '../../system/system-data';
+import { SystemData } from '../../system/components/system-data/system-data';
 
 @Component({
   selector: 'app-system-equipment',

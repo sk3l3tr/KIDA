@@ -8,15 +8,18 @@ export const systemRoutes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
       {
         path: 'overview',
-        loadComponent: () => import('./system-overview').then((m) => m.SystemOverview),
+        loadComponent: () =>
+          import('./components/system-overview/system-overview').then((m) => m.SystemOverview),
       },
       {
         path: 'energy',
-        loadComponent: () => import('./system-energy').then((m) => m.SystemEnergy),
+        loadComponent: () =>
+          import('./components/system-energy/system-energy').then((m) => m.SystemEnergy),
       },
       {
         path: 'sensors',
-        loadComponent: () => import('./system-inspector').then((m) => m.SystemInspector),
+        loadComponent: () =>
+          import('./components/system-inspector/system-inspector').then((m) => m.SystemInspector),
       },
     ],
   },

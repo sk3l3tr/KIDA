@@ -1,4 +1,4 @@
-import { CoreFields } from './system.models';
+import { CoreFields } from '../../system.models';
 
 /** Optional fields preserve older, partial and future payloads for inspection. */
 export interface SystemSensor extends CoreFields {

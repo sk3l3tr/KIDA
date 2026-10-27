@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { SystemFacade } from './system.facade';
+import { SystemFacade } from '../../system.facade';
 import { SystemSensorCard } from './system-sensor-card';
 import { SystemInspector } from './system-inspector';
 import {
