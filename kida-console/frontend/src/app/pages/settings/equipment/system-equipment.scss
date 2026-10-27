@@ -1,0 +1,138 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.equipment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  h2 {
+    margin: 0.25rem 0 0;
+  }
+}
+.equipment-status {
+  margin-bottom: 1rem;
+}
+.equipment-list {
+  background: transparent;
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  overflow: hidden;
+  padding: 0;
+}
+.equipment-extras,
+.equipment-details ion-accordion-group {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.equipment-list > :not(:last-child),
+.equipment-details ion-accordion-group > :not(:last-child) {
+  border-bottom: 1px solid var(--ion-border-color);
+}
+ion-accordion {
+  background: transparent;
+}
+ion-item {
+  --background: transparent;
+  --color: var(--ion-text-color);
+  --border-color: var(--ion-border-color);
+  --min-height: 60px;
+  --padding-start: 1rem;
+  --inner-padding-end: 1rem;
+  --border-width: 0;
+  --inner-border-width: 0;
+  font-family: var(--kida-font);
+  ion-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+ion-item[button] {
+  --background-hover: var(--ion-color-primary);
+  --background-hover-opacity: 0.08;
+  --detail-icon-color: var(--ion-color-primary);
+  --detail-icon-opacity: 1;
+}
+ion-item::part(native):focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: -3px;
+}
+ion-label.value-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  > span {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+  > app-system-data {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    text-align: end;
+  }
+}
+.equipment-extras {
+  margin-top: 1rem;
+}
+.equipment-modal {
+  --width: min(760px, calc(100vw - 3rem));
+  --height: min(760px, calc(100dvh - 4rem));
+  font-family: var(--kida-font);
+  &::part(content) {
+    box-sizing: border-box;
+  }
+}
+ion-title {
+  font-family: var(--kida-heading-font);
+}
+.equipment-details {
+  padding: clamp(1rem, 3vw, 1.75rem);
+}
+.detail-content {
+  padding: 1rem;
+  overflow-wrap: anywhere;
+  background: transparent;
+  color: var(--ion-text-color);
+}
+.disk-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  li + li {
+    border-top: 1px solid var(--ion-border-color);
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+  h3 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 767px) {
+  ion-label.value-row {
+    flex-direction: column;
+    align-items: stretch;
+    > app-system-data {
+      text-align: start;
+    }
+  }
+  .equipment-modal {
+    --width: 100%;
+    --height: 100%;
+    --border-radius: 0;
+    &::part(content) {
+      border-radius: 0;
+      border: 0;
+    }
+  }
+}

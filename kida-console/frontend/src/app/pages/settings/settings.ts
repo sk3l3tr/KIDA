@@ -1,11 +1,21 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnDestroy, inject, signal, viewChild } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
 import { ThemeService } from '../../../lib/theming/theme.service';
 import { themeCatalog } from '../../../theme/catalog';
+import { ThemeIdentity } from '../../../theme/integration';
+import { Subscription, finalize } from 'rxjs';
+import { SystemService } from '../system/system.service';
+import { systemFailure } from '../system/system.models';
+import { SystemEquipment } from './equipment/system-equipment';
 
 @Component({
   selector: 'app-settings',
-  imports: [IonContent],
+  imports: [IonContent, SystemEquipment],
+  styles: `
+    app-system-equipment {
+      margin-top: 2rem;
+    }
+  `,
   template: ` <ion-content class="console-content">
     <main class="settings-layout">
       <p class="eyebrow">KIDA CONSOLE</p>
@@ -62,16 +72,72 @@ import { themeCatalog } from '../../../theme/catalog';
           </p>
         }
       </section>
+      <app-system-equipment
+        [value]="info()"
+        [loading]="loading()"
+        [error]="error()"
+        [updated]="updated()"
+        (refresh)="refresh()"
+      />
     </main>
   </ion-content>`,
 })
-export class Settings {
+export class Settings implements OnDestroy {
+  private readonly service = inject(SystemService);
+  private readonly identity = inject(ThemeIdentity);
+  private readonly equipment = viewChild(SystemEquipment);
+  readonly info = signal<unknown>(null);
+  readonly loading = signal(false);
+  readonly error = signal('');
+  readonly updated = signal<Date | null>(null);
+  private active = false;
+  private subscriptions = new Subscription();
+  private readonly sessionChanges = this.identity.changes.subscribe(() => this.reset());
   readonly themes = inject(ThemeService);
   readonly catalog = themeCatalog;
   readonly modes = [
     { id: 'light', label: 'Claro' },
     { id: 'dark', label: 'Oscuro' },
   ] as const;
+  ionViewWillEnter(): void {
+    this.reset();
+    this.active = true;
+    this.refresh();
+  }
+  ionViewWillLeave(): void {
+    this.active = false;
+    this.reset();
+  }
+  ngOnDestroy(): void {
+    this.ionViewWillLeave();
+    this.sessionChanges.unsubscribe();
+  }
+  private reset(): void {
+    this.equipment()?.clear();
+    this.subscriptions.unsubscribe();
+    this.subscriptions = new Subscription();
+    this.info.set(null);
+    this.loading.set(false);
+    this.error.set('');
+    this.updated.set(null);
+  }
+  refresh(): void {
+    if (!this.active || this.loading()) return;
+    this.loading.set(true);
+    this.error.set('');
+    this.subscriptions.add(
+      this.service
+        .info()
+        .pipe(finalize(() => this.loading.set(false)))
+        .subscribe({
+          next: (data) => {
+            this.info.set(data);
+            this.updated.set(new Date());
+          },
+          error: (failure) => this.error.set(systemFailure(failure)),
+        }),
+    );
+  }
   selectedDefinition() {
     return this.themes.themes.find((theme) => theme.id === this.themes.theme())!;
   }

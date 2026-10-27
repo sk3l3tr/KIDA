@@ -161,18 +161,30 @@ html[data-theme],
   --kida-shadow: 0 12px 40px #00000014;
   // Effects are composed into a shadow list, where `none` is invalid.
   --kida-effect: 0 0 0 0 transparent;
+  --kida-modal-duration: 180;
+  --kida-modal-offset: 6px;
+  --kida-modal-scale: 0.98;
+  --kida-modal-easing: ease-out;
 }
 html[data-theme='neobrutalism'],
 .theme-preview[data-theme='neobrutalism'] {
   --kida-radius: 0;
   --kida-border-width: 3px;
   --kida-shadow: 5px 5px 0 var(--ion-border-color);
+  --kida-modal-duration: 140;
+  --kida-modal-offset: 12px;
+  --kida-modal-scale: 1;
+  --kida-modal-easing: cubic-bezier(0.2, 0, 0.2, 1);
 }
 html[data-theme='sakura'],
 .theme-preview[data-theme='sakura'] {
   --kida-heading-font: Georgia, 'Liberation Serif', serif;
   --kida-radius: 1.25rem;
   --kida-space: 2rem;
+  --kida-modal-duration: 280;
+  --kida-modal-offset: 16px;
+  --kida-modal-scale: 0.99;
+  --kida-modal-easing: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 html[data-theme='tokyo'],
 .theme-preview[data-theme='tokyo'] {
@@ -180,6 +192,9 @@ html[data-theme='tokyo'],
   --kida-radius: 0.25rem;
   --kida-shadow: 0 0 0 1px var(--ion-border-color);
   --kida-effect: 0 0 18px #68e3e12b;
+  --kida-modal-duration: 120;
+  --kida-modal-offset: 3px;
+  --kida-modal-scale: 1;
 }
 // Ionic Shadow DOM uses inherited variables and documented public parts.
 html[data-theme][data-mode] :is(ion-modal, ion-alert, ion-popover, ion-loading, ion-toast) {

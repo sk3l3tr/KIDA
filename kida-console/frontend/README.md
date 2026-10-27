@@ -62,8 +62,8 @@ opened with the header menu button. Each entry loads its standalone page lazily:
 `/administrators`. These routes require a session; `/login` remains public.
 The root URL and unknown paths redirect to `/dashboard`.
 
-`/settings` contains the appearance gallery. `/administrators` retains account
-management. `/system` provides equipment information, health/sensors, RTC
+`/settings` contains the appearance gallery followed by equipment information.
+`/administrators` retains account management. `/system` provides health/sensors, RTC
 diagnostics and confirmed power actions. `/scheduler` manages CORE schedules;
 dashboard and backups retain their placeholders. `/docker` provides container listing
 and actions, Compose version, project listing and inspection. See
@@ -96,13 +96,45 @@ The eight ARCA actions and typed service live in `src/app/pages/docker`, using t
 shared cookie/CSRF transport. See the [specification](docs/specs/docker-frontend.md)
 and [verification instructions](src/app/pages/docker/docker.verification.md).
 
-## System
+## System and equipment settings
 
-The page loads its three queries on each Ionic entry and refreshes sections
-individually on demand. Each section keeps its own loading, error and last-update
+`/system` redirects to `/system/overview`. System has three routed top tabs:
+Overview, RTC / Energy (`/system/energy`) and the searchable sensor inspector
+(`/system/sensors`). A container-scoped facade loads the two queries on entry,
+shares the snapshots across tabs and refreshes sections individually on demand. Each section keeps its own loading, error and last-update
 state. Values are snapshots; failed refreshes retain visibly stale data. Nulls,
 empty lists and future CORE fields remain visible. RTC diagnostics do not prove
-physical S5 wake support.
+physical S5 wake support. Known sensors are grouped dynamically; duplicate labels,
+unknown types and future fields remain inspectable. Core temperature statistics are
+snapshot-derived and separated by device and compatible unit. Proportions use only
+finite readings and positive reported critical thresholds; `max` is never capacity.
+Zero RPM does not imply a fault. Leaving Energy invalidates pending confirmations;
+a request already sent remains blocked until its response, and can keep executing.
+
+Run `node src/app/pages/system/system.browser.cjs` against the development server
+on port 4230 for the intercepted API matrix (seven theme modes, 360/768/1440 px).
+See [System verification](src/app/pages/system/system.verification.md) for scope and
+connected-read evidence.
+
+Settings loads equipment information on entry and supports manual refresh.
+It shows the equipment section after Appearance, using a separate presentation
+component: hostname is shown inline;
+operating system and hardware open responsive Ionic dialogs with multiple expandable
+groups, initially collapsed. Direct values precede expandable groups, preserving
+the relative order within each set. A single GPU is shown directly, disks retain
+their individual details, and additional CORE fields remain available under
+“Otros datos”. Dialogs reuse theme
+styles and theme-specific enter/leave motion, respect reduced motion, and close on
+page exit or session changes. Settings owns equipment requests and refresh state;
+System keeps health, RTC and power operations.
+The component uses the Ionic module already loaded by ARCA to preserve lazy loading.
+
+Browser verification (all APIs simulated, no real power operations): with the
+frontend running at `http://127.0.0.1:4230`, run
+`node src/app/pages/settings/equipment/system-equipment.browser.cjs`. Set `SYSTEM_TEST_URL`,
+`PLAYWRIGHT_MODULE`, `CHROMIUM_PATH` or `SYSTEM_TEST_OUTPUT` if needed. It checks
+desktop/mobile across all seven theme/mode combinations, keyboard/focus, stale
+refreshes, navigation/session cleanup and reduced motion.
 
 Shutdown and reboot start at `+1` and accept `now`, `+N` minutes or a valid 24-hour
 time. Power cycle selects exactly one wake mode: `HH:MM` or an integer of at least

@@ -1,0 +1,117 @@
+<section class="equipment-panel" aria-label="Equipo" [attr.aria-busy]="loading()">
+  <div class="equipment-header">
+    <div>
+      <span class="eyebrow">INFORMACIÓN DEL SERVIDOR</span>
+      <h2>Equipo</h2>
+    </div>
+    <button class="secondary" (click)="refresh.emit()" [disabled]="loading()">
+      Actualizar Equipo
+    </button>
+  </div>
+  <ng-container [ngTemplateOutlet]="status" />
+  @if (value() !== null) {
+    <ion-list class="equipment-list" lines="none">
+      <ion-item class="hostname-row">
+        <ion-label class="value-row">
+          <span>Nombre del equipo</span>
+          <app-system-data [value]="fields()['hostname']" />
+        </ion-label>
+      </ion-item>
+      <ion-item button detail (click)="open('system')" aria-haspopup="dialog">
+        <ion-label>Sistema operativo</ion-label>
+      </ion-item>
+      <ion-item button detail (click)="open('hardware')" aria-haspopup="dialog">
+        <ion-label>Hardware</ion-label>
+      </ion-item>
+    </ion-list>
+    @if (extras(); as extra) {
+      <ion-accordion-group class="equipment-extras">
+        <ion-accordion value="extra">
+          <ion-item slot="header"><ion-label>Otros datos</ion-label></ion-item>
+          <div slot="content" class="detail-content"><app-system-data [value]="extra.value" /></div>
+        </ion-accordion>
+      </ion-accordion-group>
+    }
+  }
+</section>
+
+<ion-modal
+  class="equipment-modal"
+  [isOpen]="isOpen()"
+  [enterAnimation]="enterAnimation"
+  [leaveAnimation]="leaveAnimation"
+  [attr.aria-label]="title()"
+  (willPresent)="labelDialog($event)"
+  (didPresent)="focusClose()"
+  (didDismiss)="didDismiss()"
+>
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>{{ title() }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button #closeButton class="equipment-close" (click)="close()">Cerrar</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="equipment-details">
+        <ng-container [ngTemplateOutlet]="status" />
+        <ion-accordion-group multiple>
+          @for (group of groups(); track group.key) {
+            @if (group.expandable) {
+              <ion-accordion [value]="group.key">
+                <ion-item slot="header"
+                  ><ion-label>{{ group.title }}</ion-label></ion-item
+                >
+                <div slot="content" class="detail-content">
+                  @if (group.key === 'disks' && disks(group.value); as items) {
+                    <ol class="disk-list">
+                      @for (disk of items; track $index) {
+                        <li>
+                          <h3>{{ diskName(disk, $index) }}</h3>
+                          <app-system-data [value]="disk" />
+                        </li>
+                      }
+                    </ol>
+                  } @else {
+                    <app-system-data [value]="group.value" [field]="group.key" />
+                  }
+                </div>
+              </ion-accordion>
+            } @else {
+              <ion-item class="detail-value">
+                <ion-label class="value-row">
+                  <span>{{ group.title }}</span>
+                  <app-system-data [value]="group.value" [field]="group.key" />
+                </ion-label>
+              </ion-item>
+            }
+          }
+        </ion-accordion-group>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<ng-template #status>
+  <div class="equipment-status" aria-live="polite">
+    @if (loading()) {
+      <p>Cargando…</p>
+    }
+    @if (updated()) {
+      <small
+        >Última actualización: {{ updated() | date: 'medium' }}. Instantánea; puede estar
+        desactualizada.</small
+      >
+    } @else {
+      <small>Sin actualización disponible.</small>
+    }
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+    @if (value() !== null && (error() || loading())) {
+      <p>Datos anteriores; pendientes de actualizar.</p>
+    }
+  </div>
+</ng-template>

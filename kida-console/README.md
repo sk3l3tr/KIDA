@@ -177,13 +177,32 @@ CSRF, límites de intentos, unicidad, cambios propios, revocación y eliminació
 concurrente. La aceptación en contenedor debe usar recursos desechables y
 comprobar también persistencia al recrearlo. No requiere operar sobre CORE.
 
-## Página System
+## Páginas System y Settings
 
-`/system` consulta equipo, memoria, discos, gráficos, salud/sensores y capacidades
-RTC al entrar. Cada sección tiene actualización manual, error y fecha propios;
+`/system` redirige a `/system/overview`, con pestañas superiores para Resumen,
+RTC/Energía (`/system/energy`) y el inspector con búsqueda (`/system/sensors`).
+Una fachada compartida consulta salud/sensores y capacidades RTC al entrar en
+System y conserva las instantáneas al cambiar de pestaña. `/settings` carga
+la información de Equipo al entrar, después de Apariencia en la página.
+Cada sección tiene actualización manual, error y fecha propios;
 no hay sondeo periódico. Los datos anteriores se conservan al fallar una
 actualización y se identifican como desactualizados. Se muestran nulos, listas
 vacías y campos nuevos; el diagnóstico RTC no demuestra encendido físico desde S5.
+Los sensores se agrupan por tipo y dispositivo reconocible, conservando etiquetas
+repetidas y tipos futuros en el inspector. Las estadísticas de núcleos se calculan
+por dispositivo y unidad compatible; las proporciones solo usan umbrales críticos
+positivos reportados. Cero RPM no implica avería. Abandonar Energía invalida las
+confirmaciones pendientes; una orden enviada puede continuar ejecutándose.
+
+La sección «Equipo» de Settings muestra el nombre directamente y abre los detalles de sistema
+operativo y hardware en modales adaptados a escritorio y móvil. Los datos se agrupan
+en accordions inicialmente cerrados que pueden permanecer abiertos simultáneamente.
+Los valores directos aparecen primero y los desplegables después, conservando el
+orden relativo dentro de cada grupo; un único gráfico se
+muestra directamente y los campos adicionales se conservan en «Otros datos».
+Las transiciones varían por tema y respetan la preferencia de movimiento reducido.
+Los detalles se cierran al salir de la página o cambiar de sesión. System conserva
+salud, sensores, capacidades RTC y energía; ya no carga la información de Equipo.
 
 Apagado y reinicio admiten `now`, `+N` minutos u hora válida, con `+1` inicial.
 El ciclo de energía permite elegir hora `HH:MM` o segundos desde la ejecución
