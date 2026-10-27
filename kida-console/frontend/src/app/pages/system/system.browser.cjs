@@ -43,13 +43,15 @@ const health = {
       alarm: false,
       fault: false,
     },
+    { type: 'fan', label: 'alert-fan', value: 1200, unit: 'RPM', status: 'CRITICAL', alarm: true, fault: null },
+    { type: 'fan', label: 'unknown-fan', value: null, unit: null, status: 'FUTURE', alarm: null, fault: null },
     {
       type: 'fan',
       device: 'qc71_laptop.hwmon.fan',
       label: 'fan2',
       value: 0,
       unit: 'RPM',
-      status: 'OK',
+      status: 'CRITICAL',
       alarm: false,
       fault: false,
     },
@@ -166,8 +168,27 @@ const wake = {
         await page.goto(`${base}/system`);
         await page.waitForURL('**/system/overview');
         const overview = page.locator('app-system-overview');
-        await overview.getByText('14 núcleos medidos', { exact: false }).waitFor();
-        assert.equal(await overview.locator('app-system-sensor-card').count(), 24);
+        await overview.locator('app-system-fan-row').filter({ hasText: 'fan1' }).waitFor();
+        assert.equal(await overview.locator('app-system-sensor-card').count(), 22);
+        const fans = overview.locator('app-system-fan-row');
+        assert.equal(await fans.count(), 4);
+        assert.equal(await fans.locator('.spinning').count(), 2);
+        assert.equal(await fans.locator('.danger').count(), 2);
+        const stoppedIcon = fans.filter({ hasText: 'fan2' }).locator('.fan-icon');
+        assert.equal(await stoppedIcon.evaluate((el) => {
+          const probe = document.createElement('span');
+          probe.style.backgroundColor = 'var(--kida-muted)';
+          el.appendChild(probe);
+          const matches = getComputedStyle(el).backgroundColor === getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          return matches;
+        }), true);
+        assert.match(await fans.filter({ hasText: 'unknown-fan' }).innerText(), /Fallo: Desconocido/);
+        assert.doesNotMatch(await fans.first().innerText(), /Temperatura/);
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        assert.equal(await fans.first().locator('svg').evaluate((el) => getComputedStyle(el).animationName), 'none');
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        assert.notEqual(await fans.first().locator('svg').evaluate((el) => getComputedStyle(el).animationName), 'none');
         assert.equal(await overview.locator('.compact').count(), 14);
         assert.deepEqual(reads, { health: 1, wake: 1 });
         assert.equal(await page.locator('ion-tab-bar').getAttribute('slot'), 'top');
@@ -187,7 +208,7 @@ const wake = {
         await inspector.locator('#sensor-search').fill('duplicate');
         assert.equal(await inspector.locator('tbody tr').count(), 2);
         await inspector.locator('#sensor-search').fill('');
-        assert.equal(await inspector.locator('tbody tr').count(), 24);
+        assert.equal(await inspector.locator('tbody tr').count(), 26);
         await inspector.locator('.table-wrap').focus();
         await page.keyboard.press('ArrowRight');
         await page.screenshot({ path: `${output}/${name}-sensors.png` });
@@ -262,7 +283,7 @@ const wake = {
         failHealth = true;
         await overview.getByRole('button', { name: 'Actualizar Salud y sensores' }).click();
         await overview.getByText('Datos anteriores', { exact: false }).waitFor();
-        assert.equal(await overview.locator('app-system-sensor-card').count(), 24);
+        assert.equal(await overview.locator('app-system-sensor-card').count(), 22);
         failHealth = false;
         emptyHealth = true;
         await overview.getByRole('button', { name: 'Actualizar Salud y sensores' }).click();

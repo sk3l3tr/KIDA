@@ -1,0 +1,66 @@
+.fan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: var(--kida-border-width) solid var(--ion-color-step-200, var(--kida-muted));
+  border-radius: var(--kida-radius);
+}
+.fan-icon {
+  flex: 0 0 3rem;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--kida-radius);
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+}
+.fan-icon.danger {
+  background: var(--ion-color-danger);
+  color: var(--ion-color-danger-contrast);
+}
+.fan-icon.stopped {
+  background: var(--kida-muted);
+  color: var(--ion-background-color);
+}
+.fan-blades {
+  width: 75%;
+  height: 75%;
+}
+.fan-blades.spinning {
+  animation: fan-spin 3s linear infinite;
+}
+.fan-details {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.fan-details small {
+  color: var(--kida-muted);
+}
+.fan-speed {
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+@keyframes fan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fan-blades.spinning {
+    animation: none;
+  }
+}
+@media (max-width: 400px) {
+  .fan-row {
+    flex-wrap: wrap;
+  }
+  .fan-speed {
+    flex-basis: 100%;
+  }
+}

@@ -64,6 +64,10 @@ h3 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: 0.5rem;
 }
+.fan-list {
+  display: grid;
+  gap: 0.5rem;
+}
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

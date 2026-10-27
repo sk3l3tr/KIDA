@@ -4,13 +4,14 @@ import { SystemFacade } from '../../system.facade';
 import { SystemSectionView } from '../system-section/system-section';
 import { SystemData } from '../system-data/system-data';
 import { SystemSensorCard } from '../system-sensor-card/system-sensor-card';
+import { SystemFanRow } from '../system-fan-row/system-fan-row';
 import { coreStatistics, fields, healthExtras, isCore } from '../system-sensor-card/system-sensors';
 import { SystemIndicator } from '../system-indicator/system-indicator';
 import { displaySystemValue } from '../../system-format';
 
 @Component({
   selector: 'app-system-overview',
-  imports: [IonContent, SystemSectionView, SystemData, SystemSensorCard, SystemIndicator],
+  imports: [IonContent, SystemSectionView, SystemData, SystemSensorCard, SystemFanRow, SystemIndicator],
   templateUrl: './system-overview.html',
   styleUrl: '../../system.scss',
 })
