@@ -1,25 +1,120 @@
-:host { display: block; }
-.rtc-header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem; }
-h2 { margin: 0 0 0.5rem; font-family: var(--kida-heading-font); }
-.diagnosis { color: var(--ion-color-warning); font-weight: 700; }
-.device { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; padding: var(--kida-space) 0; }
-.device-icon { position: relative; width: 7.5rem; height: 7.5rem; flex: 0 0 7.5rem; }
-.device-icon svg { width: 100%; height: 100%; }
-.device-label { position: absolute; inset: 25%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-width: 0; }
-.ring-base { stroke: var(--ion-border-color); }
-.ring-accent { stroke: var(--ion-color-primary); }
-.ring-detail { stroke: var(--kida-muted); }
-.device small, footer { color: var(--kida-muted); }
-.device-name { max-width: 100%; font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; max-height: 2.5rem; overflow: auto; }
-.device-label small { font-size: 0.6rem; line-height: 1.1; }
-.capabilities { margin: 0; }
-.capabilities > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 1rem; padding: 0.85rem 0; border-top: var(--kida-border-width) solid var(--ion-border-color); }
-dt { color: var(--kida-muted); }
-dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
-.warnings { margin-top: 1rem; padding: 1rem; border: var(--kida-border-width) solid var(--ion-color-warning); border-radius: var(--kida-radius); }
-.warnings ul { margin-bottom: 0; padding-left: 1.25rem; }
-details { margin-top: 1rem; }
-summary { cursor: pointer; color: var(--ion-color-primary); padding-block: 0.6rem; font-weight: 600; }
-summary:focus-visible { outline: 3px solid var(--ion-color-primary); outline-offset: 3px; }
-.explanation { color: var(--kida-muted); flex: 1 1 12rem; margin: 0; }
-footer { padding-top: 1rem; }
+:host {
+  display: block;
+}
+.rtc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--kida-heading-font);
+}
+.diagnosis {
+  color: var(--ion-color-warning);
+  font-weight: 700;
+}
+.device {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: var(--kida-space) 0;
+}
+.device-icon {
+  position: relative;
+  width: 7.5rem;
+  height: 7.5rem;
+  flex: 0 0 7.5rem;
+}
+.device-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.device-label {
+  position: absolute;
+  inset: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-width: 0;
+}
+.ring-base {
+  stroke: var(--ion-border-color);
+}
+.ring-accent {
+  stroke: var(--ion-color-primary);
+}
+.ring-detail {
+  stroke: var(--kida-muted);
+}
+.device small,
+footer {
+  color: var(--kida-muted);
+}
+.device-name {
+  max-width: 100%;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  max-height: 2.5rem;
+  overflow: auto;
+}
+.device-label small {
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+.capabilities {
+  margin: 0;
+}
+.capabilities > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.85rem 0;
+  border-top: var(--kida-border-width) solid var(--ion-border-color);
+}
+dt {
+  color: var(--kida-muted);
+}
+dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.warnings {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: var(--kida-border-width) solid var(--ion-color-warning);
+  border-radius: var(--kida-radius);
+}
+.warnings ul {
+  margin-bottom: 0;
+  padding-left: 1.25rem;
+}
+details {
+  margin-top: 1rem;
+}
+summary {
+  cursor: pointer;
+  color: var(--ion-color-primary);
+  padding-block: 0.6rem;
+  font-weight: 600;
+}
+summary:focus-visible {
+  outline: 3px solid var(--ion-color-primary);
+  outline-offset: 3px;
+}
+.explanation {
+  color: var(--kida-muted);
+  flex: 1 1 12rem;
+  margin: 0;
+}
+footer {
+  padding-top: 1rem;
+}

@@ -1,11 +1,11 @@
 <ion-content class="console-content"
   ><main class="system-page">
-    <header class="page-heading">
+    <!-- <header class="page-heading">
       <span class="eyebrow">CONTROL DEL EQUIPO</span>
       <h1>Inspector de sensores</h1>
       <p>Lecturas originales sin agrupar, incluidos los tipos y campos desconocidos.</p>
-    </header>
-    <section class="panel">
+    </header> -->
+    <section>
       <app-system-section [state]="state.health" (refresh)="state.refresh(state.health)" />
     </section>
     <section class="panel" aria-label="Inspector de sensores">
@@ -31,9 +31,6 @@
         aria-label="Tabla de sensores, desplazamiento horizontal"
       >
         <table>
-          <caption>
-            Instantánea Health · valores y estados reportados
-          </caption>
           <thead>
             <tr>
               <th scope="col">Dispositivo</th>
@@ -42,7 +39,6 @@
               <th scope="col">Valor</th>
               <th scope="col">Estado</th>
               <th scope="col">Crítico</th>
-              <th scope="col">Detalles</th>
             </tr>
           </thead>
           <tbody>
@@ -56,12 +52,6 @@
                 </td>
                 <td>{{ display(reading.fields['status']) }}</td>
                 <td>{{ display(reading.fields['critical']) }}</td>
-                <td>
-                  <details>
-                    <summary>Todos los campos · {{ reading.index + 1 }}</summary>
-                    <app-system-data [value]="reading.raw" />
-                  </details>
-                </td>
               </tr>
             } @empty {
               <tr>
@@ -71,11 +61,6 @@
           </tbody>
         </table>
       </div>
-      @if (state.health.data() !== null) {
-        <details>
-          <summary>Respuesta Health completa</summary>
-          <app-system-data [value]="state.health.data()" />
-        </details>
-      }
-    </section></main
-></ion-content>
+    </section>
+  </main></ion-content
+>

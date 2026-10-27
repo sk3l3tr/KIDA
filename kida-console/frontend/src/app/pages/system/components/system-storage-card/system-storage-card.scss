@@ -27,10 +27,10 @@
   min-height: 5rem;
 }
 .drive-panel {
-  fill: var(--ion-background-color);
+  fill: var(--ion-color-primary-contrast);
 }
 .drive-lines {
-  stroke: var(--ion-color-primary-contrast);
+  stroke: var(--ion-color-primary);
 }
 .storage-primary {
   min-width: 0;
@@ -52,7 +52,7 @@
   margin-top: 0.5rem;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--ion-color-step-200, var(--ion-border-color));
+  background: var(--ion-color-primary-contrast);
 }
 .storage-meter span {
   display: block;

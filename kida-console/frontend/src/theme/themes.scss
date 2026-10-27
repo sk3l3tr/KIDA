@@ -15,13 +15,13 @@ $palettes: (
       #718497,
     ),
     dark: (
-      #101b27,
-      #1b2b3c,
-      #ecf2f8,
-      #b1c3d5,
-      #83d8ef,
-      #102531,
-      #8a9eb2,
+      #080f17,
+      #101922,
+      #e8f1f3,
+      #7e96a4,
+      #1eb09f,
+      #122a32,
+      #233441,
     ),
   ),
   neobrutalism: (
@@ -222,4 +222,8 @@ html[data-theme] :is(ion-button, ion-input, ion-select, ion-textarea, ion-card) 
   --border-radius: var(--kida-radius);
   --border-color: var(--ion-border-color);
   --highlight-color-focused: var(--ion-color-primary);
+}
+
+.mutted {
+  color: var(--kida-muted);
 }
