@@ -62,7 +62,7 @@ h3 {
 .sensor-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: 1rem;
+  gap: 0.5rem;
 }
 .stats-grid {
   display: grid;
@@ -78,7 +78,6 @@ dd {
   margin: 0.25rem 0 0;
 }
 .core-statistics {
-  border-bottom: 1px solid var(--ion-border-color);
   padding-bottom: 1rem;
   margin-bottom: 1rem;
 }
@@ -158,7 +157,7 @@ td app-system-data {
   }
 }
 .core-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 5rem), 1fr));
 }
 
 .package-reading {

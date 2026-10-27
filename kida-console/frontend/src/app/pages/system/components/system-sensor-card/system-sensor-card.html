@@ -1,12 +1,20 @@
 <article class="sensor-card" [class.compact]="compact()">
   <div class="sensor-heading">
-    <div>
-      <strong>{{ display(reading().fields['label']) }}</strong
-      ><small
-        >{{ display(reading().fields['device']) }} · {{ display(reading().fields['type']) }}</small
-      >
+    <div [style.width.%]="compact() ? 100 : 80">
+      @if (!compact()) {
+        <strong>{{ display(reading().fields['label']) }}</strong>
+        <small
+          >{{ display(reading().fields['device']) }} ·
+          {{ display(reading().fields['type']) }}</small
+        >
+      } @else {
+        <span style="font-size: 0.75rem">{{ display(reading().fields['label']) }}</span>
+      }
     </div>
-    <span class="status">{{ display(reading().fields['status']) }}</span>
+
+    @if (!compact()) {
+      <span class="status">{{ display(reading().fields['status']) }}</span>
+    }
   </div>
   <div class="sensor-value">
     {{ display(reading().fields['value']) }}
@@ -14,12 +22,12 @@
   </div>
   @if (!compact() && ratio() !== null) {
     <div class="sensor-meter" aria-hidden="true"><span [style.width.%]="ratio()"></span></div>
-    <small>Proporción del umbral crítico reportado; no es porcentaje de uso.</small>
+    <!-- <small>Proporción del umbral crítico reportado; no es porcentaje de uso.</small> -->
   }
   @if (!compact()) {
     <dl class="sensor-limits">
       <div>
-        <dt>Máximo reportado</dt>
+        <dt>Máximo</dt>
         <dd>{{ display(reading().fields['max']) }}</dd>
       </div>
       <div>
@@ -36,13 +44,13 @@
       </div>
     </dl>
   } @else {
-    <small
+    <!-- <small
       >Alarma: {{ display(reading().fields['alarm']) }} · Fallo:
       {{ display(reading().fields['fault']) }}</small
-    >
+    > -->
   }
-  <details>
+  <!-- <details>
     <summary>Lectura original · todos los campos</summary>
     <app-system-data [value]="reading().raw" />
-  </details>
+  </details> -->
 </article>

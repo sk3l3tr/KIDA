@@ -3,12 +3,24 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
 .sensor-card {
   padding: 1rem;
-  border: var(--kida-border-width) solid var(--ion-border-color);
-  border-radius: var(--kida-radius);
   height: 100%;
   min-width: 0;
+}
+.compact {
+  padding: 0.75rem;
+  text-align: center;
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+}
+.compact .sensor-value {
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+.compact summary {
+  font-size: 0.8rem;
 }
 .sensor-heading {
   display: flex;
@@ -69,14 +81,4 @@ summary {
 summary:focus-visible {
   outline: 3px solid var(--ion-color-primary);
   outline-offset: 3px;
-}
-.compact {
-  padding: 0.75rem;
-}
-.compact .sensor-value {
-  font-size: 1.4rem;
-  margin: 0.5rem 0;
-}
-.compact summary {
-  font-size: 0.8rem;
 }
