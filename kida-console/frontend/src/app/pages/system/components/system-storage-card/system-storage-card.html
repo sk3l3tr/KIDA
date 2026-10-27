@@ -1,0 +1,56 @@
+<article class="storage-card">
+  <div class="storage-device">{{ display(reading().fields['device']) }}</div>
+  <div class="storage-main">
+    <div class="system-icon" aria-hidden="true">
+      <svg viewBox="0 0 100 70" width="90" height="60" fill="none">
+        <rect x="8" y="14" width="84" height="42" rx="5" stroke="currentColor" stroke-width="1.5" />
+        <rect
+          x="18"
+          y="22"
+          width="35"
+          height="25"
+          rx="3"
+          class="drive-panel"
+          stroke="currentColor"
+        />
+        <circle cx="78" cy="35" r="5" stroke="currentColor" />
+        <path d="M57 24h11M57 30h11M57 38h11M57 44h11" class="drive-lines" />
+      </svg>
+    </div>
+    <div class="storage-primary">
+      <div class="storage-value">
+        <span>{{ display(reading().fields['value']) }}</span>
+        <small>{{ display(reading().fields['unit']) }}</small>
+      </div>
+      <div class="storage-label">{{ display(reading().fields['label']) }}</div>
+    </div>
+  </div>
+  <div class="storage-limit">
+    Umbral crítico: {{ display(reading().fields['critical']) }}
+    {{ display(reading().fields['unit']) }}
+  </div>
+  @if (ratio() !== null) {
+    <div
+      class="storage-meter"
+      role="progressbar"
+      aria-label="Proporción del umbral crítico (escala visual limitada al 0–100 %)"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="ratio()"
+      [attr.aria-valuetext]="percentage() + ' del umbral crítico'"
+    >
+      <span [style.width.%]="ratio()"></span>
+    </div>
+  }
+  <div class="storage-proportion">
+    Porcentaje del umbral crítico: {{ percentage() }} · no es porcentaje de uso
+  </div>
+  @for (item of secondary(); track item.index) {
+    <div class="storage-secondary">
+      <span>{{ display(item.fields['label']) }}</span>
+      <strong
+        >{{ display(item.fields['value']) }} <span>{{ display(item.fields['unit']) }}</span></strong
+      >
+    </div>
+  }
+</article>

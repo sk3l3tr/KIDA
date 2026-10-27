@@ -44,6 +44,14 @@
                 <p>Sin lecturas disponibles.</p>
               }
             </div>
+          } @else if (group.key === 'storage') {
+          <div class="storage-list">
+            @for (readings of storageDevices(group.readings); track readings[0].index) {
+              <app-system-storage-card [readings]="readings" />
+            } @empty {
+              <p>Sin lecturas disponibles.</p>
+            }
+          </div>
           } @else {
           <div class="sensor-grid">
             @for (reading of group.readings; track reading.index) {

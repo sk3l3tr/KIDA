@@ -5,7 +5,7 @@ import { finite, SensorReading } from '../system-sensor-card/system-sensors';
 @Component({
   selector: 'app-system-fan-row',
   templateUrl: './system-fan-row.html',
-  styleUrl: './system-fan-row.scss',
+  styleUrls: ['../system-icon.scss', './system-fan-row.scss'],
 })
 export class SystemFanRow {
   readonly reading = input.required<SensorReading>();

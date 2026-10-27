@@ -6,21 +6,16 @@
   border: var(--kida-border-width) solid var(--ion-color-step-200, var(--kida-muted));
   border-radius: var(--kida-radius);
 }
-.fan-icon {
+.system-icon {
   flex: 0 0 3rem;
-  display: grid;
-  place-items: center;
   width: 3rem;
   height: 3rem;
-  border-radius: var(--kida-radius);
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
 }
-.fan-icon.danger {
+.system-icon.danger {
   background: var(--ion-color-danger);
   color: var(--ion-color-danger-contrast);
 }
-.fan-icon.stopped {
+.system-icon.stopped {
   background: var(--kida-muted);
   color: var(--ion-background-color);
 }

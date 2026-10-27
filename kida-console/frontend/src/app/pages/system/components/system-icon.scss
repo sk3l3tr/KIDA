@@ -1,0 +1,7 @@
+.system-icon {
+  display: grid;
+  place-items: center;
+  border-radius: var(--kida-radius);
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+}

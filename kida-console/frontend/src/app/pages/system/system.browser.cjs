@@ -169,12 +169,29 @@ const wake = {
         await page.waitForURL('**/system/overview');
         const overview = page.locator('app-system-overview');
         await overview.locator('app-system-fan-row').filter({ hasText: 'fan1' }).waitFor();
-        assert.equal(await overview.locator('app-system-sensor-card').count(), 22);
+        assert.equal(await overview.locator('app-system-sensor-card').count(), 20);
+        const storage = overview.locator('app-system-storage-card');
+        assert.equal(await storage.count(), 1);
+        assert.match(await storage.nth(0).innerText(), /Composite/);
+        assert.match(await storage.nth(0).innerText(), /Sensor 2/);
+        assert.equal(await storage.locator('.storage-secondary').count(), 1);
+        assert.equal(await storage.locator('.storage-status').count(), 0);
+        assert.equal(await storage.locator('.storage-value small').evaluate(el => getComputedStyle(el).display), 'inline');
+        assert.equal(await storage.locator('.storage-card').evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
+        assert.match(await storage.first().innerText(), /Porcentaje del umbral crítico/);
+        assert.equal(await storage.locator('.storage-meter').count(), 1);
+        assert.ok(await overview.locator('[aria-label="Almacenamiento"]').evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
         const fans = overview.locator('app-system-fan-row');
         assert.equal(await fans.count(), 4);
+        const iconColors = (el) => {
+          const style = getComputedStyle(el);
+          return [style.backgroundColor, style.color, style.borderRadius];
+        };
+        assert.deepEqual(await storage.locator('.system-icon').evaluate(iconColors),
+          await fans.first().locator('.system-icon').evaluate(iconColors));
         assert.equal(await fans.locator('.spinning').count(), 2);
         assert.equal(await fans.locator('.danger').count(), 2);
-        const stoppedIcon = fans.filter({ hasText: 'fan2' }).locator('.fan-icon');
+        const stoppedIcon = fans.filter({ hasText: 'fan2' }).locator('.system-icon');
         assert.equal(await stoppedIcon.evaluate((el) => {
           const probe = document.createElement('span');
           probe.style.backgroundColor = 'var(--kida-muted)';
@@ -288,7 +305,7 @@ const wake = {
         failHealth = true;
         await overview.getByRole('button', { name: 'Actualizar Salud y sensores' }).click();
         await overview.getByText('Datos anteriores', { exact: false }).waitFor();
-        assert.equal(await overview.locator('app-system-sensor-card').count(), 22);
+        assert.equal(await overview.locator('app-system-sensor-card').count(), 20);
         failHealth = false;
         emptyHealth = true;
         await overview.getByRole('button', { name: 'Actualizar Salud y sensores' }).click();
@@ -296,6 +313,8 @@ const wake = {
           () =>
             document.querySelectorAll('app-system-overview app-system-sensor-card').length === 0,
         );
+        assert.equal(await storage.count(), 0);
+        assert.match(await overview.locator('[aria-label="Almacenamiento"]').innerText(), /Sin lecturas disponibles/);
         assert.equal(reads.wake, 1);
         // Direct route reload exercises parent/child lifecycle order without tab history.
         await page.goto(`${base}/system/energy`);

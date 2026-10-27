@@ -12,7 +12,7 @@ describe('SystemFanRow', () => {
     ] as const) {
       fixture.componentRef.setInput('reading', sensorReadings({ sensors: [{ value, unit, status }] })[0]);
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('.fan-icon').classList.contains('stopped')).toBe(stopped);
+      expect(fixture.nativeElement.querySelector('.system-icon').classList.contains('stopped')).toBe(stopped);
     }
   });
   it('only spins for positive finite RPM and known operational states', () => {
@@ -50,7 +50,7 @@ describe('SystemFanRow', () => {
     for (const warning of [{ alarm: true }, { fault: true }, { status: 'CRITICAL' }]) {
       fixture.componentRef.setInput('reading', sensorReadings({ sensors: [{ value: 1200, unit: 'RPM', status: 'OK', ...warning }] })[0]);
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('.fan-icon.danger')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.system-icon.danger')).not.toBeNull();
       expect(fixture.nativeElement.querySelector('.fan-blades.spinning')).not.toBeNull();
     }
   });

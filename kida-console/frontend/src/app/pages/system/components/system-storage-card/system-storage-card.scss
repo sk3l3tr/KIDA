@@ -1,0 +1,74 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.storage-card {
+  min-width: 0;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+.storage-device,
+.storage-label,
+.storage-limit,
+.storage-proportion {
+  color: var(--kida-muted);
+  font-size: 0.85rem;
+}
+.storage-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin: 1rem 0;
+}
+.system-icon {
+  flex: 0 0 7rem;
+  min-height: 5rem;
+}
+.drive-panel {
+  fill: var(--ion-background-color);
+}
+.drive-lines {
+  stroke: var(--ion-color-primary-contrast);
+}
+.storage-primary {
+  min-width: 0;
+}
+.storage-value {
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+.storage-value small {
+  display: inline;
+  font-size: 1rem;
+}
+.storage-limit,
+.storage-proportion {
+  margin-top: 0.5rem;
+}
+.storage-meter {
+  height: 0.5rem;
+  margin-top: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ion-color-step-200, var(--ion-border-color));
+}
+.storage-meter span {
+  display: block;
+  height: 100%;
+  background: var(--ion-color-primary);
+}
+.storage-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: var(--kida-border-width) solid var(--ion-border-color);
+  font-variant-numeric: tabular-nums;
+}
+.storage-secondary > span {
+  color: var(--kida-muted);
+}
