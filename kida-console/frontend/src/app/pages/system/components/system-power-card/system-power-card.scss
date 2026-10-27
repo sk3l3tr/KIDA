@@ -1,0 +1,73 @@
+:host {
+  display: block;
+}
+form {
+  max-width: none;
+}
+.power-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--kida-heading-font);
+}
+.power-header p {
+  margin: 0;
+  color: var(--kida-muted);
+}
+.control-badge {
+  color: var(--ion-color-primary);
+  border: var(--kida-border-width) solid var(--ion-color-primary);
+  border-radius: var(--kida-radius);
+  padding: 0.3rem 0.65rem;
+  font-weight: 700;
+}
+.quick-actions,
+.power-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.timing-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.timing-row input {
+  flex: 1 1 18rem;
+  min-width: 0;
+  width: 100%;
+}
+.quick-actions button,
+.power-buttons button {
+  margin-top: 0;
+}
+.action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.quick-action[aria-pressed='true'] {
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  border-color: var(--ion-color-primary);
+}
+.confirmation-note {
+  color: var(--kida-muted);
+}
+@media (max-width: 400px) {
+  .power-buttons {
+    width: 100%;
+  }
+  .power-buttons button {
+    flex: 1 1 100%;
+  }
+}

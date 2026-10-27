@@ -8,46 +8,8 @@
     <section class="panel rtc-panel" aria-label="Capacidades RTC">
       <app-system-rtc-card [state]="state.wake" (refresh)="state.refresh(state.wake)" />
     </section>
-    <section class="panel power-panel" aria-label="Energía">
-      <h2>Energía</h2>
-      <p>Las horas corresponden al servidor CORE. CORE validará las restricciones temporales.</p>
-      <p>
-        Al abandonar System se descartan los resultados locales; una operación enviada puede seguir
-        ejecutándose.
-      </p>
-      <form (ngSubmit)="state.confirm('shutdown')">
-        <label for="power-when">Apagado o reinicio: cuándo</label>
-        <input
-          id="power-when"
-          name="when"
-          [(ngModel)]="state.when"
-          required
-          aria-describedby="when-help"
-        />
-        <small id="when-help"
-          >now, +N minutos o una hora válida de 24 horas. Valor inicial: +1.</small
-        >
-        @if (!state.validWhen(state.when)) {
-          <p class="error">Introduce now, +N o una hora válida.</p>
-        }
-        <div class="power-buttons">
-          <button
-            class="danger"
-            type="submit"
-            [disabled]="state.busy() || !state.validWhen(state.when)"
-          >
-            Apagar
-          </button>
-          <button
-            class="secondary"
-            type="button"
-            (click)="state.confirm('reboot')"
-            [disabled]="state.busy() || !state.validWhen(state.when)"
-          >
-            Reiniciar
-          </button>
-        </div>
-      </form>
+    <section class="panel power-panel" aria-label="Apagado y reinicio">
+      <app-system-power-card />
     </section>
     <section class="panel power-panel" aria-label="Ciclo de energía">
       <form (ngSubmit)="state.confirm('powerCycle')">

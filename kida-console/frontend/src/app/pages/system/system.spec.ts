@@ -314,6 +314,53 @@ describe('System page', () => {
     fixture.detectChanges();
     expect(card.textContent).toContain('Sin datos disponibles');
   });
+  it('updates quick choices and manual input without sending an operation', async () => {
+    const fixture = enter();
+    const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
+    const input = card.querySelector<HTMLInputElement>('#power-when')!;
+    const choices = Array.from(card.querySelectorAll<HTMLButtonElement>('.quick-action'));
+    const actions = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
+    expect(choices.map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    for (const [index, value] of ['now', '+1', '+30'].entries()) {
+      choices[index].click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(fixture.componentInstance.state.when).toBe(value);
+      expect(choices.map((button) => button.getAttribute('aria-pressed'))).toEqual(
+        choices.map((_, choice) => String(choice === index)),
+      );
+    }
+    input.value = '23:45';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.state.when).toBe('23:45');
+    expect(choices.every((button) => button.getAttribute('aria-pressed') === 'false')).toBe(true);
+    input.value = 'invalid';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(card.textContent).toContain('Introduce now');
+    expect(Array.from(actions).every((button) => button.disabled)).toBe(true);
+    http.expectNone(`${base}/shutdown`);
+    http.expectNone(`${base}/reboot`);
+    expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
+  });
+  it.each(['shutdown', 'reboot'] as const)('confirms %s from the card with frozen parameters', async (action) => {
+    const fixture = enter();
+    const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
+    const buttons = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
+    const form = card.querySelector<HTMLFormElement>('form')!;
+    if (action === 'shutdown') form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    else buttons[1].click();
+    await ready();
+    fixture.detectChanges();
+    expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
+    card.querySelector<HTMLButtonElement>('.quick-action')!.click();
+    dismiss({ role: 'confirm' });
+    await ready();
+    const request = http.expectOne(`${base}/${action}`);
+    expect(request.request.body).toEqual({ when: '+1' });
+    request.flush({ scheduled: true, when: '+1' });
+  });
   it('cancels without sending an action and freezes confirmed parameters, blocking duplicates', async () => {
     const view = enter().componentInstance.state;
     const cancel = view.confirm('shutdown');
