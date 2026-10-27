@@ -7,22 +7,7 @@ import { SystemFacade } from './system.facade';
   imports: [IonicModule],
   providers: [SystemFacade],
   templateUrl: './system.html',
-  styles: `
-    ion-tab-bar {
-      justify-content: start;
-      border-bottom: var(--kida-border-width) solid var(--ion-border-color);
-    }
-    ion-tab-button {
-      max-width: 12rem;
-      min-height: 52px;
-      font-family: var(--kida-font);
-      font-weight: 700;
-    }
-    ion-tab-button::part(native):focus-visible {
-      outline: 3px solid var(--ion-color-primary);
-      outline-offset: -4px;
-    }
-  `,
+  styleUrl: './system-tabs.scss',
 })
 export class System implements OnDestroy {
   readonly state = inject(SystemFacade);

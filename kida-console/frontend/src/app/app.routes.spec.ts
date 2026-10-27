@@ -58,6 +58,7 @@ describe('Console navigation', () => {
       expect(auth.accounts).not.toHaveBeenCalled();
     } else if (component === System) {
       expect(harness.routeNativeElement?.querySelectorAll('ion-tab-button').length).toBe(3);
+      expect(harness.routeNativeElement?.querySelector('ion-tab-button[tab="sensors"]')?.textContent).toContain('Todos los sensores');
       expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe(
         'top',
       );
