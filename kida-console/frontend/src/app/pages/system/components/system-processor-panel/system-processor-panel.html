@@ -1,0 +1,59 @@
+<section class="panel sensor-group" aria-label="Procesador">
+  <div class="section-header">
+    <h2>Procesador</h2>
+    <small>{{ cores().length }} núcleos medidos</small>
+  </div>
+  @for (reading of packages(); track reading.index) {
+    <div class="processor-package">
+      <div class="processor-label">
+        {{ display(reading.fields['device']) }} · {{ display(reading.fields['label']) }}
+      </div>
+      <div class="processor-summary">
+        <app-system-sensor-card [reading]="reading" [processorSummary]="true" />
+        <dl class="processor-statistics">
+          @let stats = statisticsFor(reading);
+          <div>
+            <dt>Más caliente</dt>
+            <dd>
+              {{ stats ? statisticNumber.format(stats.maximum) + ' ' + stats.unit : 'Desconocido' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Más frío</dt>
+            <dd>
+              {{ stats ? statisticNumber.format(stats.minimum) + ' ' + stats.unit : 'Desconocido' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Temperatura media</dt>
+            <dd>
+              {{ stats ? statisticNumber.format(stats.average) + ' ' + stats.unit : 'Desconocido' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Límite crítico</dt>
+            <dd>{{ display(reading.fields['critical']) }}@if (reading.fields['critical'] != null) { {{ display(reading.fields['unit']) }} }</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  }
+  @if (cores().length) {
+    <h3>Mapa térmico por núcleo</h3>
+    <div class="sensor-grid core-grid">
+      @for (reading of cores(); track reading.index) {
+        <app-system-sensor-card [reading]="reading" [compact]="true" />
+      }
+    </div>
+  }
+  @if (otherProcessorReadings().length) {
+    <div class="sensor-grid processor-other">
+      @for (reading of otherProcessorReadings(); track reading.index) {
+        <app-system-sensor-card [reading]="reading" />
+      }
+    </div>
+  }
+  @if (!readings().length) {
+    <p>Sin lecturas disponibles.</p>
+  }
+</section>

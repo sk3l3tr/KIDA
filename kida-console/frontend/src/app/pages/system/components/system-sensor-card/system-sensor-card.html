@@ -1,4 +1,5 @@
 <article class="sensor-card" [class.compact]="compact()">
+  @if (!processorSummary()) {
   <div class="sensor-heading">
     <div [style.width.%]="compact() ? 100 : 80">
       @if (!compact()) {
@@ -16,15 +17,23 @@
       <span class="status">{{ display(reading().fields['status']) }}</span>
     }
   </div>
-  <div class="sensor-value">
-    {{ display(reading().fields['value']) }}
-    <small>{{ display(reading().fields['unit']) }}</small>
-  </div>
-  @if (!compact() && ratio() !== null) {
-    <div class="sensor-meter" aria-hidden="true"><span [style.width.%]="ratio()"></span></div>
-    <!-- <small>Proporción del umbral crítico reportado; no es porcentaje de uso.</small> -->
   }
-  @if (!compact()) {
+  @if (!compact() && ratio() !== null) {
+    <div class="sensor-meter" [style.--sensor-ratio]="ratio() + '%'">
+      <span class="sensor-meter-ring" aria-hidden="true"></span>
+      <div class="sensor-value">
+        {{ display(reading().fields['value']) }}
+        <small>{{ display(reading().fields['unit']) }}</small>
+      </div>
+    </div>
+    <!-- <small>Proporción del umbral crítico reportado; no es porcentaje de uso.</small> -->
+  } @else {
+    <div class="sensor-value">
+      {{ display(reading().fields['value']) }}
+      <small>{{ display(reading().fields['unit']) }}</small>
+    </div>
+  }
+  @if (!compact() && !processorSummary()) {
     <dl class="sensor-limits">
       <div>
         <dt>Máximo</dt>

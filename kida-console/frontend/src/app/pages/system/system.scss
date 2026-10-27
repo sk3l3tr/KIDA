@@ -160,10 +160,3 @@ td app-system-data {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.core-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 5rem), 1fr));
-}
-
-.package-reading {
-  grid-column: 1 / -1;
-}

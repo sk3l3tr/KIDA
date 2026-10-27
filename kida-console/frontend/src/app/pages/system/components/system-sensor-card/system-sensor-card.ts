@@ -11,6 +11,7 @@ import { displaySystemValue } from '../../system-format';
 })
 export class SystemSensorCard {
   readonly compact = input(false);
+  readonly processorSummary = input(false);
   readonly reading = input.required<SensorReading>();
   readonly ratio = computed(() => criticalRatio(this.reading().fields));
   readonly display = displaySystemValue;

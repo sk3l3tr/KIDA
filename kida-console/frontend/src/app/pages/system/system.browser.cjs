@@ -190,6 +190,11 @@ const wake = {
         await page.emulateMedia({ reducedMotion: 'no-preference' });
         assert.notEqual(await fans.first().locator('svg').evaluate((el) => getComputedStyle(el).animationName), 'none');
         assert.equal(await overview.locator('.compact').count(), 14);
+        const processor = overview.locator('app-system-processor-panel');
+        assert.match(await processor.innerText(), /14 núcleos medidos/);
+        assert.match(await processor.innerText(), /Temperatura media/);
+        assert.equal(await processor.locator('.processor-package').count(), 1);
+        assert.ok(await processor.evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
         assert.deepEqual(reads, { health: 1, wake: 1 });
         assert.equal(await page.locator('ion-tab-bar').getAttribute('slot'), 'top');
         assert.deepEqual(

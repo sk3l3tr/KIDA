@@ -5,18 +5,18 @@ import { SystemSectionView } from '../system-section/system-section';
 import { SystemData } from '../system-data/system-data';
 import { SystemSensorCard } from '../system-sensor-card/system-sensor-card';
 import { SystemFanRow } from '../system-fan-row/system-fan-row';
-import { coreStatistics, fields, healthExtras, isCore } from '../system-sensor-card/system-sensors';
+import { SystemProcessorPanel } from '../system-processor-panel/system-processor-panel';
+import { fields, healthExtras, isCore } from '../system-sensor-card/system-sensors';
 import { SystemIndicator } from '../system-indicator/system-indicator';
 import { displaySystemValue } from '../../system-format';
 
 @Component({
   selector: 'app-system-overview',
-  imports: [IonContent, SystemSectionView, SystemData, SystemSensorCard, SystemFanRow, SystemIndicator],
+  imports: [IonContent, SystemSectionView, SystemData, SystemSensorCard, SystemFanRow, SystemProcessorPanel, SystemIndicator],
   templateUrl: './system-overview.html',
   styleUrl: '../../system.scss',
 })
 export class SystemOverview {
-  readonly statisticNumber = new Intl.NumberFormat('es', { maximumFractionDigits: 2 });
   readonly state = inject(SystemFacade);
   readonly isCore = isCore;
   readonly display = displaySystemValue;
@@ -36,7 +36,6 @@ export class SystemOverview {
   readonly faults = computed(
     () => this.state.sensors().filter((s) => s.fields['fault'] === true).length,
   );
-  readonly statistics = computed(() => coreStatistics(this.state.sensors()));
   readonly extras = computed(() => healthExtras(this.state.health.data()));
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();

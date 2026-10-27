@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { SystemFacade } from '../../system.facade';
 import { SystemSensorCard } from './system-sensor-card';
-import { SystemInspector } from './system-inspector';
+import { SystemInspector } from '../system-inspector/system-inspector';
+import { SystemOverview } from '../system-overview/system-overview';
 import {
   coreStatistics,
   criticalRatio,
@@ -137,11 +138,57 @@ describe('System sensor interpretation', () => {
     const fixture = TestBed.createComponent(SystemSensorCard);
     fixture.componentRef.setInput('reading', reading);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.sensor-meter span').style.width).toBe('100%');
+    const meter = fixture.nativeElement.querySelector('.sensor-meter');
+    expect(meter.style.getPropertyValue('--sensor-ratio')).toBe('100%');
+    expect(meter.querySelector('.sensor-meter-ring').getAttribute('aria-hidden')).toBe('true');
+    expect(meter.querySelector('.sensor-value').textContent).toContain('150.123456');
     expect(fixture.nativeElement.textContent).toContain('150.123456');
     expect(fixture.nativeElement.textContent).toContain('65261.85');
     expect(fixture.nativeElement.textContent).toContain('FUTURE');
     expect(fixture.nativeElement.querySelector('script')).toBeNull();
+  });
+  it('keeps compact readings outside the meter even when a critical threshold is present', () => {
+    const reading = sensorReadings({ sensors: [core(50, { critical: 100 })] })[0];
+    const fixture = TestBed.createComponent(SystemSensorCard);
+    fixture.componentRef.setInput('reading', reading);
+    fixture.componentRef.setInput('compact', true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.sensor-meter')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.sensor-value').textContent).toContain('50');
+  });
+  it('shows processor summaries only with matching device and unit, retaining other readings', () => {
+    const data = signal<unknown>({ sensors: [
+      core(50, { label: 'Package id 0', critical: 100 }),
+      core(40), core(60, { label: 'Core 1' }),
+      core(90, { device: 'coretemp.1', label: 'Package id 1', unit: 'F' }),
+      core(30, { device: 'coretemp.1', unit: 'C' }),
+      core(10, { label: 'Auxiliary' }),
+    ] });
+    const sensors = () => sensorReadings(data());
+    TestBed.configureTestingModule({ providers: [{ provide: SystemFacade, useValue: {
+      health: { title: 'Salud', data, loading: signal(false), updated: signal(null), error: signal('') },
+      sensorsAvailable: () => true, sensors, groups: () => sensorGroups(sensors()),
+    } }] });
+    const fixture = TestBed.createComponent(SystemOverview);
+    fixture.detectChanges();
+    const panel = fixture.nativeElement.querySelector('[aria-label="Procesador"]');
+    const summaries = panel.querySelectorAll('.processor-package');
+    expect(panel.textContent).toContain('3 núcleos medidos');
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0].textContent).toContain('60 C');
+    expect(summaries[0].textContent).toContain('40 C');
+    expect(summaries[0].textContent).toContain('50 C');
+    expect(summaries[0].textContent).toContain('100 C');
+    expect(summaries[0].textContent).not.toContain('Alarma');
+    expect(summaries[1].textContent).toContain('Desconocido');
+    expect(summaries[1].textContent).not.toContain('30 C');
+    expect(panel.querySelectorAll('app-system-sensor-card')).toHaveLength(6);
+    expect(panel.textContent).toContain('Auxiliary');
+    data.set({ sensors: [] });
+    fixture.detectChanges();
+    expect(panel.textContent).toContain('0 núcleos medidos');
+    expect(panel.textContent).toContain('Sin lecturas disponibles.');
+    expect(panel.querySelectorAll('app-system-sensor-card')).toHaveLength(0);
   });
   it('searches all original fields and preserves all duplicate and unknown readings in the inspector', () => {
     const data = signal<unknown>({ sensors: [core(1), core(2), { future: { text: 'visible' } }] });

@@ -28,33 +28,14 @@
     </section>
     <div class="sensor-panels">
       @for (group of state.groups(); track group.key) {
-        <section class="panel sensor-group" [attr.aria-label]="group.title">
-          <div class="section-header">
-            <h2>{{ group.title }}</h2>
-            <small>{{ group.readings.length }} lecturas</small>
-          </div>
-          <!-- @if (group.key === 'processor') {
-            @for (stats of statistics(); track $index) {
-              <div class="core-statistics">
-                <strong>{{ stats.device }} · {{ stats.count }} núcleos medidos</strong>
-                <dl class="stats-grid">
-                  <div>
-                    <dt>Core más caliente</dt>
-                    <dd>{{ statisticNumber.format(stats.maximum) }} {{ stats.unit }}</dd>
-                  </div>
-                  <div>
-                    <dt>Core más frío</dt>
-                    <dd>{{ statisticNumber.format(stats.minimum) }} {{ stats.unit }}</dd>
-                  </div>
-                  <div>
-                    <dt>Media</dt>
-                    <dd>{{ statisticNumber.format(stats.average) }} {{ stats.unit }}</dd>
-                  </div>
-                </dl>
-                <small></small>
-              </div>
-            }
-          } -->
+        @if (group.key === 'processor') {
+          <app-system-processor-panel [readings]="group.readings" [packages]="packages()" />
+        } @else {
+          <section class="panel sensor-group" [attr.aria-label]="group.title">
+            <div class="section-header">
+              <h2>{{ group.title }}</h2>
+              <small>{{ group.readings.length }} lecturas</small>
+            </div>
           @if (group.key === 'cooling') {
             <div class="fan-list">
               @for (reading of group.readings; track reading.index) {
@@ -64,10 +45,9 @@
               }
             </div>
           } @else {
-          <div class="sensor-grid" [class.core-grid]="group.key === 'processor'">
+          <div class="sensor-grid">
             @for (reading of group.readings; track reading.index) {
               <app-system-sensor-card
-                [class.package-reading]="group.key === 'processor' && !isCore(reading.fields)"
                 [reading]="reading"
                 [compact]="isCore(reading.fields)"
               />
@@ -76,7 +56,8 @@
             }
           </div>
           }
-        </section>
+          </section>
+        }
       }
     </div>
     <!-- @if (state.health.data() !== null) {
