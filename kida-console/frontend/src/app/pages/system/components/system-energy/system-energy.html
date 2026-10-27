@@ -12,56 +12,7 @@
       <app-system-power-card />
     </section>
     <section class="panel power-panel" aria-label="Ciclo de energía">
-      <form (ngSubmit)="state.confirm('powerCycle')">
-        <h3>Ciclo de energía</h3>
-        <fieldset>
-          <legend>Encendido: selecciona una modalidad</legend>
-          <label class="radio-label"
-            ><input type="radio" name="wakeMode" value="time" [(ngModel)]="state.wakeMode" /> Hora
-            de encendido</label
-          >
-          <label class="radio-label"
-            ><input type="radio" name="wakeMode" value="seconds" [(ngModel)]="state.wakeMode" />
-            Segundos desde la ejecución</label
-          >
-        </fieldset>
-        @if (state.wakeMode === 'time') {
-          <label for="wake-time">Hora de encendido (HH:MM)</label>
-          <input
-            id="wake-time"
-            name="wakeTime"
-            [(ngModel)]="state.wakeTime"
-            placeholder="06:00"
-            inputmode="numeric"
-          />
-        } @else {
-          <label for="wake-seconds">Segundos hasta el encendido (mínimo 120)</label>
-          <input
-            id="wake-seconds"
-            name="wakeSeconds"
-            [(ngModel)]="state.wakeSeconds"
-            inputmode="numeric"
-          />
-        }
-        <label for="shutdown-time">Hora de apagado opcional (HH:MM)</label>
-        <input
-          id="shutdown-time"
-          name="shutdownTime"
-          [(ngModel)]="state.shutdownTime"
-          placeholder="23:00"
-          inputmode="numeric"
-        />
-        <small
-          >Sin hora de apagado se usa +1. El intervalo mínimo de encendido es de 120 segundos; CORE
-          valida la relación con el apagado.</small
-        >
-        @if (!state.cycleBody()) {
-          <p>Completa el encendido y, si la indicas, una hora de apagado válida.</p>
-        }
-        <button class="danger" type="submit" [disabled]="state.busy() || !state.cycleBody()">
-          Ciclo de energía
-        </button>
-      </form>
+      <app-system-cycle-card />
     </section>
     <section class="panel action-result" aria-label="Estado de la operación">
       <div aria-live="polite">

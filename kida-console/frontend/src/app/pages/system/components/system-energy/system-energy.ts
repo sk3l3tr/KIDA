@@ -1,14 +1,14 @@
 import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { IonContent } from '@ionic/angular/standalone';
 import { SystemData } from '../system-data/system-data';
 import { SystemRtcCard } from '../system-rtc-card/system-rtc-card';
 import { SystemPowerCard } from '../system-power-card/system-power-card';
+import { SystemCycleCard } from '../system-cycle-card/system-cycle-card';
 import { SystemFacade } from '../../system.facade';
 
 @Component({
   selector: 'app-system-energy',
-  imports: [IonContent, FormsModule, SystemData, SystemRtcCard, SystemPowerCard],
+  imports: [IonContent, SystemData, SystemRtcCard, SystemPowerCard, SystemCycleCard],
   templateUrl: './system-energy.html',
   styleUrl: '../../system.scss',
 })

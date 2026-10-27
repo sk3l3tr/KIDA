@@ -267,15 +267,36 @@ const wake = {
         await alert.waitFor({ state: 'detached' });
         await page.waitForFunction(() => document.activeElement?.textContent.trim() === 'Apagar');
         assert.equal(writes.length, 0);
-        await energy.getByRole('radio', { name: 'Segundos desde la ejecución' }).check();
+        const cycle = energy.getByRole('button', { name: 'Programar ciclo', exact: true });
+        assert.equal(await cycle.isDisabled(), true);
+        await energy.locator('#wake-time').fill('06:00');
+        await energy.locator('#shutdown-time').fill('25:00');
+        assert.equal(await cycle.isDisabled(), true);
+        await energy.locator('#shutdown-time').fill('23:00');
+        await cycle.click();
+        await alert.waitFor();
+        assert.ok((await alert.innerText()).includes('06:00'));
+        assert.ok((await alert.innerText()).includes('23:00'));
+        await alert.getByRole('button', { name: 'Cancelar', exact: true }).click();
+        await alert.waitFor({ state: 'detached' });
+        await energy.locator('#shutdown-time').fill('');
+        const timeMode = energy.getByRole('tab', { name: 'Hora programada' });
+        const secondsMode = energy.getByRole('tab', { name: 'Segundos desde la ejecución' });
+        await energy.locator('ion-segment-button[value="seconds"]').click();
         assert.equal(await energy.locator('#wake-time').count(), 0);
+        await secondsMode.focus();
+        await page.keyboard.press('ArrowLeft');
+        await page.keyboard.press('Enter');
+        await energy.locator('#wake-time').waitFor();
+        assert.equal(await timeMode.getAttribute('aria-selected'), 'true');
+        await energy.locator('ion-segment-button[value="seconds"]').click();
         await energy.locator('#wake-seconds').fill('119');
         assert.equal(
-          await energy.getByRole('button', { name: 'Ciclo de energía', exact: true }).isDisabled(),
+          await energy.getByRole('button', { name: 'Programar ciclo', exact: true }).isDisabled(),
           true,
         );
         await energy.locator('#wake-seconds').fill('120');
-        await energy.getByRole('button', { name: 'Ciclo de energía', exact: true }).click();
+        await energy.getByRole('button', { name: 'Programar ciclo', exact: true }).click();
         await alert.waitFor();
         assert.ok((await alert.innerText()).includes('120 segundos'));
         await alert.getByRole('button', { name: 'Cancelar', exact: true }).click();

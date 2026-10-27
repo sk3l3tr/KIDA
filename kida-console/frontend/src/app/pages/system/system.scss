@@ -41,16 +41,6 @@
   .other-row { flex-wrap: wrap; }
   .other-value { flex-basis: 100%; }
 }
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.radio-label input {
-  width: 22px;
-  min-height: 22px;
-  accent-color: var(--ion-color-primary);
-}
 :host {
   font-family: var(--kida-font);
 }
