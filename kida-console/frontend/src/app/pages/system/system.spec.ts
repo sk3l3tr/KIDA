@@ -283,7 +283,7 @@ describe('System page', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Datos anteriores');
   });
-  it('renders RTC values, ordered warnings and future fields through refresh and failure', () => {
+  it('renders RTC values and ordered warnings through refresh and failure', () => {
     const fixture = enter();
     const state = fixture.componentInstance.state;
     const card = fixture.nativeElement.querySelector('app-system-rtc-card');
@@ -298,8 +298,9 @@ describe('System page', () => {
     });
     fixture.detectChanges();
     const text = card.textContent;
-    for (const expected of ['rtc0', 'No', 'Desconocido', 'future_status', 'Diagnóstico parcial', 'dato nuevo', 'Instantánea'])
+    for (const expected of ['rtc0', 'No', 'Desconocido', 'future_status', 'Diagnóstico parcial', 'Instantánea'])
       expect(text).toContain(expected);
+    expect(state.wake.data()).toMatchObject({ future: { extra: 'dato nuevo' } });
     const notices = card.querySelectorAll('.warnings li');
     expect(Array.from(notices, (item: any) => item.textContent.trim())).toEqual(['Primer aviso', 'Segundo aviso']);
     card.querySelector('button').click();
