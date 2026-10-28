@@ -1,0 +1,30 @@
+<ion-modal
+  class="side-panel"
+  [isOpen]="open()"
+  [focusTrap]="focusTrap()"
+  [enterAnimation]="enterAnimation"
+  [leaveAnimation]="leaveAnimation"
+  [attr.aria-label]="title()"
+  (willPresent)="willPresent($event)"
+  (didPresent)="focusClose()"
+  (didDismiss)="didDismiss()"
+  #modal
+>
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <div class="panel-heading">
+          <h2>{{ title() }}</h2>
+          @if (subtitle()) { <p>{{ subtitle() }}</p> }
+        </div>
+        <ion-buttons slot="end">
+          <ion-button #closeButton (click)="modal.dismiss()">Cerrar</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="panel-content"><ng-content /></div>
+    </ion-content>
+    <div class="panel-actions"><ng-content select="[panel-actions]" /></div>
+  </ng-template>
+</ion-modal>
