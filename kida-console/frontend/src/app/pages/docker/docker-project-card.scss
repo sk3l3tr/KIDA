@@ -1,0 +1,9 @@
+:host { display: block; min-width: 0; }
+.project-card { height: 100%; min-width: 0; }
+.project-header, footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
+h3 { margin: 0; overflow-wrap: anywhere; }
+.observed { color: var(--ion-color-primary); font-weight: 600; }
+p, footer span { overflow-wrap: anywhere; }
+.activity { height: 0.5rem; overflow: hidden; border-radius: 1rem; background: var(--ion-color-light-shade); }
+.activity span { display: block; height: 100%; background: var(--ion-color-primary); }
+.services { border-top: 1px solid var(--ion-border-color); border-bottom: 1px solid var(--ion-border-color); margin-bottom: 1rem; }

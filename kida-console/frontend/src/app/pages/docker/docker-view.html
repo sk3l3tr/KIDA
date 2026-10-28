@@ -20,8 +20,10 @@
         }
       </div>
     @if (tab === 'projects') {
-    <section class="panel" aria-labelledby="docker-projects-title">
-      <h2 id="docker-projects-title">Proyectos</h2>
+    <section aria-labelledby="docker-projects-title">
+      <div class="section-header">
+      <div><h2 id="docker-projects-title">Proyectos observados</h2>
+      <p>Servicios y contenedores agrupados por proyecto.</p></div>
       <button
         type="button"
         (click)="state.refreshProjects()"
@@ -29,6 +31,7 @@
       >
         Actualizar proyectos
       </button>
+      </div>
       @if (state.projects.loading()) {
         <p role="status">Cargando proyectos…</p>
       }
@@ -39,31 +42,16 @@
         <p>Proyectos anteriores, desactualizados.</p>
       }
       @if (state.projects.data(); as data) {
-        <ul class="project-list">
+        <div class="project-grid">
           @for (project of data; track project.name) {
-            <li>
-              <h4>{{ project.name }}</h4>
-              @for (service of project.services; track $index) {
-                <p>
-                  Servicio: {{ service.name === null ? 'Sin nombre' : service.name }} ·
-                  Contenedores: {{ service.containers.length }}
-                </p>
-              } @empty {
-                <p>Sin servicios.</p>
-              }
-              <button
-                type="button"
-                [disabled]="state.detail.loading() || state.busy() || state.pending() !== null || state.projects.loading()"
-                (click)="state.inspect(project.name)"
-                [attr.aria-label]="'Inspeccionar proyecto ' + project.name"
-              >
-                Inspeccionar
-              </button>
-            </li>
+            <app-docker-project-card [project]="project"
+              [disabled]="state.detail.loading() || state.busy() || state.pending() !== null || state.projects.loading()"
+              (inspect)="state.inspect($event)" />
           } @empty {
-            <li>No hay proyectos Compose.</li>
+            <p>No hay proyectos Compose.</p>
           }
-        </ul>
+        </div>
+        <p>Los proyectos se han observado en Docker Compose. Observado no significa creado ni administrado por KIDA.</p>
         <details>
           <summary>Datos de proyectos (JSON interpretado)</summary>
           <pre>{{ data | json }}</pre>

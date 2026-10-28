@@ -6,10 +6,11 @@ import { ContainerDetails } from './container-details';
 import { DockerFacade } from './docker.facade';
 import { DockerIndicators } from './docker-indicators';
 import { DockerComposeVersion } from './docker-compose-version';
+import { DockerProjectCard } from './docker-project-card';
 
 @Component({
   selector: 'app-docker-view',
-  imports: [IonContent, JsonPipe, ContainerDetails, DockerIndicators, DockerComposeVersion],
+  imports: [IonContent, JsonPipe, ContainerDetails, DockerIndicators, DockerComposeVersion, DockerProjectCard],
   templateUrl: './docker-view.html',
   styleUrl: './docker.scss',
 })

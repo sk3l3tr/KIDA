@@ -252,6 +252,33 @@ describe('Docker page', () => {
     expect(indicators().every((text) => text.includes('0'))).toBe(true);
     expect(indicators().every((text) => !text.includes('desactualizada'))).toBe(true);
   });
+  it('renders project card totals from Compose and retains inspection and stale data', () => {
+    const f = enter(), state = f.componentInstance.state;
+    http.expectOne(`${base}/containers`).flush(inventory);
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    http.expectOne(`${base}/compose/projects`).flush([
+      { ...project, services: [{ name: null, containers: [{ ...container, online: true }, { ...container, id: 'offline' }] }] },
+      { name: 'empty', services: [] },
+    ]);
+    const v = view(f, 'projects');
+    const cards = v.location.nativeElement.querySelectorAll('app-docker-project-card');
+    expect(cards).toHaveLength(2);
+    expect(cards[0].textContent).toContain('1 / 2 activos');
+    expect(cards[0].textContent).toContain('1 servicio · 2 contenedores');
+    expect(cards[0].textContent).toContain('Sin nombre');
+    expect(cards[0].querySelector('[role="progressbar"]').getAttribute('aria-valuetext')).toBe('1 de 2 activos');
+    expect(cards[1].textContent).toContain('0 / 0 activos');
+    expect(cards[1].querySelector('[role="progressbar"] span').style.width).toBe('0%');
+    cards[0].querySelector('button').click();
+    http.expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`).flush(project);
+    v.changeDetectorRef.detectChanges();
+    expect(v.location.nativeElement.textContent).toContain('Inspección: ' + project.name);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(v.location.nativeElement.textContent).toContain('Proyectos anteriores, desactualizados');
+    expect(v.location.nativeElement.querySelectorAll('app-docker-project-card')).toHaveLength(2);
+  });
   it('keeps initial failures separate from empty data and permits independent refresh', () => {
     const f = enter(),
       v = f.componentInstance.state;

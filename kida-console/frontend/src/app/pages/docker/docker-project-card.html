@@ -1,0 +1,25 @@
+<article class="panel project-card" [attr.aria-label]="'Proyecto ' + project().name">
+  <header class="project-header">
+    <h3>{{ project().name }}</h3>
+    <span class="observed">Observado</span>
+  </header>
+  <p>{{ totals().active }} / {{ totals().containers }} activos</p>
+  <div class="activity" role="progressbar" aria-label="Actividad de contenedores"
+    [attr.aria-valuemin]="0" [attr.aria-valuemax]="totals().containers || 1"
+    [attr.aria-valuenow]="totals().active" [attr.aria-valuetext]="totals().active + ' de ' + totals().containers + ' activos'">
+    <span [style.width.%]="totals().containers ? totals().active / totals().containers * 100 : 0"></span>
+  </div>
+  <p>{{ totals().services }} {{ totals().services === 1 ? 'servicio' : 'servicios' }} · {{ totals().containers }} {{ totals().containers === 1 ? 'contenedor' : 'contenedores' }}</p>
+  <div class="services">
+    @for (service of project().services; track $index) {
+      <p>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }} · Contenedores: {{ service.containers.length }}</p>
+    } @empty {
+      <p>Sin servicios.</p>
+    }
+  </div>
+  <footer>
+    <span>Datos de Compose · solo lectura</span>
+    <button type="button" [disabled]="disabled()" (click)="inspect.emit(project().name)"
+      [attr.aria-label]="'Inspeccionar proyecto ' + project().name">Inspeccionar proyecto</button>
+  </footer>
+</article>
