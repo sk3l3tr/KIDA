@@ -1,5 +1,25 @@
 import { formatCoreFailure } from '../../services/core-failure';
-import { ContainerAction } from './docker.models';
+import { ComposeProject, ContainerAction } from './docker.models';
+
+export type ComposeAssociation = { project: string; service: string | null } | 'ambiguous';
+
+export function composeAssociations(projects: ComposeProject[]): Map<string, ComposeAssociation> {
+  const result = new Map<string, ComposeAssociation>();
+  for (const project of projects) {
+    for (const service of project.services) {
+      for (const container of service.containers) {
+        const existing = result.get(container.id);
+        if (existing === 'ambiguous') continue;
+        if (existing && (existing.project !== project.name || existing.service !== service.name)) {
+          result.set(container.id, 'ambiguous');
+        } else {
+          result.set(container.id, { project: project.name, service: service.name });
+        }
+      }
+    }
+  }
+  return result;
+}
 
 export const actionLabels: Record<ContainerAction, string> = {
   start: 'Arrancar',

@@ -59,3 +59,21 @@ dialog {
 .docker-layout > p {
   grid-column: 1 / -1;
 }
+.inventory-panel { min-width: 0; }
+.table-wrap { overflow-x: auto; }
+.container-list { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.operations-column { width: 21rem; }
+.container-list th, .container-list td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--ion-border-color); overflow-wrap: anywhere; vertical-align: top; }
+.container-list th:last-child { text-align: right; }
+.container-list td small { display: block; }
+.container-list .action-buttons { justify-content: flex-end; gap: 0.25rem; margin: 0; }
+.container-list .action-buttons button { padding-inline: 0.45rem; }
+.mobile-label { display: none; }
+@media (max-width: 1099px) {
+  .container-list, .container-list tbody, .container-list tr, .container-list td { display: block; }
+  .container-list thead { display: none; }
+  .container-list tr { border: 1px solid var(--ion-border-color); border-radius: var(--kida-radius); margin-bottom: 1rem; padding: 0.5rem; }
+  .container-list td { border: 0; }
+  .mobile-label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+  .container-list .action-buttons { justify-content: flex-start; }
+}

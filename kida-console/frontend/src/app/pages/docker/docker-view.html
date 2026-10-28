@@ -87,13 +87,10 @@
       }
     </section>
     } @else {
-    <section
-      class="panel"
-      aria-labelledby="docker-containers-title"
-      [attr.aria-busy]="state.inventory.loading()"
-    >
+    <section aria-labelledby="docker-containers-title" [attr.aria-busy]="state.inventory.loading()">
       <div class="section-header">
-        <h2 id="docker-containers-title" #listHeading tabindex="-1">Contenedores</h2>
+        <div><h2 id="docker-containers-title" #listHeading tabindex="-1">Contenedores Docker</h2>
+        <p>Consulta el inventario de contenedores del servidor.</p></div>
         <button
           type="button"
           (click)="state.refreshContainers()"
@@ -102,6 +99,8 @@
           Actualizar contenedores
         </button>
       </div>
+      <div class="panel inventory-panel">
+      <h3>Inventario de contenedores</h3>
       @if (state.inventory.loading()) {
         <p role="status">Cargando contenedores…</p>
       }
@@ -112,12 +111,32 @@
         <p>Datos anteriores, desactualizados; actualiza contenedores.</p>
       }
       @if (state.inventory.data(); as data) {
+        <p>{{ data.containers.length }} {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}</p>
         <p>Total: {{ state.counter(data.total) }} · En ejecución: {{ state.counter(data.running) }}</p>
-        <ul class="container-list">
+        @if (data.containers.length) {
+        <div class="table-wrap"><table class="container-list">
+          <colgroup><col><col><col><col><col><col><col class="operations-column"></colgroup>
+          <thead><tr><th>Contenedor</th><th>Estado</th><th>Imagen</th><th>Servicio / Proyecto</th><th>Salud</th><th>Salida</th><th>Operaciones</th></tr></thead>
+          <tbody>
           @for (container of data.containers; track container.id) {
-            <li>
-              <app-container-details [container]="container" />
-              <div class="action-buttons">
+            <tr>
+              <td><span class="mobile-label">Contenedor</span><strong>{{ container.name }}</strong>
+                <details><summary>Ver detalles</summary><app-container-details [container]="container" /></details>
+              </td>
+              <td><span class="mobile-label">Estado</span>{{ container.online ? 'En ejecución' : 'Fuera de línea' }}</td>
+              <td><span class="mobile-label">Imagen</span>{{ container.image }}</td>
+              <td><span class="mobile-label">Servicio / Proyecto</span>
+                @if (state.associations(); as associations) {
+                  @let association = associations.get(container.id);
+                  @if (association === 'ambiguous') { Asociación ambigua }
+                  @else if (association) { {{ association.service === null ? 'Sin nombre' : association.service }} / {{ association.project }} }
+                  @else { Sin asociación Compose observada }
+                  @if (state.projects.stale()) { <small>Lectura de proyectos desactualizada.</small> }
+                } @else { Asociación no disponible }
+              </td>
+              <td><span class="mobile-label">Salud</span>{{ state.display(container.health) }}</td>
+              <td><span class="mobile-label">Salida</span>{{ state.counter(container.exit_code) }}</td>
+              <td><span class="mobile-label">Operaciones</span><div class="action-buttons">
                 @for (action of state.actions; track action) {
                   <button
                     type="button"
@@ -128,17 +147,19 @@
                     {{ state.labels[action] }}
                   </button>
                 }
-              </div>
-            </li>
-          } @empty {
-            <li>No hay contenedores.</li>
+              </div></td>
+            </tr>
           }
-        </ul>
+          </tbody>
+        </table></div>
+        } @else { <p>No hay contenedores.</p> }
+        <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
         <details>
           <summary>Datos del inventario (JSON interpretado)</summary>
           <pre>{{ data | json }}</pre>
         </details>
       }
+      </div>
     </section>
     }
     <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>

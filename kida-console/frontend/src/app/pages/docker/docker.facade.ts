@@ -23,6 +23,7 @@ import {
 } from './docker.models';
 import {
   actionLabels,
+  composeAssociations,
   counter,
   display,
   dockerFailure,
@@ -60,6 +61,10 @@ export class DockerFacade implements OnDestroy {
   readonly version = reading<ComposeVersion>();
   readonly versionPanelOpen = signal<'projects' | 'containers' | null>(null);
   readonly projects = reading<ComposeProject[]>();
+  readonly associations = computed(() => {
+    const projects = this.projects.data();
+    return projects === null ? null : composeAssociations(projects);
+  });
   readonly expandedServices = signal<Record<string, string[]>>({});
   readonly inspectedContainer = signal<{ project: string; service: string; id: string } | null>(null);
   readonly detail = reading<ComposeProject>();

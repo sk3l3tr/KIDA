@@ -16,7 +16,7 @@ import { DockerView } from './docker-view';
 import { SidePanel } from '../../components/side-panel/side-panel';
 import { DockerContainer, ComposeProject } from './docker.models';
 import { dockerActions } from './docker.actions';
-import { counter, display, dockerFailure } from './docker-presentation';
+import { composeAssociations, counter, display, dockerFailure } from './docker-presentation';
 const base = `${environment.apiBaseUrl}/docker`;
 const container: DockerContainer = {
   id: 'f'.repeat(64),
@@ -357,6 +357,31 @@ describe('Docker page', () => {
     expect(view(f, 'containers').location.nativeElement.textContent).toContain('No hay contenedores.');
     expect(v.version.error()).not.toBe('');
   });
+  it('renders associations independently from inventory, including unavailable and stale readings', () => {
+    const f = enter(), state = f.componentInstance.state;
+    http.expectOne(`${base}/containers`).flush({ ...inventory, containers: [container, { ...container, id: 'unrelated', name: 'unrelated' }] });
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    const v = view(f, 'containers');
+    expect(v.location.nativeElement.textContent).toContain('Asociación no disponible');
+    http.expectOne(`${base}/compose/projects`).flush([project]);
+    v.changeDetectorRef.detectChanges();
+    const rows = v.location.nativeElement.querySelectorAll('tbody tr');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('Sin nombre / ' + project.name);
+    expect(rows[1].textContent).toContain('Sin asociación Compose observada');
+    expect(rows[0].querySelectorAll('.action-buttons button')).toHaveLength(4);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(rows[0].textContent).toContain('Lectura de proyectos desactualizada');
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([project, { ...project, name: 'other' }]);
+    v.changeDetectorRef.detectChanges();
+    expect(rows[0].textContent).toContain('Asociación ambigua');
+    expect(rows[0].textContent).not.toContain('Sin nombre / ' + project.name);
+    expect(v.location.nativeElement.textContent).toContain('2 contenedores recibidos');
+    expect(v.location.nativeElement.textContent).toContain('El código de salida 137 no establece por sí solo la causa');
+  });
   it('shows API totals, future states, nulls, zero, anonymous services and safe remote text', () => {
     const f = initial();
     const rendered = view(f, 'containers').location.nativeElement;
@@ -596,6 +621,15 @@ describe('Docker page', () => {
 });
 
 describe('Docker presentation', () => {
+  it('deduplicates identical associations and compares full IDs and null service names', () => {
+    const associations = composeAssociations([
+      { ...project, services: [project.services[0], project.services[0]] },
+      { name: 'other', services: [{ name: null, containers: [{ ...container, id: container.id + 'x' }] }] },
+    ]);
+    expect(associations.get(container.id)).toEqual({ project: project.name, service: null });
+    expect(associations.get(container.id + 'x')).toEqual({ project: 'other', service: null });
+    expect(composeAssociations([{ ...project, services: [project.services[0], { name: 'web', containers: [container] }] }]).get(container.id)).toBe('ambiguous');
+  });
   it('preserves zeros and reports unsafe integer precision', () => {
     expect(display(null)).toContain('Desconocido');
     expect(display(0)).toBe('0');
