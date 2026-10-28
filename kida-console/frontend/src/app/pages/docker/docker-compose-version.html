@@ -1,0 +1,33 @@
+<section class="panel compose-strip" aria-labelledby="docker-compose-title">
+  <div class="compose-main">
+    <svg class="compose-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M12 2 2 7l10 5 10-5-10-5ZM2 12l10 5 10-5M2 17l10 5 10-5" />
+    </svg>
+    <div>
+      <h2 id="docker-compose-title">Docker Compose</h2>
+      <p>Versión detectada: {{ state.version.data()?.version ?? 'No disponible' }}</p>
+      <p>Los proyectos observados no acreditan propiedad KIDA.</p>
+      @if (state.version.loading()) { <p role="status">Cargando versión…</p> }
+      @if (state.version.error()) { <p class="error" role="alert">Error de versión: {{ state.version.error() }}</p> }
+      @if (state.version.stale()) { <p>Versión anterior, desactualizada.</p> }
+    </div>
+  </div>
+  <div class="compose-actions">
+    <button type="button" [disabled]="!state.version.data()" (click)="state.versionPanelOpen.set(tab())">Datos de versión</button>
+    <button type="button" (click)="state.refreshVersion()" [disabled]="state.version.loading() || state.busy() || state.pending() !== null">Actualizar versión</button>
+  </div>
+</section>
+<app-side-panel [open]="state.versionPanelOpen() === tab()" title="Docker Compose" subtitle="Lectura de versión"
+  [fallbackFocus]="fallbackFocus()" (closed)="close()">
+  @if (state.version.data(); as data) {
+    <h3>Versión detectada</h3>
+    <p>{{ data.version }}</p>
+    @if (state.version.stale()) { <p>Versión anterior, desactualizada.</p> }
+    <details>
+      <summary>JSON interpretado</summary>
+      <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>
+      @if (state.limitedPrecision(data)) { <p role="status">Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.</p> }
+      <pre>{{ data | json }}</pre>
+    </details>
+  }
+</app-side-panel>

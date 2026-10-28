@@ -49,6 +49,7 @@ export class DockerFacade implements OnDestroy {
   heading: () => HTMLElement | undefined = () => undefined;
   readonly inventory = reading<DockerContainers>();
   readonly version = reading<ComposeVersion>();
+  readonly versionPanelOpen = signal<'projects' | 'containers' | null>(null);
   readonly projects = reading<ComposeProject[]>();
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
@@ -96,6 +97,7 @@ export class DockerFacade implements OnDestroy {
     this.sessionChanges.unsubscribe();
   }
   leaveTab(): void {
+    this.versionPanelOpen.set(null);
     ++this.selectionRevision;
     this.closeConfirmation();
     this.selected.set(null);
@@ -105,6 +107,7 @@ export class DockerFacade implements OnDestroy {
     this.trigger = null;
   }
   private reset(): void {
+    this.versionPanelOpen.set(null);
     this.active = false;
     ++this.generation;
     this.subscriptions.unsubscribe();

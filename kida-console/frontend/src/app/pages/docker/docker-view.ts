@@ -5,10 +5,11 @@ import { IonContent } from '@ionic/angular/standalone';
 import { ContainerDetails } from './container-details';
 import { DockerFacade } from './docker.facade';
 import { DockerIndicators } from './docker-indicators';
+import { DockerComposeVersion } from './docker-compose-version';
 
 @Component({
   selector: 'app-docker-view',
-  imports: [IonContent, JsonPipe, ContainerDetails, DockerIndicators],
+  imports: [IonContent, JsonPipe, ContainerDetails, DockerIndicators, DockerComposeVersion],
   templateUrl: './docker-view.html',
   styleUrl: './docker.scss',
 })

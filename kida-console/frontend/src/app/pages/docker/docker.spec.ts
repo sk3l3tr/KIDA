@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { createComponent, EnvironmentInjector, inject } from '@angular/core';
+import { createComponent, EnvironmentInjector, getDebugNode, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
@@ -13,6 +13,7 @@ import { Observable } from 'rxjs';
 import { DockerService } from './docker.service';
 import { Docker } from './docker';
 import { DockerView } from './docker-view';
+import { SidePanel } from '../../components/side-panel/side-panel';
 import { DockerContainer, ComposeProject } from './docker.models';
 import { dockerActions } from './docker.actions';
 import { counter, display, dockerFailure } from './docker-presentation';
@@ -39,7 +40,7 @@ const project: ComposeProject = {
   services: [{ name: null, containers: [container] }],
   future: null,
 };
-function setup() {
+function setup(projectPanel = false) {
   TestBed.configureTestingModule({
     imports: [Docker],
     providers: [
@@ -55,6 +56,7 @@ function setup() {
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
   });
+  if (projectPanel) TestBed.overrideComponent(SidePanel, { set: { template: '<ng-content />' } });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   return TestBed.inject(HttpTestingController);
 }
@@ -136,7 +138,7 @@ describe('Docker HTTP through ARCA', () => {
 describe('Docker page', () => {
   let http: HttpTestingController;
   beforeEach(() => {
-    http = setup();
+    http = setup(true);
     Object.defineProperties(HTMLDialogElement.prototype, {
       showModal: {
         configurable: true,
@@ -181,6 +183,46 @@ describe('Docker page', () => {
     return component;
   }
   const fail = { status: 503, statusText: 'Unavailable' };
+  it('opens the existing version reading without a request and keeps refresh failures independent', () => {
+    const f = initial(), state = f.componentInstance.state;
+    const projectsView = view(f, 'projects');
+    const containersView = view(f, 'containers');
+    const strip = projectsView.location.nativeElement.querySelector('app-docker-compose-version');
+    const buttons = strip.querySelectorAll('button');
+    expect(strip.textContent).toContain('v2');
+    buttons[0].click();
+    projectsView.changeDetectorRef.detectChanges();
+    expect(state.versionPanelOpen()).toBe('projects');
+    http.expectNone(`${base}/compose/version`);
+    state.leaveTab();
+    expect(state.versionPanelOpen()).toBeNull();
+    containersView.location.nativeElement.querySelector('app-docker-compose-version button').click();
+    expect(state.versionPanelOpen()).toBe('containers');
+    state.refreshVersion();
+    http.expectOne(`${base}/compose/version`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    expect(state.version.data()).toEqual({ version: 'v2' });
+    expect(state.version.stale()).toBe(true);
+    expect(state.inventory.data()).toEqual(inventory);
+    expect(state.projects.data()).toEqual([project]);
+    projectsView.changeDetectorRef.detectChanges();
+    expect(strip.textContent).toContain('desactualizada');
+    state.refreshVersion();
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v3', extra: null, count: 9007199254740992 });
+    containersView.changeDetectorRef.detectChanges();
+    expect(state.version.stale()).toBe(false);
+    const panel = containersView.location.nativeElement.querySelector('app-side-panel');
+    const panelComponent = getDebugNode(panel)!.injector.get(SidePanel);
+    expect(panelComponent.open()).toBe(true);
+    expect(panel.textContent).toContain('v3');
+    expect(panel.textContent).toContain('JSON interpretado');
+    expect(panel.textContent).toContain('"extra": null');
+    expect(panel.textContent).toContain('Precisión limitada');
+    panelComponent.closed.emit();
+    expect(state.versionPanelOpen()).toBeNull();
+    state.versionPanelOpen.set('containers');
+    state.ionViewWillLeave();
+    expect(state.versionPanelOpen()).toBeNull();
+  });
   it('shows independent indicators for missing, zero, stale and differing readings in both tabs', () => {
     const f = enter(), state = f.componentInstance.state;
     const v = view(f, 'projects');

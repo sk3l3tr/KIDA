@@ -5,33 +5,7 @@
       <p>Consulta el inventario de contenedores y los proyectos Compose observados.</p>
     </header>
     <app-docker-indicators />
-    <section class="panel" aria-labelledby="docker-compose-title">
-      <h2 id="docker-compose-title">Compose</h2>
-      <p>Los proyectos observados no acreditan propiedad KIDA.</p>
-      <button
-        type="button"
-        (click)="state.refreshVersion()"
-        [disabled]="state.version.loading() || state.busy() || state.pending() !== null"
-      >
-        Actualizar versión
-      </button>
-      @if (state.version.loading()) {
-        <p role="status">Cargando versión…</p>
-      }
-      @if (state.version.error()) {
-        <p class="error" role="alert">Error de versión: {{ state.version.error() }}</p>
-      }
-      @if (state.version.stale()) {
-        <p>Versión anterior, desactualizada.</p>
-      }
-      @if (state.version.data(); as data) {
-        <p>Versión de Compose: {{ data.version }}</p>
-        <details>
-          <summary>Datos de versión</summary>
-          <pre>{{ data | json }}</pre>
-        </details>
-      }
-    </section>
+    <app-docker-compose-version [tab]="tab" [fallbackFocus]="heading" />
       <div aria-live="polite">
         @if (state.busy()) {
           <p>Acción o actualización posterior pendiente…</p>

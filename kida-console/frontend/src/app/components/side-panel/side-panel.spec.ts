@@ -99,4 +99,20 @@ describe('SidePanel', () => {
     fixture.detectChanges();
     expect(content.getAttribute('aria-label')).toBe('Segundo');
   });
+  it('makes the panel visible on entry and reverses the animation on exit', () => {
+    const fixture = TestBed.createComponent(SidePanel);
+    fixture.componentRef.setInput('title', 'Detalles');
+    fixture.detectChanges();
+    const base = document.createElement('div');
+    base.attachShadow({ mode: 'open' }).innerHTML = '<div part="content"></div><ion-backdrop></ion-backdrop>';
+    const enter = fixture.componentInstance.enterAnimation(base);
+    const leave = fixture.componentInstance.leaveAnimation(base);
+    const frames = enter.childAnimations[0].getKeyframes();
+    expect(frames[0]['opacity']).toBe('0');
+    expect(frames[frames.length - 1]['opacity']).toBe('1');
+    expect(leave.getDirection()).toBe('reverse');
+    expect(leave.childAnimations[0].getKeyframes()[1]['opacity']).toBe('1');
+    enter.destroy();
+    leave.destroy();
+  });
 });

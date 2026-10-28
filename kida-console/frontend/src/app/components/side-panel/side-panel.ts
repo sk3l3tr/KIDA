@@ -13,6 +13,7 @@ function panelMotion(base: HTMLElement, leaving: boolean) {
     .duration(reduced ? 1 : leaving ? duration * 0.8 : duration)
     .easing(easing).direction(leaving ? 'reverse' : 'normal');
   if (content) animation.addAnimation(createAnimation().addElement(content)
+    .fromTo('opacity', '0', '1')
     .fromTo('transform', reduced ? 'none' : 'translateX(100%)', 'none'));
   if (backdrop) animation.addAnimation(createAnimation().addElement(backdrop)
     .fromTo('opacity', '0', 'var(--backdrop-opacity)'));
