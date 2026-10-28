@@ -1,5 +1,5 @@
 import { Component, forwardRef, input } from '@angular/core';
-import { displaySystemValue, systemLabel } from '../../system-format';
+import { displaySystemValue, systemLabel } from '../../utils/system-format';
 
 @Component({
   selector: 'app-system-data',

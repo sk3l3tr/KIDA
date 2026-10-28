@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { SystemFacade } from '../../system.facade';
+import { SystemFacade } from '../../services/system.facade';
 import { SystemSensorCard } from './system-sensor-card';
 import { SystemInspector } from '../system-inspector/system-inspector';
 import { SystemOverview } from '../system-overview/system-overview';
@@ -157,18 +157,36 @@ describe('System sensor interpretation', () => {
     expect(fixture.nativeElement.querySelector('.sensor-value').textContent).toContain('50');
   });
   it('shows processor summaries only with matching device and unit, retaining other readings', () => {
-    const data = signal<unknown>({ sensors: [
-      core(50, { label: 'Package id 0', critical: 100 }),
-      core(40), core(60, { label: 'Core 1' }),
-      core(90, { device: 'coretemp.1', label: 'Package id 1', unit: 'F' }),
-      core(30, { device: 'coretemp.1', unit: 'C' }),
-      core(10, { label: 'Auxiliary' }),
-    ] });
+    const data = signal<unknown>({
+      sensors: [
+        core(50, { label: 'Package id 0', critical: 100 }),
+        core(40),
+        core(60, { label: 'Core 1' }),
+        core(90, { device: 'coretemp.1', label: 'Package id 1', unit: 'F' }),
+        core(30, { device: 'coretemp.1', unit: 'C' }),
+        core(10, { label: 'Auxiliary' }),
+      ],
+    });
     const sensors = () => sensorReadings(data());
-    TestBed.configureTestingModule({ providers: [{ provide: SystemFacade, useValue: {
-      health: { title: 'Salud', data, loading: signal(false), updated: signal(null), error: signal('') },
-      sensorsAvailable: () => true, sensors, groups: () => sensorGroups(sensors()),
-    } }] });
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: SystemFacade,
+          useValue: {
+            health: {
+              title: 'Salud',
+              data,
+              loading: signal(false),
+              updated: signal(null),
+              error: signal(''),
+            },
+            sensorsAvailable: () => true,
+            sensors,
+            groups: () => sensorGroups(sensors()),
+          },
+        },
+      ],
+    });
     const fixture = TestBed.createComponent(SystemOverview);
     fixture.detectChanges();
     const panel = fixture.nativeElement.querySelector('[aria-label="Procesador"]');
@@ -225,15 +243,46 @@ describe('System sensor interpretation', () => {
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(3);
   });
   it('shows the total while filtering and formats sensor units and missing critical values', () => {
-    const data = signal<unknown>({ sensors: [
-      { device: 'cpu', label: 'core', type: 'temperature', value: 33, unit: 'C', status: 'OK', critical: 105 },
-      { device: 'fan', type: 'fan', value: 0, unit: 'RPM', status: 'WARNING', critical: null, fault: true },
-    ] });
-    TestBed.configureTestingModule({ providers: [{ provide: SystemFacade, useValue: {
-      health: { title: 'Salud', data, loading: signal(false), updated: signal(null), error: signal('') },
-      sensorsAvailable: () => true,
-      sensors: () => sensorReadings(data()),
-    } }] });
+    const data = signal<unknown>({
+      sensors: [
+        {
+          device: 'cpu',
+          label: 'core',
+          type: 'temperature',
+          value: 33,
+          unit: 'C',
+          status: 'OK',
+          critical: 105,
+        },
+        {
+          device: 'fan',
+          type: 'fan',
+          value: 0,
+          unit: 'RPM',
+          status: 'WARNING',
+          critical: null,
+          fault: true,
+        },
+      ],
+    });
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: SystemFacade,
+          useValue: {
+            health: {
+              title: 'Salud',
+              data,
+              loading: signal(false),
+              updated: signal(null),
+              error: signal(''),
+            },
+            sensorsAvailable: () => true,
+            sensors: () => sensorReadings(data()),
+          },
+        },
+      ],
+    });
     const fixture = TestBed.createComponent(SystemInspector);
     fixture.detectChanges();
     const element: HTMLElement = fixture.nativeElement;
@@ -247,25 +296,56 @@ describe('System sensor interpretation', () => {
     expect(element.querySelectorAll('tbody tr')).toHaveLength(1);
   });
   it('renders other readings in order with original identifiers and explicit unknowns', () => {
-    const data = signal<unknown>({ sensors: [
-      { type: 'temperature', device: 'iwlwifi_1', label: 'temp1', value: 33, unit: 'C', status: 'hidden', critical: 99 },
-      { type: 'temperature', device: 'acpitz_02', label: 'temp2', value: 0, unit: 'K' },
-      { type: 'future', device: 'other', label: 'duplicate', value: null, unit: null },
-      { type: 'future', device: 'other', label: 'duplicate', value: 2, unit: 'V' },
-      {},
-    ] });
+    const data = signal<unknown>({
+      sensors: [
+        {
+          type: 'temperature',
+          device: 'iwlwifi_1',
+          label: 'temp1',
+          value: 33,
+          unit: 'C',
+          status: 'hidden',
+          critical: 99,
+        },
+        { type: 'temperature', device: 'acpitz_02', label: 'temp2', value: 0, unit: 'K' },
+        { type: 'future', device: 'other', label: 'duplicate', value: null, unit: null },
+        { type: 'future', device: 'other', label: 'duplicate', value: 2, unit: 'V' },
+        {},
+      ],
+    });
     const sensors = () => sensorReadings(data());
-    TestBed.configureTestingModule({ providers: [{ provide: SystemFacade, useValue: {
-      health: { title: 'Salud', data, loading: signal(false), updated: signal(null), error: signal('') },
-      sensorsAvailable: () => true, sensors, groups: () => sensorGroups(sensors()),
-    } }] });
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: SystemFacade,
+          useValue: {
+            health: {
+              title: 'Salud',
+              data,
+              loading: signal(false),
+              updated: signal(null),
+              error: signal(''),
+            },
+            sensorsAvailable: () => true,
+            sensors,
+            groups: () => sensorGroups(sensors()),
+          },
+        },
+      ],
+    });
     const fixture = TestBed.createComponent(SystemOverview);
     fixture.detectChanges();
     const panel = fixture.nativeElement.querySelector('[aria-label="Otros sensores"]');
     const rows = [...panel.querySelectorAll('.other-row')] as HTMLElement[];
     expect(rows).toHaveLength(5);
     expect(panel.textContent).toContain('5 lecturas');
-    expect(rows.map(row => row.querySelector('strong')?.textContent)).toEqual(['Wi-Fi', 'Zona térmica ACPI 02', 'duplicate', 'duplicate', 'Desconocido']);
+    expect(rows.map((row) => row.querySelector('strong')?.textContent)).toEqual([
+      'Wi-Fi',
+      'Zona térmica ACPI 02',
+      'duplicate',
+      'duplicate',
+      'Desconocido',
+    ]);
     expect(rows[0].textContent).toContain('Dispositivo: iwlwifi_1 · Etiqueta: temp1');
     expect(rows[0].textContent).not.toContain('hidden');
     expect(rows[0].textContent).not.toContain('99');

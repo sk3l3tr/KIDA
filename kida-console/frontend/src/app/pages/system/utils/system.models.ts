@@ -1,5 +1,5 @@
-import type { SystemSensor } from './components/system-sensor-card/system-sensors';
-import { formatCoreFailure } from '../../services/core-failure';
+import type { SystemSensor } from '../components/system-sensor-card/system-sensors';
+import { formatCoreFailure } from '../../../services/core-failure';
 
 // CORE may extend these objects. Keep unknown fields for presentation.
 export interface CoreFields {

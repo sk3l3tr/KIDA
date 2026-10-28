@@ -5,15 +5,15 @@ import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
-import { appConfig } from '../../app.config';
-import { environment } from '../../../environments/environment';
-import { ThemeIdentity } from '../../../theme/integration';
-import { ArcaRequestService, ChannelBusyError } from '../../services/arca-request.service';
-import { SystemService } from './system.service';
-import { SystemFacade } from './system.facade';
-import { SystemOverview } from './components/system-overview/system-overview';
-import { SystemEnergy } from './components/system-energy/system-energy';
-import { SystemInspector } from './components/system-inspector/system-inspector';
+import { appConfig } from '../../../app.config';
+import { environment } from '../../../../environments/environment';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { ArcaRequestService, ChannelBusyError } from '../../../services/arca-request.service';
+import { SystemService } from '../services/system.service';
+import { SystemFacade } from '../services/system.facade';
+import { SystemOverview } from '../tabs/system-overview/system-overview';
+import { SystemEnergy } from '../tabs/system-energy/system-energy';
+import { SystemInspector } from '../tabs/system-inspector/system-inspector';
 
 @Component({
   imports: [SystemOverview, SystemEnergy, SystemInspector],
@@ -22,8 +22,8 @@ import { SystemInspector } from './components/system-inspector/system-inspector'
 class SystemHarness {
   readonly state = inject(SystemFacade);
 }
-import { cycleRequest, systemFailure, validWhen } from './system.models';
-import { systemActions } from './system.actions';
+import { cycleRequest, systemFailure, validWhen } from '../utils/system.models';
+import { systemActions } from '../utils/system.actions';
 
 const base = `${environment.apiBaseUrl}/system`;
 const info = {
@@ -291,17 +291,30 @@ describe('System page', () => {
     expect(card.textContent).toContain('Cargando');
     expect(card.textContent).toContain('Datos anteriores');
     http.expectOne(`${base}/wake-capabilities`).flush({
-      rtc_device: 'rtc0', rtcwake_available: false, rtc_alarm_available: null,
-      s5_wake_status: 'future_status', warnings: ['Primer aviso', 'Segundo aviso'],
+      rtc_device: 'rtc0',
+      rtcwake_available: false,
+      rtc_alarm_available: null,
+      s5_wake_status: 'future_status',
+      warnings: ['Primer aviso', 'Segundo aviso'],
       future: { extra: 'dato nuevo' },
     });
     fixture.detectChanges();
     const text = card.textContent;
-    for (const expected of ['rtc0', 'No', 'Desconocido', 'future_status', 'Diagnóstico parcial', 'Instantánea'])
+    for (const expected of [
+      'rtc0',
+      'No',
+      'Desconocido',
+      'future_status',
+      'Diagnóstico parcial',
+      'Instantánea',
+    ])
       expect(text).toContain(expected);
     expect(state.wake.data()).toMatchObject({ future: { extra: 'dato nuevo' } });
     const notices = card.querySelectorAll('.warnings li');
-    expect(Array.from(notices, (item: any) => item.textContent.trim())).toEqual(['Primer aviso', 'Segundo aviso']);
+    expect(Array.from(notices, (item: any) => item.textContent.trim())).toEqual([
+      'Primer aviso',
+      'Segundo aviso',
+    ]);
     card.querySelector('button').click();
     http.expectOne(`${base}/wake-capabilities`).error(new ProgressEvent('error'));
     fixture.detectChanges();
@@ -319,7 +332,11 @@ describe('System page', () => {
     const input = card.querySelector<HTMLInputElement>('#power-when')!;
     const choices = Array.from(card.querySelectorAll<HTMLButtonElement>('.quick-action'));
     const actions = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
-    expect(choices.map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    expect(choices.map((button) => button.getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'true',
+      'false',
+    ]);
     for (const [index, value] of ['now', '+1', '+30'].entries()) {
       choices[index].click();
       fixture.detectChanges();
@@ -343,23 +360,27 @@ describe('System page', () => {
     http.expectNone(`${base}/reboot`);
     expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
   });
-  it.each(['shutdown', 'reboot'] as const)('confirms %s from the card with frozen parameters', async (action) => {
-    const fixture = enter();
-    const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
-    const buttons = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
-    const form = card.querySelector<HTMLFormElement>('form')!;
-    if (action === 'shutdown') form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    else buttons[1].click();
-    await ready();
-    fixture.detectChanges();
-    expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
-    card.querySelector<HTMLButtonElement>('.quick-action')!.click();
-    dismiss({ role: 'confirm' });
-    await ready();
-    const request = http.expectOne(`${base}/${action}`);
-    expect(request.request.body).toEqual({ when: '+1' });
-    request.flush({ scheduled: true, when: '+1' });
-  });
+  it.each(['shutdown', 'reboot'] as const)(
+    'confirms %s from the card with frozen parameters',
+    async (action) => {
+      const fixture = enter();
+      const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
+      const buttons = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
+      const form = card.querySelector<HTMLFormElement>('form')!;
+      if (action === 'shutdown')
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      else buttons[1].click();
+      await ready();
+      fixture.detectChanges();
+      expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
+      card.querySelector<HTMLButtonElement>('.quick-action')!.click();
+      dismiss({ role: 'confirm' });
+      await ready();
+      const request = http.expectOne(`${base}/${action}`);
+      expect(request.request.body).toEqual({ when: '+1' });
+      request.flush({ scheduled: true, when: '+1' });
+    },
+  );
   it('cancels without sending an action and freezes confirmed parameters, blocking duplicates', async () => {
     const view = enter().componentInstance.state;
     const cancel = view.confirm('shutdown');

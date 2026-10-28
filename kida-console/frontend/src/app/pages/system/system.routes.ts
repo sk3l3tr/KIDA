@@ -9,17 +9,17 @@ export const systemRoutes: Routes = [
       {
         path: 'overview',
         loadComponent: () =>
-          import('./components/system-overview/system-overview').then((m) => m.SystemOverview),
+          import('./tabs/system-overview/system-overview').then((m) => m.SystemOverview),
       },
       {
         path: 'energy',
         loadComponent: () =>
-          import('./components/system-energy/system-energy').then((m) => m.SystemEnergy),
+          import('./tabs/system-energy/system-energy').then((m) => m.SystemEnergy),
       },
       {
         path: 'sensors',
         loadComponent: () =>
-          import('./components/system-inspector/system-inspector').then((m) => m.SystemInspector),
+          import('./tabs/system-inspector/system-inspector').then((m) => m.SystemInspector),
       },
     ],
   },

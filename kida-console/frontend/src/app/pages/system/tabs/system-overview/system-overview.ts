@@ -1,18 +1,30 @@
 import { Component, computed, inject } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
-import { SystemFacade } from '../../system.facade';
-import { SystemSectionView } from '../system-section/system-section';
-import { SystemStorageCard, storageDevices } from '../system-storage-card/system-storage-card';
-import { SystemFanRow } from '../system-fan-row/system-fan-row';
-import { SystemProcessorPanel } from '../system-processor-panel/system-processor-panel';
-import { fields, healthExtras } from '../system-sensor-card/system-sensors';
-import { SystemIndicator } from '../system-indicator/system-indicator';
-import { displaySystemValue } from '../../system-format';
+import { SystemFacade } from '../../services/system.facade';
+import { SystemSectionView } from '../../components/system-section/system-section';
+import {
+  SystemStorageCard,
+  storageDevices,
+} from '../../components/system-storage-card/system-storage-card';
+import { SystemFanRow } from '../../components/system-fan-row/system-fan-row';
+import { SystemProcessorPanel } from '../../components/system-processor-panel/system-processor-panel';
+import { fields, healthExtras } from '../../components/system-sensor-card/system-sensors';
+import { SystemIndicator } from '../../components/system-indicator/system-indicator';
+import { displaySystemValue } from '../../utils/system-format';
 import { Masonry, MasonryItem } from '../../../../components/masonry/masonry';
 
 @Component({
   selector: 'app-system-overview',
-  imports: [IonContent, SystemSectionView, SystemStorageCard, SystemFanRow, SystemProcessorPanel, SystemIndicator, Masonry, MasonryItem],
+  imports: [
+    IonContent,
+    SystemSectionView,
+    SystemStorageCard,
+    SystemFanRow,
+    SystemProcessorPanel,
+    SystemIndicator,
+    Masonry,
+    MasonryItem,
+  ],
   templateUrl: './system-overview.html',
   styleUrl: '../../system.scss',
 })

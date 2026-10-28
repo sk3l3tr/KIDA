@@ -1,22 +1,24 @@
 <article class="sensor-card" [class.compact]="compact()">
   @if (!processorSummary()) {
-  <div class="sensor-heading">
-    <div [style.width.%]="compact() ? 100 : 80">
+    <div class="sensor-heading">
+      <div [style.width.%]="compact() ? 100 : 80">
+        @if (!compact()) {
+          <strong>{{ display(reading().fields['label']) }}</strong>
+          <small
+            >{{ display(reading().fields['device']) }} ·
+            {{ display(reading().fields['type']) }}</small
+          >
+        } @else {
+          <span class="mutted" style="font-size: 0.75rem">{{
+            display(reading().fields['label'])
+          }}</span>
+        }
+      </div>
+
       @if (!compact()) {
-        <strong>{{ display(reading().fields['label']) }}</strong>
-        <small
-          >{{ display(reading().fields['device']) }} ·
-          {{ display(reading().fields['type']) }}</small
-        >
-      } @else {
-        <span style="font-size: 0.75rem">{{ display(reading().fields['label']) }}</span>
+        <span class="status">{{ display(reading().fields['status']) }}</span>
       }
     </div>
-
-    @if (!compact()) {
-      <span class="status">{{ display(reading().fields['status']) }}</span>
-    }
-  </div>
   }
   @if (!compact() && ratio() !== null) {
     <div class="sensor-meter" [style.--sensor-ratio]="ratio() + '%'">

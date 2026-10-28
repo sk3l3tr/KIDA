@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
-import { SystemSection } from '../../system.facade';
-import { displaySystemValue } from '../../system-format';
+import { SystemSection } from '../../services/system.facade';
+import { displaySystemValue } from '../../utils/system-format';
 import { fields } from '../system-sensor-card/system-sensors';
 import { SystemData } from '../system-data/system-data';
 import { SystemSectionStatus } from '../system-section-status/system-section-status';

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ArcaRequestService } from '../../services/arca-request.service';
+import { ArcaRequestService } from '../../../services/arca-request.service';
 import {
   CycleResult,
   PendingAction,
@@ -8,7 +8,7 @@ import {
   SystemHealth,
   SystemInfo,
   WakeCapabilities,
-} from './system.models';
+} from '../utils/system.models';
 
 @Injectable({ providedIn: 'root' })
 export class SystemService {

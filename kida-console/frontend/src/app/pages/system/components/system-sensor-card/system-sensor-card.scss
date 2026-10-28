@@ -14,7 +14,20 @@
   text-align: center;
   border: var(--kida-border-width) solid var(--ion-border-color);
   border-radius: var(--kida-radius);
+  background: var(--ion-color-primary-contrast);
+
+  transition: all 0.2s ease-in-out;
 }
+
+.compact:hover,
+.compact:focus-visible {
+  border-color: var(--ion-color-primary);
+  outline: 0;
+  transform: translateY(-2px);
+
+  cursor: pointer;
+}
+
 .compact .sensor-value {
   font-size: 1rem;
   margin: 0.5rem 0;

@@ -43,8 +43,24 @@ const health = {
       alarm: false,
       fault: false,
     },
-    { type: 'fan', label: 'alert-fan', value: 1200, unit: 'RPM', status: 'CRITICAL', alarm: true, fault: null },
-    { type: 'fan', label: 'unknown-fan', value: null, unit: null, status: 'FUTURE', alarm: null, fault: null },
+    {
+      type: 'fan',
+      label: 'alert-fan',
+      value: 1200,
+      unit: 'RPM',
+      status: 'CRITICAL',
+      alarm: true,
+      fault: null,
+    },
+    {
+      type: 'fan',
+      label: 'unknown-fan',
+      value: null,
+      unit: null,
+      status: 'FUTURE',
+      alarm: null,
+      fault: null,
+    },
     {
       type: 'fan',
       device: 'qc71_laptop.hwmon.fan',
@@ -174,46 +190,87 @@ const wake = {
         const otherRows = other.locator('.other-row');
         assert.equal(await otherRows.count(), 5);
         assert.match(await other.innerText(), /5 lecturas/);
-        assert.deepEqual(await otherRows.locator('strong').allTextContents(), ['Wi-Fi', 'Zona térmica ACPI 0', 'Zona térmica ACPI 1', 'duplicate', 'duplicate']);
+        assert.deepEqual(await otherRows.locator('strong').allTextContents(), [
+          'Wi-Fi',
+          'Zona térmica ACPI 0',
+          'Zona térmica ACPI 1',
+          'duplicate',
+          'duplicate',
+        ]);
         assert.match(await otherRows.first().innerText(), /iwlwifi_1_5.*temp1/);
         assert.doesNotMatch(await otherRows.first().innerText(), /Estado|Alarma|Crítico/);
-        assert.ok(await other.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+        assert.ok(await other.evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
         const storage = overview.locator('app-system-storage-card');
         assert.equal(await storage.count(), 1);
         assert.match(await storage.nth(0).innerText(), /Composite/);
         assert.match(await storage.nth(0).innerText(), /Sensor 2/);
         assert.equal(await storage.locator('.storage-secondary').count(), 1);
         assert.equal(await storage.locator('.storage-status').count(), 0);
-        assert.equal(await storage.locator('.storage-value small').evaluate(el => getComputedStyle(el).display), 'inline');
-        assert.equal(await storage.locator('.storage-card').evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
+        assert.equal(
+          await storage
+            .locator('.storage-value small')
+            .evaluate((el) => getComputedStyle(el).display),
+          'inline',
+        );
+        assert.equal(
+          await storage
+            .locator('.storage-card')
+            .evaluate((el) => getComputedStyle(el).backgroundColor),
+          'rgba(0, 0, 0, 0)',
+        );
         assert.match(await storage.first().innerText(), /Porcentaje del umbral crítico/);
         assert.equal(await storage.locator('.storage-meter').count(), 1);
-        assert.ok(await overview.locator('[aria-label="Almacenamiento"]').evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
+        assert.ok(
+          await overview
+            .locator('[aria-label="Almacenamiento"]')
+            .evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+        );
         const fans = overview.locator('app-system-fan-row');
         assert.equal(await fans.count(), 4);
         const iconColors = (el) => {
           const style = getComputedStyle(el);
           return [style.backgroundColor, style.color, style.borderRadius];
         };
-        assert.deepEqual(await storage.locator('.system-icon').evaluate(iconColors),
-          await fans.first().locator('.system-icon').evaluate(iconColors));
+        assert.deepEqual(
+          await storage.locator('.system-icon').evaluate(iconColors),
+          await fans.first().locator('.system-icon').evaluate(iconColors),
+        );
         assert.equal(await fans.locator('.spinning').count(), 2);
         assert.equal(await fans.locator('.danger').count(), 2);
         const stoppedIcon = fans.filter({ hasText: 'fan2' }).locator('.system-icon');
-        assert.equal(await stoppedIcon.evaluate((el) => {
-          const probe = document.createElement('span');
-          probe.style.backgroundColor = 'var(--kida-muted)';
-          el.appendChild(probe);
-          const matches = getComputedStyle(el).backgroundColor === getComputedStyle(probe).backgroundColor;
-          probe.remove();
-          return matches;
-        }), true);
-        assert.match(await fans.filter({ hasText: 'unknown-fan' }).innerText(), /Fallo: Desconocido/);
+        assert.equal(
+          await stoppedIcon.evaluate((el) => {
+            const probe = document.createElement('span');
+            probe.style.backgroundColor = 'var(--kida-muted)';
+            el.appendChild(probe);
+            const matches =
+              getComputedStyle(el).backgroundColor === getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return matches;
+          }),
+          true,
+        );
+        assert.match(
+          await fans.filter({ hasText: 'unknown-fan' }).innerText(),
+          /Fallo: Desconocido/,
+        );
         assert.doesNotMatch(await fans.first().innerText(), /Temperatura/);
         await page.emulateMedia({ reducedMotion: 'reduce' });
-        assert.equal(await fans.first().locator('svg').evaluate((el) => getComputedStyle(el).animationName), 'none');
+        assert.equal(
+          await fans
+            .first()
+            .locator('svg')
+            .evaluate((el) => getComputedStyle(el).animationName),
+          'none',
+        );
         await page.emulateMedia({ reducedMotion: 'no-preference' });
-        assert.notEqual(await fans.first().locator('svg').evaluate((el) => getComputedStyle(el).animationName), 'none');
+        assert.notEqual(
+          await fans
+            .first()
+            .locator('svg')
+            .evaluate((el) => getComputedStyle(el).animationName),
+          'none',
+        );
         assert.equal(await overview.locator('.compact').count(), 14);
         const processor = overview.locator('app-system-processor-panel');
         assert.match(await processor.innerText(), /14 núcleos medidos/);
@@ -347,7 +404,10 @@ const wake = {
         assert.equal(await storage.count(), 0);
         assert.match(await other.innerText(), /0 lecturas/);
         assert.match(await other.innerText(), /Sin lecturas disponibles/);
-        assert.match(await overview.locator('[aria-label="Almacenamiento"]').innerText(), /Sin lecturas disponibles/);
+        assert.match(
+          await overview.locator('[aria-label="Almacenamiento"]').innerText(),
+          /Sin lecturas disponibles/,
+        );
         assert.equal(reads.wake, 1);
         // Direct route reload exercises parent/child lifecycle order without tab history.
         await page.goto(`${base}/system/energy`);

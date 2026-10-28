@@ -1,4 +1,4 @@
-import { systemLabel } from '../../system/system-format';
+import { systemLabel } from '../../system/utils/system-format';
 
 export interface EquipmentGroup {
   key: string;

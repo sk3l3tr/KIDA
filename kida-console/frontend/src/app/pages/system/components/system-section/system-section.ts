@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { SystemSectionStatus } from '../system-section-status/system-section-status';
-import { SystemSection } from '../../system.facade';
+import { SystemSection } from '../../services/system.facade';
 
 @Component({
   selector: 'app-system-section',

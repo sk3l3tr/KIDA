@@ -1,6 +1,6 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, input } from '@angular/core';
-import { SystemSection } from '../../system.facade';
+import { SystemSection } from '../../services/system.facade';
 
 @Component({
   selector: 'app-system-section-status',

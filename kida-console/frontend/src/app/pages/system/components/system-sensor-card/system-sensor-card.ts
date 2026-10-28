@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { SensorReading, criticalRatio } from './system-sensors';
-import { displaySystemValue } from '../../system-format';
+import { displaySystemValue } from '../../utils/system-format';
 
 @Component({
   selector: 'app-system-sensor-card',

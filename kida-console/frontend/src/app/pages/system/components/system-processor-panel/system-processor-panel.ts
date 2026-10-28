@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { displaySystemValue } from '../../system-format';
+import { displaySystemValue } from '../../utils/system-format';
 import { SystemSensorCard } from '../system-sensor-card/system-sensor-card';
 import { coreStatistics, isCore, SensorReading } from '../system-sensor-card/system-sensors';
 

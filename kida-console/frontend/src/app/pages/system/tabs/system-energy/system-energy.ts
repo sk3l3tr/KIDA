@@ -1,10 +1,10 @@
 import { Component, inject } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
-import { SystemData } from '../system-data/system-data';
-import { SystemRtcCard } from '../system-rtc-card/system-rtc-card';
-import { SystemPowerCard } from '../system-power-card/system-power-card';
-import { SystemCycleCard } from '../system-cycle-card/system-cycle-card';
-import { SystemFacade } from '../../system.facade';
+import { SystemData } from '../../components/system-data/system-data';
+import { SystemRtcCard } from '../../components/system-rtc-card/system-rtc-card';
+import { SystemPowerCard } from '../../components/system-power-card/system-power-card';
+import { SystemCycleCard } from '../../components/system-cycle-card/system-cycle-card';
+import { SystemFacade } from '../../services/system.facade';
 
 @Component({
   selector: 'app-system-energy',

@@ -1,6 +1,6 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
-import { SystemFacade } from './system.facade';
+import { SystemFacade } from './services/system.facade';
 
 @Component({
   selector: 'app-system',

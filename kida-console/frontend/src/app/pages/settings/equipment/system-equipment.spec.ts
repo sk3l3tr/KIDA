@@ -17,7 +17,7 @@ import {
   provideIonicAngular,
 } from '@ionic/angular/standalone';
 import { equipmentGroup, equipmentGroups, extraEquipmentFields } from './equipment-data';
-import { displaySystemValue } from '../../system/system-format';
+import { displaySystemValue } from '../../system/utils/system-format';
 import { SystemEquipment } from './system-equipment';
 
 const info = {

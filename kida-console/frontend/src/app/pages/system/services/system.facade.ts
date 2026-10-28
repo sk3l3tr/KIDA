@@ -10,13 +10,13 @@ import {
 import { DOCUMENT } from '@angular/common';
 import { AlertController } from '@ionic/angular';
 import { Observable, Subscription, finalize } from 'rxjs';
-import { ThemeIdentity } from '../../../theme/integration';
+import { ThemeIdentity } from '../../../../theme/integration';
 import { SystemService } from './system.service';
 import {
   fields,
   sensorGroups,
   sensorReadings,
-} from './components/system-sensor-card/system-sensors';
+} from '../components/system-sensor-card/system-sensors';
 import {
   PendingAction,
   PowerAction,
@@ -24,7 +24,7 @@ import {
   cycleRequest,
   systemFailure,
   validWhen,
-} from './system.models';
+} from '../utils/system.models';
 
 function section(title: string) {
   return {

@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SystemFacade } from '../../system.facade';
+import { SystemFacade } from '../../services/system.facade';
 
 @Component({
   selector: 'app-system-power-card',

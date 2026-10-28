@@ -4,8 +4,8 @@ import { ThemeService } from '../../../lib/theming/theme.service';
 import { themeCatalog } from '../../../theme/catalog';
 import { ThemeIdentity } from '../../../theme/integration';
 import { Subscription, finalize } from 'rxjs';
-import { SystemService } from '../system/system.service';
-import { systemFailure } from '../system/system.models';
+import { SystemService } from '../system/services/system.service';
+import { systemFailure } from '../system/utils/system.models';
 import { SystemEquipment } from './equipment/system-equipment';
 
 @Component({

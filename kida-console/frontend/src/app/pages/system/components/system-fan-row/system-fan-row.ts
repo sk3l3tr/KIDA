@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { displaySystemValue } from '../../system-format';
+import { displaySystemValue } from '../../utils/system-format';
 import { finite, SensorReading } from '../system-sensor-card/system-sensors';
 
 @Component({
@@ -10,10 +10,14 @@ import { finite, SensorReading } from '../system-sensor-card/system-sensors';
 export class SystemFanRow {
   readonly reading = input.required<SensorReading>();
   readonly display = displaySystemValue;
-  readonly stopped = computed(() => this.reading().fields['value'] === 0 && this.reading().fields['unit'] === 'RPM');
+  readonly stopped = computed(
+    () => this.reading().fields['value'] === 0 && this.reading().fields['unit'] === 'RPM',
+  );
   readonly spinning = computed(() => {
     const { value, unit, status } = this.reading().fields;
-    return finite(value) && value > 0 && unit === 'RPM' && (status === 'OK' || status === 'CRITICAL');
+    return (
+      finite(value) && value > 0 && unit === 'RPM' && (status === 'OK' || status === 'CRITICAL')
+    );
   });
   readonly danger = computed(() => {
     const { alarm, fault, status } = this.reading().fields;
