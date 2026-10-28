@@ -4,10 +4,11 @@ import { ActivatedRoute } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
 import { ContainerDetails } from './container-details';
 import { DockerFacade } from './docker.facade';
+import { DockerIndicators } from './docker-indicators';
 
 @Component({
   selector: 'app-docker-view',
-  imports: [IonContent, JsonPipe, ContainerDetails],
+  imports: [IonContent, JsonPipe, ContainerDetails, DockerIndicators],
   templateUrl: './docker-view.html',
   styleUrl: './docker.scss',
 })

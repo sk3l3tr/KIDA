@@ -1,6 +1,10 @@
 <ion-content>
   <div class="console-layout docker-layout">
-    <h1 tabindex="-1" #heading>Docker</h1>
+    <header class="docker-heading">
+      <h1 tabindex="-1" #heading>Docker &amp; Compose</h1>
+      <p>Consulta el inventario de contenedores y los proyectos Compose observados.</p>
+    </header>
+    <app-docker-indicators />
     <section class="panel" aria-labelledby="docker-compose-title">
       <h2 id="docker-compose-title">Compose</h2>
       <p>Los proyectos observados no acreditan propiedad KIDA.</p>

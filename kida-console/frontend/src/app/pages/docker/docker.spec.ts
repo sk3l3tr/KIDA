@@ -181,6 +181,35 @@ describe('Docker page', () => {
     return component;
   }
   const fail = { status: 503, statusText: 'Unavailable' };
+  it('shows independent indicators for missing, zero, stale and differing readings in both tabs', () => {
+    const f = enter(), state = f.componentInstance.state;
+    const v = view(f, 'projects');
+    const indicators = () => Array.from(v.location.nativeElement.querySelectorAll('.indicator'))
+      .map((element: any) => element.textContent as string);
+    expect(indicators().every((text) => text.includes('Desconocido'))).toBe(true);
+    http.expectOne(`${base}/containers`).flush(inventory);
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    http.expectOne(`${base}/compose/projects`).flush([
+      project, { ...project, name: 'second', services: [...project.services, ...project.services] },
+    ]);
+    v.changeDetectorRef.detectChanges();
+    expect(indicators()).toEqual(['Contenedores99', 'En ejecución0de 99 contenedores', 'Proyectos2', 'Servicios3']);
+    expect(view(f, 'containers').location.nativeElement.querySelectorAll('.indicator')).toHaveLength(4);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(indicators()[0]).not.toContain('desactualizada');
+    expect(indicators()[2]).toContain('2');
+    expect(indicators()[2]).toContain('desactualizada');
+    expect(indicators()[3]).toContain('desactualizada');
+    state.refreshContainers();
+    http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([]);
+    v.changeDetectorRef.detectChanges();
+    expect(indicators().every((text) => text.includes('0'))).toBe(true);
+    expect(indicators().every((text) => !text.includes('desactualizada'))).toBe(true);
+  });
   it('keeps initial failures separate from empty data and permits independent refresh', () => {
     const f = enter(),
       v = f.componentInstance.state;

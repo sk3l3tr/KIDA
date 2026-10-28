@@ -1,6 +1,10 @@
 .docker-layout {
   padding-bottom: 3rem;
 }
+.docker-layout > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
 .section-header,
 .dialog-buttons,
 .action-buttons {
