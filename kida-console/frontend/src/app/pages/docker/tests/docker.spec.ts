@@ -4,19 +4,19 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { createComponent, EnvironmentInjector, getDebugNode, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
-import { appConfig } from '../../app.config';
-import { environment } from '../../../environments/environment';
-import { ThemeIdentity } from '../../../theme/integration';
-import { AuthService } from '../../auth/auth.service';
-import { ChannelBusyError } from '../../services/arca-request.service';
+import { appConfig } from '../../../app.config';
+import { environment } from '../../../../environments/environment';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { AuthService } from '../../../auth/auth.service';
+import { ChannelBusyError } from '../../../services/arca-request.service';
 import { Observable } from 'rxjs';
-import { DockerService } from './docker.service';
-import { Docker } from './docker';
-import { DockerView } from './docker-view';
-import { SidePanel } from '../../components/side-panel/side-panel';
-import { DockerContainer, ComposeProject } from './docker.models';
-import { dockerActions } from './docker.actions';
-import { composeAssociations, counter, display, dockerFailure } from './docker-presentation';
+import { DockerService } from '../services/docker.service';
+import { Docker } from '../docker';
+import { DockerView } from '../docker-view';
+import { SidePanel } from '../../../components/side-panel/side-panel';
+import { DockerContainer, ComposeProject } from '../utils/docker.models';
+import { dockerActions } from '../utils/docker.actions';
+import { composeAssociations, counter, display, dockerFailure } from '../utils/docker-presentation';
 const base = `${environment.apiBaseUrl}/docker`;
 const container: DockerContainer = {
   id: 'f'.repeat(64),
@@ -184,7 +184,8 @@ describe('Docker page', () => {
   }
   const fail = { status: 503, statusText: 'Unavailable' };
   it('opens the existing version reading without a request and keeps refresh failures independent', () => {
-    const f = initial(), state = f.componentInstance.state;
+    const f = initial(),
+      state = f.componentInstance.state;
     const projectsView = view(f, 'projects');
     const containersView = view(f, 'containers');
     const strip = projectsView.location.nativeElement.querySelector('app-docker-compose-version');
@@ -196,7 +197,9 @@ describe('Docker page', () => {
     http.expectNone(`${base}/compose/version`);
     state.leaveTab();
     expect(state.versionPanelOpen()).toBeNull();
-    containersView.location.nativeElement.querySelector('app-docker-compose-version button').click();
+    containersView.location.nativeElement
+      .querySelector('app-docker-compose-version button')
+      .click();
     expect(state.versionPanelOpen()).toBe('containers');
     state.refreshVersion();
     http.expectOne(`${base}/compose/version`).flush({ detail: { code: 'core_unavailable' } }, fail);
@@ -207,7 +210,9 @@ describe('Docker page', () => {
     projectsView.changeDetectorRef.detectChanges();
     expect(strip.textContent).toContain('desactualizada');
     state.refreshVersion();
-    http.expectOne(`${base}/compose/version`).flush({ version: 'v3', extra: null, count: 9007199254740992 });
+    http
+      .expectOne(`${base}/compose/version`)
+      .flush({ version: 'v3', extra: null, count: 9007199254740992 });
     containersView.changeDetectorRef.detectChanges();
     expect(state.version.stale()).toBe(false);
     const panel = containersView.location.nativeElement.querySelector('app-side-panel');
@@ -224,21 +229,36 @@ describe('Docker page', () => {
     expect(state.versionPanelOpen()).toBeNull();
   });
   it('shows independent indicators for missing, zero, stale and differing readings in both tabs', () => {
-    const f = enter(), state = f.componentInstance.state;
+    const f = enter(),
+      state = f.componentInstance.state;
     const v = view(f, 'projects');
-    const indicators = () => Array.from(v.location.nativeElement.querySelectorAll('.indicator'))
-      .map((element: any) => element.textContent as string);
+    const indicators = () =>
+      Array.from(v.location.nativeElement.querySelectorAll('.indicator')).map(
+        (element: any) => element.textContent as string,
+      );
     expect(indicators().every((text) => text.includes('Desconocido'))).toBe(true);
     http.expectOne(`${base}/containers`).flush(inventory);
     http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
-    http.expectOne(`${base}/compose/projects`).flush([
-      project, { ...project, name: 'second', services: [...project.services, ...project.services] },
-    ]);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush([
+        project,
+        { ...project, name: 'second', services: [...project.services, ...project.services] },
+      ]);
     v.changeDetectorRef.detectChanges();
-    expect(indicators()).toEqual(['Contenedores99', 'En ejecución0de 99 contenedores', 'Proyectos2', 'Servicios3']);
-    expect(view(f, 'containers').location.nativeElement.querySelectorAll('.indicator')).toHaveLength(4);
+    expect(indicators()).toEqual([
+      'Contenedores99',
+      'En ejecución0de 99 contenedores',
+      'Proyectos2',
+      'Servicios3',
+    ]);
+    expect(
+      view(f, 'containers').location.nativeElement.querySelectorAll('.indicator'),
+    ).toHaveLength(4);
     state.refreshProjects();
-    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush({ detail: { code: 'core_unavailable' } }, fail);
     v.changeDetectorRef.detectChanges();
     expect(indicators()[0]).not.toContain('desactualizada');
     expect(indicators()[2]).toContain('2');
@@ -253,11 +273,23 @@ describe('Docker page', () => {
     expect(indicators().every((text) => !text.includes('desactualizada'))).toBe(true);
   });
   it('renders project card totals from Compose and retains inspection and stale data', () => {
-    const f = enter(), state = f.componentInstance.state;
+    const f = enter(),
+      state = f.componentInstance.state;
     http.expectOne(`${base}/containers`).flush(inventory);
     http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
     http.expectOne(`${base}/compose/projects`).flush([
-      { ...project, services: [{ name: null, containers: [{ ...container, online: true }, { ...container, id: 'offline' }] }] },
+      {
+        ...project,
+        services: [
+          {
+            name: null,
+            containers: [
+              { ...container, online: true },
+              { ...container, id: 'offline' },
+            ],
+          },
+        ],
+      },
       { name: 'empty', services: [] },
     ]);
     const v = view(f, 'projects');
@@ -266,21 +298,28 @@ describe('Docker page', () => {
     expect(cards[0].textContent).toContain('1 / 2 activos');
     expect(cards[0].textContent).toContain('1 servicio · 2 contenedores');
     expect(cards[0].textContent).toContain('Sin nombre');
-    expect(cards[0].querySelector('[role="progressbar"]').getAttribute('aria-valuetext')).toBe('1 de 2 activos');
+    expect(cards[0].querySelector('[role="progressbar"]').getAttribute('aria-valuetext')).toBe(
+      '1 de 2 activos',
+    );
     expect(cards[1].textContent).toContain('0 / 0 activos');
     expect(cards[1].querySelector('[role="progressbar"] span').style.width).toBe('0%');
     cards[0].querySelector('footer button').click();
-    http.expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`).flush(project);
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+      .flush(project);
     v.changeDetectorRef.detectChanges();
     expect(v.location.nativeElement.textContent).toContain('Inspección: ' + project.name);
     state.refreshProjects();
-    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush({ detail: { code: 'core_unavailable' } }, fail);
     v.changeDetectorRef.detectChanges();
     expect(v.location.nativeElement.textContent).toContain('Proyectos anteriores, desactualizados');
     expect(v.location.nativeElement.querySelectorAll('app-docker-project-card')).toHaveLength(2);
   });
   it('retains service expansion across refresh and tabs, and inspects Compose containers locally', () => {
-    const f = enter(), state = f.componentInstance.state;
+    const f = enter(),
+      state = f.componentInstance.state;
     const services = [
       { name: null, containers: [container] },
       { name: 'web', containers: [{ ...container, id: 'second', online: true }] },
@@ -292,7 +331,9 @@ describe('Docker page', () => {
     const v = view(f, 'projects');
     const card = v.location.nativeElement.querySelector('app-docker-project-card');
     const group = card.querySelector('ion-accordion-group');
-    const keys = Array.from(card.querySelectorAll('ion-accordion')).map((item: any) => item.value as string);
+    const keys = Array.from(card.querySelectorAll('ion-accordion')).map(
+      (item: any) => item.value as string,
+    );
     expect(new Set(keys).size).toBe(3);
     expect(group.value).toEqual([keys[0]]);
     expect(card.textContent).toContain('Sin nombre');
@@ -300,7 +341,9 @@ describe('Docker page', () => {
     group.dispatchEvent(new CustomEvent('ionChange', { detail: { value: [keys[1], keys[2]] } }));
     state.leaveTab();
     state.refreshProjects();
-    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [services[1], services[2], services[0]] }]);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush([{ ...project, services: [services[1], services[2], services[0]] }]);
     v.changeDetectorRef.detectChanges();
     expect(group.value).toEqual([keys[1], keys[2]]);
     const button = card.querySelector('.inspect-container');
@@ -309,9 +352,16 @@ describe('Docker page', () => {
     expect(card.querySelector('app-container-details')?.textContent).toContain('ID: second');
     http.expectNone(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
     state.refreshProjects();
-    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [
-      { ...services[1], containers: [container, services[1].containers[0]] }, services[2], services[0],
-    ] }]);
+    http.expectOne(`${base}/compose/projects`).flush([
+      {
+        ...project,
+        services: [
+          { ...services[1], containers: [container, services[1].containers[0]] },
+          services[2],
+          services[0],
+        ],
+      },
+    ]);
     v.changeDetectorRef.detectChanges();
     expect(card.querySelector('app-container-details')?.textContent).toContain('ID: second');
     state.leaveTab();
@@ -325,7 +375,8 @@ describe('Docker page', () => {
     expect(state.expandedServices()).toEqual({});
   });
   it('opens the first service when an initially empty project receives services', () => {
-    const f = enter(), state = f.componentInstance.state;
+    const f = enter(),
+      state = f.componentInstance.state;
     http.expectOne(`${base}/containers`).flush(inventory);
     http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
     http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [] }]);
@@ -349,17 +400,27 @@ describe('Docker page', () => {
     http.expectOne(`${base}/compose/projects`).flush([]);
     f.detectChanges();
     expect(v.inventory.data()).toBeNull();
-    expect(view(f, 'containers').location.nativeElement.textContent).not.toContain('No hay contenedores.');
-    expect(view(f, 'projects').location.nativeElement.textContent).toContain('No hay proyectos Compose.');
+    expect(view(f, 'containers').location.nativeElement.textContent).not.toContain(
+      'No hay contenedores.',
+    );
+    expect(view(f, 'projects').location.nativeElement.textContent).toContain(
+      'No hay proyectos Compose.',
+    );
     v.refreshContainers();
     http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
     f.detectChanges();
-    expect(view(f, 'containers').location.nativeElement.textContent).toContain('No hay contenedores.');
+    expect(view(f, 'containers').location.nativeElement.textContent).toContain(
+      'No hay contenedores.',
+    );
     expect(v.version.error()).not.toBe('');
   });
   it('renders associations independently from inventory, including unavailable and stale readings', () => {
-    const f = enter(), state = f.componentInstance.state;
-    http.expectOne(`${base}/containers`).flush({ ...inventory, containers: [container, { ...container, id: 'unrelated', name: 'unrelated' }] });
+    const f = enter(),
+      state = f.componentInstance.state;
+    http.expectOne(`${base}/containers`).flush({
+      ...inventory,
+      containers: [container, { ...container, id: 'unrelated', name: 'unrelated' }],
+    });
     http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
     const v = view(f, 'containers');
     expect(v.location.nativeElement.textContent).toContain('Asociación no disponible');
@@ -371,7 +432,9 @@ describe('Docker page', () => {
     expect(rows[1].textContent).toContain('Sin asociación Compose observada');
     expect(rows[0].querySelectorAll('.action-buttons button')).toHaveLength(4);
     state.refreshProjects();
-    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush({ detail: { code: 'core_unavailable' } }, fail);
     v.changeDetectorRef.detectChanges();
     expect(rows[0].textContent).toContain('Lectura de proyectos desactualizada');
     state.refreshProjects();
@@ -380,14 +443,19 @@ describe('Docker page', () => {
     expect(rows[0].textContent).toContain('Asociación ambigua');
     expect(rows[0].textContent).not.toContain('Sin nombre / ' + project.name);
     expect(v.location.nativeElement.textContent).toContain('2 contenedores recibidos');
-    expect(v.location.nativeElement.textContent).toContain('El código de salida 137 no establece por sí solo la causa');
+    expect(v.location.nativeElement.textContent).toContain(
+      'El código de salida 137 no establece por sí solo la causa',
+    );
   });
   it('searches local inventory and known Compose associations without changing source readings', () => {
-    const f = enter(), state = f.componentInstance.state;
+    const f = enter(),
+      state = f.componentInstance.state;
     const first = { ...container, id: 'full-id-alpha', name: 'Nombre Alpha', image: 'Image:ONE' };
     const second = { ...container, id: 'full-id-beta', name: 'Nombre Beta', image: 'Image:TWO' };
     const data = { total: 99, running: 0, containers: [first, second], future: 'preserved' };
-    const compose = [{ name: 'Proyecto Especial', services: [{ name: 'Servicio Web', containers: [first] }] }];
+    const compose = [
+      { name: 'Proyecto Especial', services: [{ name: 'Servicio Web', containers: [first] }] },
+    ];
     http.expectOne(`${base}/containers`).flush(data);
     http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
     http.expectOne(`${base}/compose/projects`).flush(compose);
@@ -399,7 +467,13 @@ describe('Docker page', () => {
       input.dispatchEvent(new Event('input'));
       v.changeDetectorRef.detectChanges();
     };
-    for (const query of ['  ALPHA  ', 'FULL-ID-ALPHA', 'image:one', 'PROYECTO ESPECIAL', 'servicio web']) {
+    for (const query of [
+      '  ALPHA  ',
+      'FULL-ID-ALPHA',
+      'image:one',
+      'PROYECTO ESPECIAL',
+      'servicio web',
+    ]) {
       search(query);
       expect(root.querySelectorAll('tbody tr:not(.row-hidden)')).toHaveLength(1);
       expect(root.querySelector('tbody tr:not(.row-hidden)').textContent).toContain(first.name);
@@ -408,8 +482,12 @@ describe('Docker page', () => {
     expect(state.inventory.data()).toEqual(data);
     expect(state.projects.data()).toEqual(compose);
     expect(root.querySelector('app-docker-indicators').textContent).toContain('99');
-    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain('preserved');
-    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain('full-id-beta');
+    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain(
+      'preserved',
+    );
+    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain(
+      'full-id-beta',
+    );
     state.leaveTab();
     expect(state.search()).toBe('servicio web');
     search('no coincide');
@@ -426,16 +504,21 @@ describe('Docker page', () => {
     expect(state.search()).toBe('');
   });
   it('recalculates search for unavailable, stale and ambiguous associations and refreshed inventories', () => {
-    const f = enter(), state = f.componentInstance.state;
+    const f = enter(),
+      state = f.componentInstance.state;
     const first = { ...container, id: 'alpha', name: 'first' };
     http.expectOne(`${base}/containers`).flush({ ...inventory, containers: [first] });
     http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
     state.search.set('web');
     expect(state.visibleContainers()).toEqual([]);
-    http.expectOne(`${base}/compose/projects`).flush([{ name: 'project', services: [{ name: 'web', containers: [first] }] }]);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush([{ name: 'project', services: [{ name: 'web', containers: [first] }] }]);
     expect(state.visibleContainers()).toEqual([first]);
     state.refreshProjects();
-    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    http
+      .expectOne(`${base}/compose/projects`)
+      .flush({ detail: { code: 'core_unavailable' } }, fail);
     expect(state.projects.stale()).toBe(true);
     expect(state.visibleContainers()).toEqual([first]);
     state.refreshProjects();
@@ -455,7 +538,8 @@ describe('Docker page', () => {
     expect(state.search()).toBe('');
   });
   it('returns focus to search when an updated association hides the focused row', () => {
-    const f = initial(), state = f.componentInstance.state;
+    const f = initial(),
+      state = f.componentInstance.state;
     const v = view(f, 'containers');
     const root = v.location.nativeElement as HTMLElement;
     document.body.append(root);
@@ -464,7 +548,10 @@ describe('Docker page', () => {
       v.changeDetectorRef.detectChanges();
       const summary = root.querySelector<HTMLElement>('tbody summary')!;
       const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(summary);
-      const searchFocus = vi.spyOn(root.querySelector<HTMLInputElement>('#docker-search')!, 'focus');
+      const searchFocus = vi.spyOn(
+        root.querySelector<HTMLInputElement>('#docker-search')!,
+        'focus',
+      );
       state.refreshProjects();
       http.expectOne(`${base}/compose/projects`).flush([]);
       TestBed.flushEffects();
@@ -549,7 +636,9 @@ describe('Docker page', () => {
     expect(v.projects.stale()).toBe(true);
     expect(v.error()).toBe('');
     f.detectChanges();
-    expect(view(f, 'projects').location.nativeElement.textContent).toContain('Acción solicitada: Arrancar');
+    expect(view(f, 'projects').location.nativeElement.textContent).toContain(
+      'Acción solicitada: Arrancar',
+    );
   });
   it('keeps uncertain warning and blocks actions until a successful inventory read', () => {
     const f = initial(),
@@ -671,7 +760,8 @@ describe('Docker page', () => {
     },
   );
   it('keeps readings and a submitted write across tab changes while clearing confirmation and inspection', () => {
-    const f = initial(), v = f.componentInstance.state;
+    const f = initial(),
+      v = f.componentInstance.state;
     v.prepare('delete', container);
     v.leaveTab();
     expect(v.pending()).toBeNull();
@@ -693,9 +783,12 @@ describe('Docker page', () => {
     http.expectNone(`${base}/compose/projects`);
   });
   it('ignores inspection responses after changing tabs', () => {
-    const f = initial(), v = f.componentInstance.state;
+    const f = initial(),
+      v = f.componentInstance.state;
     v.inspect(project.name);
-    const request = http.expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
+    const request = http.expectOne(
+      `${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`,
+    );
     v.leaveTab();
     request.flush(project);
     expect(v.selected()).toBeNull();
@@ -718,11 +811,18 @@ describe('Docker presentation', () => {
   it('deduplicates identical associations and compares full IDs and null service names', () => {
     const associations = composeAssociations([
       { ...project, services: [project.services[0], project.services[0]] },
-      { name: 'other', services: [{ name: null, containers: [{ ...container, id: container.id + 'x' }] }] },
+      {
+        name: 'other',
+        services: [{ name: null, containers: [{ ...container, id: container.id + 'x' }] }],
+      },
     ]);
     expect(associations.get(container.id)).toEqual({ project: project.name, service: null });
     expect(associations.get(container.id + 'x')).toEqual({ project: 'other', service: null });
-    expect(composeAssociations([{ ...project, services: [project.services[0], { name: 'web', containers: [container] }] }]).get(container.id)).toBe('ambiguous');
+    expect(
+      composeAssociations([
+        { ...project, services: [project.services[0], { name: 'web', containers: [container] }] },
+      ]).get(container.id),
+    ).toBe('ambiguous');
   });
   it('preserves zeros and reports unsafe integer precision', () => {
     expect(display(null)).toContain('Desconocido');

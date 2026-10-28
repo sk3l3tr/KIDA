@@ -1,5 +1,5 @@
 import { IactionDefinition, UrlRequestFormat, UrlRequestType } from 'arca';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../../environments/environment';
 
 export const dockerActions: IactionDefinition[] = (
   [

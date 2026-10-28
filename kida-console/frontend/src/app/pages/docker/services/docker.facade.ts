@@ -1,16 +1,9 @@
-import { trapDialogFocus, restoreDialogFocus } from '../../services/dialog-focus';
-import {
-  Injectable,
-  Injector,
-  OnDestroy,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { trapDialogFocus, restoreDialogFocus } from '../../../services/dialog-focus';
+import { Injectable, Injector, OnDestroy, computed, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Observable, Subscription, catchError, finalize, forkJoin, map, of, tap } from 'rxjs';
-import { ThemeIdentity } from '../../../theme/integration';
-import { classifyCoreFailure } from '../../services/core-failure';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { classifyCoreFailure } from '../../../services/core-failure';
 import { DockerService } from './docker.service';
 import {
   ComposeProject,
@@ -20,7 +13,7 @@ import {
   DockerContainer,
   DockerContainers,
   PendingContainer,
-} from './docker.models';
+} from '../utils/docker.models';
 import {
   actionLabels,
   composeAssociations,
@@ -28,7 +21,7 @@ import {
   display,
   dockerFailure,
   limitedPrecision,
-} from './docker-presentation';
+} from '../utils/docker-presentation';
 
 /** Each reading retains its last successful value independently of refresh errors. */
 function reading<T>() {
@@ -81,9 +74,13 @@ export class DockerFacade implements OnDestroy {
       return fields.some((field) => field.toLowerCase().includes(query));
     });
   });
-  readonly visibleContainerIds = computed(() => new Set(this.visibleContainers().map((container) => container.id)));
+  readonly visibleContainerIds = computed(
+    () => new Set(this.visibleContainers().map((container) => container.id)),
+  );
   readonly expandedServices = signal<Record<string, string[]>>({});
-  readonly inspectedContainer = signal<{ project: string; service: string; id: string } | null>(null);
+  readonly inspectedContainer = signal<{ project: string; service: string; id: string } | null>(
+    null,
+  );
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
   readonly busy = signal(false);
@@ -227,11 +224,19 @@ export class DockerFacade implements OnDestroy {
       }
       this.expandedServices.set(next);
       const inspected = this.inspectedContainer();
-      if (inspected && !projects.some((project) =>
-        project.name === inspected.project && project.services.some((service, index) =>
-          serviceKeys(project)[index] === inspected.service && service.containers.some((container) => container.id === inspected.id),
-        ),
-      )) this.inspectedContainer.set(null);
+      if (
+        inspected &&
+        !projects.some(
+          (project) =>
+            project.name === inspected.project &&
+            project.services.some(
+              (service, index) =>
+                serviceKeys(project)[index] === inspected.service &&
+                service.containers.some((container) => container.id === inspected.id),
+            ),
+        )
+      )
+        this.inspectedContainer.set(null);
       if (
         this.selected() !== null &&
         !projects.some((project) => project.name === this.selected())
@@ -264,7 +269,10 @@ export class DockerFacade implements OnDestroy {
     this.detail.loading.set(true);
     this.detail.error.set('');
     const selectionRevision = this.selectionRevision;
-    const applies = () => this.valid(generation, revision) && this.selectionRevision === selectionRevision && this.selected() === project;
+    const applies = () =>
+      this.valid(generation, revision) &&
+      this.selectionRevision === selectionRevision &&
+      this.selected() === project;
     this.subscriptions.add(
       this.service
         .inspect(project)
@@ -382,7 +390,10 @@ export class DockerFacade implements OnDestroy {
       this.injector,
       trigger,
       () => this.heading(),
-      () => this.active && generation === this.generation && selectionRevision === this.selectionRevision,
+      () =>
+        this.active &&
+        generation === this.generation &&
+        selectionRevision === this.selectionRevision,
     );
   }
 }

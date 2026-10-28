@@ -1,4 +1,4 @@
-import { formatCoreFailure } from '../../services/core-failure';
+import { formatCoreFailure } from '../../../services/core-failure';
 import { ComposeProject, ContainerAction } from './docker.models';
 
 export type ComposeAssociation = { project: string; service: string | null } | 'ambiguous';
@@ -42,7 +42,8 @@ export function limitedPrecision(value: unknown): boolean {
 }
 export function dockerFailure(failure: unknown, writing = false): string {
   return formatCoreFailure(failure, writing, {
-    uncertain: 'No se pudo confirmar el resultado. No se reenviará automáticamente. Actualiza contenedores antes de realizar otra acción.',
+    uncertain:
+      'No se pudo confirmar el resultado. No se reenviará automáticamente. Actualiza contenedores antes de realizar otra acción.',
     validation: 'Validación HTTP: datos rechazados por el servidor.',
     rejected: 'core',
   });

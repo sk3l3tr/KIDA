@@ -1,12 +1,12 @@
 import { Injectable, inject } from '@angular/core';
-import { ArcaRequestService } from '../../services/arca-request.service';
+import { ArcaRequestService } from '../../../services/arca-request.service';
 import {
   ComposeProject,
   ComposeVersion,
   ContainerAction,
   ContainerResult,
   DockerContainers,
-} from './docker.models';
+} from '../utils/docker.models';
 
 @Injectable({ providedIn: 'root' })
 export class DockerService {

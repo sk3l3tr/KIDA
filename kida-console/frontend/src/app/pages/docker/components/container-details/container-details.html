@@ -1,0 +1,39 @@
+<p>Nombre: {{ container().name }} · ID: {{ container().id }}</p>
+<p>Imagen: {{ container().image }}</p>
+<p>
+  Actividad: {{ container().online ? 'En línea' : 'Fuera de línea' }} · Estado:
+  {{ container().status }} · Salud: {{ display(container().health) }}
+</p>
+<details>
+  <summary>Detalles del contenedor {{ container().name }}</summary>
+  <p>Inicio: {{ display(container().started_at) }} · Fin: {{ display(container().finished_at) }}</p>
+  <p>
+    Salida: {{ counter(container().exit_code) }} · Reinicios:
+    {{ counter(container().restart_count) }} · Política:
+    {{ display(container().restart_policy) }}
+  </p>
+  <h4>Puertos</h4>
+  @for (port of container().ports; track $index) {
+    <p>
+      {{ display(port.container_port) }} / {{ port.protocol }} → {{ display(port.host_ip) }}:{{
+        display(port.host_port)
+      }}
+    </p>
+  } @empty {
+    <p>Sin puertos.</p>
+  }
+  <h4>Redes</h4>
+  @for (network of container().networks; track $index) {
+    <p>
+      {{ network.name }} · IP: {{ display(network.ip_address) }} · Puerta de enlace:
+      {{ display(network.gateway) }} · MAC: {{ display(network.mac_address) }}
+    </p>
+  } @empty {
+    <p>Sin redes.</p>
+  }
+  <p>Datos recibidos, interpretados por JavaScript (JSON).</p>
+  @if (limitedPrecision(container())) {
+    <p>Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.</p>
+  }
+  <pre>{{ container() | json }}</pre>
+</details>
