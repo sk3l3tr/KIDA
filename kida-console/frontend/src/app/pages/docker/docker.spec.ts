@@ -382,6 +382,100 @@ describe('Docker page', () => {
     expect(v.location.nativeElement.textContent).toContain('2 contenedores recibidos');
     expect(v.location.nativeElement.textContent).toContain('El código de salida 137 no establece por sí solo la causa');
   });
+  it('searches local inventory and known Compose associations without changing source readings', () => {
+    const f = enter(), state = f.componentInstance.state;
+    const first = { ...container, id: 'full-id-alpha', name: 'Nombre Alpha', image: 'Image:ONE' };
+    const second = { ...container, id: 'full-id-beta', name: 'Nombre Beta', image: 'Image:TWO' };
+    const data = { total: 99, running: 0, containers: [first, second], future: 'preserved' };
+    const compose = [{ name: 'Proyecto Especial', services: [{ name: 'Servicio Web', containers: [first] }] }];
+    http.expectOne(`${base}/containers`).flush(data);
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    http.expectOne(`${base}/compose/projects`).flush(compose);
+    const v = view(f, 'containers');
+    const root = v.location.nativeElement;
+    const input = root.querySelector('#docker-search') as HTMLInputElement;
+    const search = (value: string) => {
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+      v.changeDetectorRef.detectChanges();
+    };
+    for (const query of ['  ALPHA  ', 'FULL-ID-ALPHA', 'image:one', 'PROYECTO ESPECIAL', 'servicio web']) {
+      search(query);
+      expect(root.querySelectorAll('tbody tr:not(.row-hidden)')).toHaveLength(1);
+      expect(root.querySelector('tbody tr:not(.row-hidden)').textContent).toContain(first.name);
+      expect(root.textContent).toContain('1 resultado');
+    }
+    expect(state.inventory.data()).toEqual(data);
+    expect(state.projects.data()).toEqual(compose);
+    expect(root.querySelector('app-docker-indicators').textContent).toContain('99');
+    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain('preserved');
+    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain('full-id-beta');
+    state.leaveTab();
+    expect(state.search()).toBe('servicio web');
+    search('no coincide');
+    expect(root.textContent).toContain('No hay contenedores que coincidan con la búsqueda');
+    expect(root.textContent).not.toContain('No hay contenedores.');
+    expect(Array.from(root.querySelectorAll('tbody tr')).every((row: any) => row.inert)).toBe(true);
+    search('  ');
+    expect(root.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(root.querySelectorAll('tbody tr')[0].textContent).toContain(first.name);
+    expect(root.querySelectorAll('tbody tr')[1].textContent).toContain(second.name);
+    http.expectNone(`${base}/containers`);
+    http.expectNone(`${base}/compose/projects`);
+    TestBed.inject(ThemeIdentity).begin();
+    expect(state.search()).toBe('');
+  });
+  it('recalculates search for unavailable, stale and ambiguous associations and refreshed inventories', () => {
+    const f = enter(), state = f.componentInstance.state;
+    const first = { ...container, id: 'alpha', name: 'first' };
+    http.expectOne(`${base}/containers`).flush({ ...inventory, containers: [first] });
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    state.search.set('web');
+    expect(state.visibleContainers()).toEqual([]);
+    http.expectOne(`${base}/compose/projects`).flush([{ name: 'project', services: [{ name: 'web', containers: [first] }] }]);
+    expect(state.visibleContainers()).toEqual([first]);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    expect(state.projects.stale()).toBe(true);
+    expect(state.visibleContainers()).toEqual([first]);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([
+      { name: 'project', services: [{ name: 'web', containers: [first] }] },
+      { name: 'other', services: [{ name: 'web', containers: [first] }] },
+    ]);
+    expect(state.visibleContainers()).toEqual([]);
+    state.search.set('first');
+    expect(state.visibleContainers()).toEqual([first]);
+    state.refreshContainers();
+    http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+    const v = view(f, 'containers');
+    expect(v.location.nativeElement.textContent).toContain('No hay contenedores.');
+    expect(v.location.nativeElement.textContent).not.toContain('coincidan con la búsqueda');
+    state.ionViewWillLeave();
+    expect(state.search()).toBe('');
+  });
+  it('returns focus to search when an updated association hides the focused row', () => {
+    const f = initial(), state = f.componentInstance.state;
+    const v = view(f, 'containers');
+    const root = v.location.nativeElement as HTMLElement;
+    document.body.append(root);
+    try {
+      state.search.set(project.name);
+      v.changeDetectorRef.detectChanges();
+      const summary = root.querySelector<HTMLElement>('tbody summary')!;
+      const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(summary);
+      const searchFocus = vi.spyOn(root.querySelector<HTMLInputElement>('#docker-search')!, 'focus');
+      state.refreshProjects();
+      http.expectOne(`${base}/compose/projects`).flush([]);
+      TestBed.flushEffects();
+      v.changeDetectorRef.detectChanges();
+      expect(searchFocus).toHaveBeenCalled();
+      expect(root.querySelector<HTMLTableRowElement>('tbody tr')!.inert).toBe(true);
+      active.mockRestore();
+    } finally {
+      root.remove();
+    }
+  });
   it('shows API totals, future states, nulls, zero, anonymous services and safe remote text', () => {
     const f = initial();
     const rendered = view(f, 'containers').location.nativeElement;

@@ -113,13 +113,20 @@
       @if (state.inventory.data(); as data) {
         <p>{{ data.containers.length }} {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}</p>
         <p>Total: {{ state.counter(data.total) }} · En ejecución: {{ state.counter(data.running) }}</p>
-        @if (data.containers.length) {
+        <div class="inventory-tools">
+          <label for="docker-search">Buscar contenedores</label>
+          <input id="docker-search" class="console-control" type="search" placeholder="Nombre, ID, imagen, proyecto o servicio"
+            [value]="state.search()" (input)="state.search.set($any($event.target).value)" />
+          <span aria-live="polite">{{ state.visibleContainers().length }} {{ state.visibleContainers().length === 1 ? 'resultado' : 'resultados' }}</span>
+        </div>
         <div class="table-wrap"><table class="container-list">
           <colgroup><col><col><col><col><col><col><col class="operations-column"></colgroup>
           <thead><tr><th>Contenedor</th><th>Estado</th><th>Imagen</th><th>Servicio / Proyecto</th><th>Salud</th><th>Salida</th><th>Operaciones</th></tr></thead>
           <tbody>
           @for (container of data.containers; track container.id) {
-            <tr>
+            <tr class="inventory-row" [class.row-hidden]="!state.visibleContainerIds().has(container.id)"
+              [attr.data-container-id]="container.id"
+              [inert]="!state.visibleContainerIds().has(container.id)">
               <td><span class="mobile-label">Contenedor</span><strong>{{ container.name }}</strong>
                 <details><summary>Ver detalles</summary><app-container-details [container]="container" /></details>
               </td>
@@ -152,7 +159,8 @@
           }
           </tbody>
         </table></div>
-        } @else { <p>No hay contenedores.</p> }
+        @if (!data.containers.length) { <p>No hay contenedores.</p> }
+        @else if (!state.visibleContainers().length) { <p>No hay contenedores que coincidan con la búsqueda.</p> }
         <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
         <details>
           <summary>Datos del inventario (JSON interpretado)</summary>

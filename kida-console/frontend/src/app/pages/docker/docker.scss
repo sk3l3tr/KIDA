@@ -60,6 +60,8 @@ dialog {
   grid-column: 1 / -1;
 }
 .inventory-panel { min-width: 0; }
+.inventory-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 1rem 0; }
+.inventory-tools input { flex: 1 1 16rem; min-width: 0; }
 .table-wrap { overflow-x: auto; }
 .container-list { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .operations-column { width: 21rem; }
@@ -69,6 +71,12 @@ dialog {
 .container-list .action-buttons { justify-content: flex-end; gap: 0.25rem; margin: 0; }
 .container-list .action-buttons button { padding-inline: 0.45rem; }
 .mobile-label { display: none; }
+.inventory-row { opacity: 1; transform: translateY(0); transition: opacity 180ms ease, transform 180ms ease, display 180ms allow-discrete; }
+.inventory-row.row-hidden { display: none; opacity: 0; transform: translateY(-0.25rem); pointer-events: none; }
+@starting-style { .inventory-row:not(.row-hidden) { opacity: 0; transform: translateY(0.35rem); } }
+@media (prefers-reduced-motion: reduce) {
+  .inventory-row { transition: none; }
+}
 @media (max-width: 1099px) {
   .container-list, .container-list tbody, .container-list tr, .container-list td { display: block; }
   .container-list thead { display: none; }

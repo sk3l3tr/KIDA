@@ -65,6 +65,23 @@ export class DockerFacade implements OnDestroy {
     const projects = this.projects.data();
     return projects === null ? null : composeAssociations(projects);
   });
+  readonly search = signal('');
+  readonly visibleContainers = computed(() => {
+    const containers = this.inventory.data()?.containers ?? [];
+    const query = this.search().trim().toLowerCase();
+    if (!query) return containers;
+    const associations = this.associations();
+    return containers.filter((container) => {
+      const association = associations?.get(container.id);
+      const fields = [container.name, container.id, container.image];
+      if (association && association !== 'ambiguous') {
+        fields.push(association.project);
+        if (association.service !== null) fields.push(association.service);
+      }
+      return fields.some((field) => field.toLowerCase().includes(query));
+    });
+  });
+  readonly visibleContainerIds = computed(() => new Set(this.visibleContainers().map((container) => container.id)));
   readonly expandedServices = signal<Record<string, string[]>>({});
   readonly inspectedContainer = signal<{ project: string; service: string; id: string } | null>(null);
   readonly detail = reading<ComposeProject>();
@@ -139,6 +156,7 @@ export class DockerFacade implements OnDestroy {
     this.selected.set(null);
     this.expandedServices.set({});
     this.inspectedContainer.set(null);
+    this.search.set('');
     this.busy.set(false);
     this.uncertain.set(false);
     this.error.set('');
