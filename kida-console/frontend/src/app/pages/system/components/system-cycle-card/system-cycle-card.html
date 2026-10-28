@@ -1,7 +1,7 @@
 <form (ngSubmit)="state.confirm('powerCycle')">
   <header class="cycle-header">
     <div>
-      <h2><span class="cycle-icon" aria-hidden="true">⟳</span> Ciclo de energía</h2>
+      <h2>Ciclo de energía</h2>
       <p>Programar encendido RTC y apagado opcional</p>
     </div>
     <span class="cycle-badge">RTC WAKE</span>
@@ -9,12 +9,22 @@
 
   <div class="mode-field">
     <span id="wake-mode-label">Modalidad de encendido</span>
-    <ion-segment mode="ios" name="wakeMode" [(ngModel)]="state.wakeMode" aria-labelledby="wake-mode-label">
+    <ion-segment
+      mode="ios"
+      name="wakeMode"
+      [(ngModel)]="state.wakeMode"
+      aria-labelledby="wake-mode-label"
+    >
       <ion-segment-button value="time" type="button">
-        <span class="mode-content"><span class="mode-indicator" aria-hidden="true"></span><span>Hora programada</span></span>
+        <span class="mode-content"
+          ><span class="mode-indicator" aria-hidden="true"></span><span>Hora programada</span></span
+        >
       </ion-segment-button>
       <ion-segment-button value="seconds" type="button">
-        <span class="mode-content"><span class="mode-indicator" aria-hidden="true"></span><span>Segundos desde la ejecución</span></span>
+        <span class="mode-content"
+          ><span class="mode-indicator" aria-hidden="true"></span
+          ><span>Segundos desde la ejecución</span></span
+        >
       </ion-segment-button>
     </ion-segment>
   </div>
@@ -23,27 +33,52 @@
     <div>
       @if (state.wakeMode === 'time') {
         <label for="wake-time">Hora de encendido</label>
-        <input id="wake-time" name="wakeTime" [(ngModel)]="state.wakeTime" placeholder="06:00" inputmode="numeric" aria-describedby="wake-help" />
+        <input
+          id="wake-time"
+          name="wakeTime"
+          [(ngModel)]="state.wakeTime"
+          placeholder="06:00"
+          inputmode="numeric"
+          aria-describedby="wake-help"
+        />
         <small id="wake-help">HH:MM · reloj del servidor CORE</small>
       } @else {
         <label for="wake-seconds">Segundos hasta el encendido</label>
-        <input id="wake-seconds" name="wakeSeconds" [(ngModel)]="state.wakeSeconds" inputmode="numeric" aria-describedby="wake-help" />
+        <input
+          id="wake-seconds"
+          name="wakeSeconds"
+          [(ngModel)]="state.wakeSeconds"
+          inputmode="numeric"
+          aria-describedby="wake-help"
+        />
         <small id="wake-help">Mínimo 120 segundos desde la ejecución</small>
       }
     </div>
     <div>
       <label for="shutdown-time">Apagado (opcional)</label>
-      <input id="shutdown-time" name="shutdownTime" [(ngModel)]="state.shutdownTime" placeholder="23:00" inputmode="numeric" aria-describedby="shutdown-help" />
+      <input
+        id="shutdown-time"
+        name="shutdownTime"
+        [(ngModel)]="state.shutdownTime"
+        placeholder="23:00"
+        inputmode="numeric"
+        aria-describedby="shutdown-help"
+      />
       <small id="shutdown-help">HH:MM · vacío equivale a +1 minuto</small>
     </div>
   </div>
 
   <p class="cycle-notice">
     <span class="notice-icon" aria-hidden="true">ⓘ</span>
-    <span><strong>El encendido desde S5 requiere verificación.</strong> Depende del hardware y los permisos RTC. CORE valida la relación temporal y exige un mínimo de 120 segundos.</span>
+    <span
+      ><strong>El encendido desde S5 requiere verificación.</strong> Depende del hardware y los
+      permisos RTC. CORE valida la relación temporal y exige un mínimo de 120 segundos.</span
+    >
   </p>
   <div class="cycle-actions">
-    <button class="danger" type="submit" [disabled]="state.busy() || !state.cycleBody()">Programar ciclo</button>
+    <button class="danger" type="submit" [disabled]="state.busy() || !state.cycleBody()">
+      Programar ciclo
+    </button>
     @if (!state.cycleBody()) {
       <small>Completa el encendido y, si la indicas, una hora de apagado válida.</small>
     }

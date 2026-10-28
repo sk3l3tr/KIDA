@@ -29,44 +29,58 @@
     <app-masonry class="sensor-panels">
       @for (group of state.groups(); track group.key) {
         @if (group.key === 'processor') {
-          <app-system-processor-panel appMasonryItem [readings]="group.readings" [packages]="packages()" />
+          <app-system-processor-panel
+            appMasonryItem
+            [readings]="group.readings"
+            [packages]="packages()"
+          />
         } @else {
           <section appMasonryItem class="panel sensor-group" [attr.aria-label]="group.title">
             <div class="section-header">
-              <h2>@if (group.key === 'other') {<span class="system-icon other-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></svg></span>}{{ group.title }}</h2>
+              <h2>
+                {{ group.title }}
+              </h2>
               <small>{{ group.readings.length }} lecturas</small>
             </div>
-          @if (group.key === 'cooling') {
-            <div class="fan-list">
-              @for (reading of group.readings; track reading.index) {
-                <app-system-fan-row [reading]="reading" />
-              } @empty {
-                <p>Sin lecturas disponibles.</p>
-              }
-            </div>
-          } @else if (group.key === 'storage') {
-          <div class="storage-list">
-            @for (readings of storageDevices(group.readings); track readings[0].index) {
-              <app-system-storage-card [readings]="readings" />
-            } @empty {
-              <p>Sin lecturas disponibles.</p>
+            @if (group.key === 'cooling') {
+              <div class="fan-list">
+                @for (reading of group.readings; track reading.index) {
+                  <app-system-fan-row [reading]="reading" />
+                } @empty {
+                  <p>Sin lecturas disponibles.</p>
+                }
+              </div>
+            } @else if (group.key === 'storage') {
+              <div class="storage-list">
+                @for (readings of storageDevices(group.readings); track readings[0].index) {
+                  <app-system-storage-card [readings]="readings" />
+                } @empty {
+                  <p>Sin lecturas disponibles.</p>
+                }
+              </div>
+            } @else {
+              <div class="other-list">
+                @for (reading of group.readings; track reading.index) {
+                  <article class="other-row">
+                    <div class="other-details">
+                      <strong>{{
+                        otherName(reading.fields['device'], reading.fields['label'])
+                      }}</strong>
+                      <small
+                        >Dispositivo: {{ display(reading.fields['device']) }} · Etiqueta:
+                        {{ display(reading.fields['label']) }}</small
+                      >
+                    </div>
+                    <div class="other-value">
+                      {{ display(reading.fields['value']) }}
+                      <small>{{ display(reading.fields['unit']) }}</small>
+                    </div>
+                  </article>
+                } @empty {
+                  <p>Sin lecturas disponibles.</p>
+                }
+              </div>
             }
-          </div>
-          } @else {
-          <div class="other-list">
-            @for (reading of group.readings; track reading.index) {
-              <article class="other-row">
-                <div class="other-details">
-                  <strong>{{ otherName(reading.fields['device'], reading.fields['label']) }}</strong>
-                  <small>Dispositivo: {{ display(reading.fields['device']) }} · Etiqueta: {{ display(reading.fields['label']) }}</small>
-                </div>
-                <div class="other-value">{{ display(reading.fields['value']) }} <small>{{ display(reading.fields['unit']) }}</small></div>
-              </article>
-            } @empty {
-              <p>Sin lecturas disponibles.</p>
-            }
-          </div>
-          }
           </section>
         }
       }
