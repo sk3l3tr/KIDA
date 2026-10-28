@@ -6,169 +6,255 @@
     </header>
     <app-docker-indicators />
     <app-docker-compose-version [tab]="tab" [fallbackFocus]="heading" />
-      <div aria-live="polite">
-        @if (state.busy()) {
-          <p>Acción o actualización posterior pendiente…</p>
-        }
-        @if (state.error()) {
-          <p class="error" role="alert">{{ state.error() }}</p>
-        }
-        @if (state.result(); as response) {
-          <h3>Acción solicitada: {{ state.resultLabel() }}</h3>
-          <p>Respuesta de CORE: {{ response.container }} · {{ response.status }}</p>
-          <pre>{{ response | json }}</pre>
-        }
-      </div>
+    <div aria-live="polite">
+      @if (state.busy()) {
+        <p>Acción o actualización posterior pendiente…</p>
+      }
+      @if (state.error()) {
+        <p class="error" role="alert">{{ state.error() }}</p>
+      }
+      @if (state.result(); as response) {
+        <h3>Acción solicitada: {{ state.resultLabel() }}</h3>
+        <p>Respuesta de CORE: {{ response.container }} · {{ response.status }}</p>
+        <pre>{{ response | json }}</pre>
+      }
+    </div>
     @if (tab === 'projects') {
-    <section aria-labelledby="docker-projects-title">
-      <div class="section-header">
-      <div><h2 id="docker-projects-title">Proyectos observados</h2>
-      <p>Servicios y contenedores agrupados por proyecto.</p></div>
-      <button
-        type="button"
-        (click)="state.refreshProjects()"
-        [disabled]="state.projects.loading() || state.busy() || state.pending() !== null"
-      >
-        Actualizar proyectos
-      </button>
-      </div>
-      @if (state.projects.loading()) {
-        <p role="status">Cargando proyectos…</p>
-      }
-      @if (state.projects.error()) {
-        <p class="error" role="alert">Error de proyectos: {{ state.projects.error() }}</p>
-      }
-      @if (state.projects.stale()) {
-        <p>Proyectos anteriores, desactualizados.</p>
-      }
-      @if (state.projects.data(); as data) {
-        <div class="project-grid">
-          @for (project of data; track project.name) {
-            <app-docker-project-card [project]="project"
-              [disabled]="state.detail.loading() || state.busy() || state.pending() !== null || state.projects.loading()"
-              (inspect)="state.inspect($event)" />
-          } @empty {
-            <p>No hay proyectos Compose.</p>
-          }
+      <section aria-labelledby="docker-projects-title">
+        <div class="section-header">
+          <div>
+            <h2 id="docker-projects-title">Proyectos observados</h2>
+            <p>Servicios y contenedores agrupados por proyecto.</p>
+          </div>
+          <button
+            type="button"
+            (click)="state.refreshProjects()"
+            [disabled]="state.projects.loading() || state.busy() || state.pending() !== null"
+          >
+            Actualizar proyectos
+          </button>
         </div>
-        <p>Los proyectos se han observado en Docker Compose. Observado no significa creado ni administrado por KIDA.</p>
-        <details>
-          <summary>Datos de proyectos (JSON interpretado)</summary>
-          <pre>{{ data | json }}</pre>
-        </details>
-      }
-      @if (state.selected() !== null) {
-        <h3>Inspección: {{ state.selected() }}</h3>
-        @if (state.detail.loading()) {
-          <p role="status">Inspeccionando proyecto…</p>
+        @if (state.projects.loading()) {
+          <p role="status">Cargando proyectos…</p>
         }
-        @if (state.detail.error()) {
-          <p class="error" role="alert">Error de inspección: {{ state.detail.error() }}</p>
+        @if (state.projects.error()) {
+          <p class="error" role="alert">Error de proyectos: {{ state.projects.error() }}</p>
         }
-        @if (state.detail.stale()) {
-          <p>Inspección anterior, desactualizada.</p>
+        @if (state.projects.stale()) {
+          <p>Proyectos anteriores, desactualizados.</p>
         }
-        @if (state.detail.data(); as project) {
-          @for (service of project.services; track $index) {
-            <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
-            @for (container of service.containers; track container.id) {
-              <app-container-details [container]="container" />
+        @if (state.projects.data(); as data) {
+          <div class="project-grid">
+            @for (project of data; track project.name) {
+              <app-docker-project-card
+                [project]="project"
+                [disabled]="
+                  state.detail.loading() ||
+                  state.busy() ||
+                  state.pending() !== null ||
+                  state.projects.loading()
+                "
+                (inspect)="state.inspect($event)"
+              />
             } @empty {
-              <p>Sin contenedores.</p>
+              <p>No hay proyectos Compose.</p>
             }
-          } @empty {
-            <p>Sin servicios.</p>
-          }
+          </div>
+          <p>
+            Los proyectos se han observado en Docker Compose. Observado no significa creado ni
+            administrado por KIDA.
+          </p>
           <details>
-            <summary>Datos de inspección (JSON interpretado)</summary>
-            <pre>{{ project | json }}</pre>
+            <summary>Datos de proyectos (JSON interpretado)</summary>
+            <pre>{{ data | json }}</pre>
           </details>
         }
-      }
-    </section>
-    } @else {
-    <section aria-labelledby="docker-containers-title" [attr.aria-busy]="state.inventory.loading()">
-      <div class="section-header">
-        <div><h2 id="docker-containers-title" #listHeading tabindex="-1">Contenedores Docker</h2>
-        <p>Consulta el inventario de contenedores del servidor.</p></div>
-        <button
-          type="button"
-          (click)="state.refreshContainers()"
-          [disabled]="state.inventory.loading() || state.busy() || state.pending() !== null"
-        >
-          Actualizar contenedores
-        </button>
-      </div>
-      <div class="panel inventory-panel">
-      <h3>Inventario de contenedores</h3>
-      @if (state.inventory.loading()) {
-        <p role="status">Cargando contenedores…</p>
-      }
-      @if (state.inventory.error()) {
-        <p class="error" role="alert">Error de actualización: {{ state.inventory.error() }}</p>
-      }
-      @if (state.inventory.stale()) {
-        <p>Datos anteriores, desactualizados; actualiza contenedores.</p>
-      }
-      @if (state.inventory.data(); as data) {
-        <p>{{ data.containers.length }} {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}</p>
-        <p>Total: {{ state.counter(data.total) }} · En ejecución: {{ state.counter(data.running) }}</p>
-        <div class="inventory-tools">
-          <label for="docker-search">Buscar contenedores</label>
-          <input id="docker-search" class="console-control" type="search" placeholder="Nombre, ID, imagen, proyecto o servicio"
-            [value]="state.search()" (input)="state.search.set($any($event.target).value)" />
-          <span aria-live="polite">{{ state.visibleContainers().length }} {{ state.visibleContainers().length === 1 ? 'resultado' : 'resultados' }}</span>
-        </div>
-        <div class="table-wrap"><table class="container-list">
-          <colgroup><col><col><col><col><col><col><col class="operations-column"></colgroup>
-          <thead><tr><th>Contenedor</th><th>Estado</th><th>Imagen</th><th>Servicio / Proyecto</th><th>Salud</th><th>Salida</th><th>Operaciones</th></tr></thead>
-          <tbody>
-          @for (container of data.containers; track container.id) {
-            <tr class="inventory-row" [class.row-hidden]="!state.visibleContainerIds().has(container.id)"
-              [attr.data-container-id]="container.id"
-              [inert]="!state.visibleContainerIds().has(container.id)">
-              <td><span class="mobile-label">Contenedor</span><strong>{{ container.name }}</strong>
-                <details><summary>Ver detalles</summary><app-container-details [container]="container" /></details>
-              </td>
-              <td><span class="mobile-label">Estado</span>{{ container.online ? 'En ejecución' : 'Fuera de línea' }}</td>
-              <td><span class="mobile-label">Imagen</span>{{ container.image }}</td>
-              <td><span class="mobile-label">Servicio / Proyecto</span>
-                @if (state.associations(); as associations) {
-                  @let association = associations.get(container.id);
-                  @if (association === 'ambiguous') { Asociación ambigua }
-                  @else if (association) { {{ association.service === null ? 'Sin nombre' : association.service }} / {{ association.project }} }
-                  @else { Sin asociación Compose observada }
-                  @if (state.projects.stale()) { <small>Lectura de proyectos desactualizada.</small> }
-                } @else { Asociación no disponible }
-              </td>
-              <td><span class="mobile-label">Salud</span>{{ state.display(container.health) }}</td>
-              <td><span class="mobile-label">Salida</span>{{ state.counter(container.exit_code) }}</td>
-              <td><span class="mobile-label">Operaciones</span><div class="action-buttons">
-                @for (action of state.actions; track action) {
-                  <button
-                    type="button"
-                    [disabled]="state.locked()"
-                    [attr.aria-label]="state.labels[action] + ' contenedor ' + container.name"
-                    (click)="state.prepare(action, container)"
-                  >
-                    {{ state.labels[action] }}
-                  </button>
-                }
-              </div></td>
-            </tr>
+        @if (state.selected() !== null) {
+          <h3>Inspección: {{ state.selected() }}</h3>
+          @if (state.detail.loading()) {
+            <p role="status">Inspeccionando proyecto…</p>
           }
-          </tbody>
-        </table></div>
-        @if (!data.containers.length) { <p>No hay contenedores.</p> }
-        @else if (!state.visibleContainers().length) { <p>No hay contenedores que coincidan con la búsqueda.</p> }
-        <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
-        <details>
-          <summary>Datos del inventario (JSON interpretado)</summary>
-          <pre>{{ data | json }}</pre>
-        </details>
-      }
-      </div>
-    </section>
+          @if (state.detail.error()) {
+            <p class="error" role="alert">Error de inspección: {{ state.detail.error() }}</p>
+          }
+          @if (state.detail.stale()) {
+            <p>Inspección anterior, desactualizada.</p>
+          }
+          @if (state.detail.data(); as project) {
+            @for (service of project.services; track $index) {
+              <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
+              @for (container of service.containers; track container.id) {
+                <app-container-details [container]="container" />
+              } @empty {
+                <p>Sin contenedores.</p>
+              }
+            } @empty {
+              <p>Sin servicios.</p>
+            }
+            <details>
+              <summary>Datos de inspección (JSON interpretado)</summary>
+              <pre>{{ project | json }}</pre>
+            </details>
+          }
+        }
+      </section>
+    } @else {
+      <section
+        aria-labelledby="docker-containers-title"
+        [attr.aria-busy]="state.inventory.loading()"
+      >
+        <div class="section-header">
+          <div>
+            <h2 id="docker-containers-title" #listHeading tabindex="-1">Contenedores Docker</h2>
+            <p>Consulta el inventario de contenedores del servidor.</p>
+          </div>
+          <button
+            type="button"
+            (click)="state.refreshContainers()"
+            [disabled]="state.inventory.loading() || state.busy() || state.pending() !== null"
+          >
+            Actualizar contenedores
+          </button>
+        </div>
+        <div class="panel inventory-panel">
+          <h3>Inventario de contenedores</h3>
+          @if (state.inventory.loading()) {
+            <p role="status">Cargando contenedores…</p>
+          }
+          @if (state.inventory.error()) {
+            <p class="error" role="alert">Error de actualización: {{ state.inventory.error() }}</p>
+          }
+          @if (state.inventory.stale()) {
+            <p>Datos anteriores, desactualizados; actualiza contenedores.</p>
+          }
+          @if (state.inventory.data(); as data) {
+            <p>
+              {{ data.containers.length }}
+              {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}
+            </p>
+            <p>
+              Total: {{ state.counter(data.total) }} · En ejecución:
+              {{ state.counter(data.running) }}
+            </p>
+            <div class="inventory-tools">
+              <label for="docker-search">Buscar contenedores</label>
+              <input
+                id="docker-search"
+                class="console-control"
+                type="search"
+                placeholder="Nombre, ID, imagen, proyecto o servicio"
+                [value]="state.search()"
+                (input)="state.search.set($any($event.target).value)"
+              />
+              <span aria-live="polite"
+                >{{ state.visibleContainers().length }}
+                {{ state.visibleContainers().length === 1 ? 'resultado' : 'resultados' }}</span
+              >
+            </div>
+            <div class="table-wrap">
+              <table class="container-list">
+                <colgroup>
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                  <col class="operations-column" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Contenedor</th>
+                    <th>Estado</th>
+                    <th>Imagen</th>
+                    <th>Servicio / Proyecto</th>
+                    <th>Salud</th>
+                    <th>Salida</th>
+                    <th>Operaciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (container of data.containers; track container.id) {
+                    <tr
+                      class="inventory-row"
+                      [class.row-hidden]="!state.visibleContainerIds().has(container.id)"
+                      [attr.data-container-id]="container.id"
+                      [inert]="!state.visibleContainerIds().has(container.id)"
+                    >
+                      <td>
+                        <span class="mobile-label">Contenedor</span
+                        ><strong>{{ container.name }}</strong>
+                        <details>
+                          <summary>Ver detalles</summary>
+                          <app-container-details [container]="container" />
+                        </details>
+                      </td>
+                      <td>
+                        <span class="mobile-label">Estado</span
+                        >{{ container.online ? 'En ejecución' : 'Fuera de línea' }}
+                      </td>
+                      <td><span class="mobile-label">Imagen</span>{{ container.image }}</td>
+                      <td>
+                        <span class="mobile-label">Servicio / Proyecto</span>
+                        @if (state.associations(); as associations) {
+                          @let association = associations.get(container.id);
+                          @if (association === 'ambiguous') {
+                            Asociación ambigua
+                          } @else if (association) {
+                            {{ association.service === null ? 'Sin nombre' : association.service }}
+                            / {{ association.project }}
+                          } @else {
+                            Sin asociación Compose observada
+                          }
+                          @if (state.projects.stale()) {
+                            <small>Lectura de proyectos desactualizada.</small>
+                          }
+                        } @else {
+                          Asociación no disponible
+                        }
+                      </td>
+                      <td>
+                        <span class="mobile-label">Salud</span>{{ state.display(container.health) }}
+                      </td>
+                      <td>
+                        <span class="mobile-label">Salida</span
+                        >{{ state.counter(container.exit_code) }}
+                      </td>
+                      <td>
+                        <span class="mobile-label">Operaciones</span>
+                        <div class="action-buttons">
+                          @for (action of state.actions; track action) {
+                            <button
+                              type="button"
+                              [disabled]="state.locked()"
+                              [attr.aria-label]="
+                                state.labels[action] + ' contenedor ' + container.name
+                              "
+                              (click)="state.prepare(action, container)"
+                            >
+                              <span class="i i-{{ state.labels[action] }}"></span>
+                            </button>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (!data.containers.length) {
+              <p>No hay contenedores.</p>
+            } @else if (!state.visibleContainers().length) {
+              <p>No hay contenedores que coincidan con la búsqueda.</p>
+            }
+            <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
+            <details>
+              <summary>Datos del inventario (JSON interpretado)</summary>
+              <pre>{{ data | json }}</pre>
+            </details>
+          }
+        </div>
+      </section>
     }
     <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>
     @if (

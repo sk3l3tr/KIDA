@@ -1,15 +1,17 @@
 <article class="fan-row">
   <div class="system-icon" [class.danger]="danger()" [class.stopped]="stopped()">
-    <svg class="fan-blades" [class.spinning]="spinning()" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="2.2" />
-      <path d="M12 10C7 10 7 4 11 3c3-1 5 3 1 7ZM14 12c0-5 6-5 7-1 1 3-3 5-7 1ZM12 14c5 0 5 6 1 7-3 1-5-3-1-7ZM10 12c0 5-6 5-7 1-1-3 3-5 7-1Z" />
-    </svg>
+    <span class="i i-fan fan-blades" [class.spinning]="spinning()"></span>
   </div>
   <div class="fan-details">
     <strong>{{ display(reading().fields['label']) }}</strong>
     <small>{{ display(reading().fields['device']) }}</small>
     <span>Estado: {{ display(reading().fields['status']) }}</span>
-    <span>Avisos · Alarma: {{ display(reading().fields['alarm']) }} · Fallo: {{ display(reading().fields['fault']) }}</span>
+    <span
+      >Avisos · Alarma: {{ display(reading().fields['alarm']) }} · Fallo:
+      {{ display(reading().fields['fault']) }}</span
+    >
   </div>
-  <div class="fan-speed">{{ display(reading().fields['value']) }} <small>{{ display(reading().fields['unit']) }}</small></div>
+  <div class="fan-speed">
+    {{ display(reading().fields['value']) }} <small>{{ display(reading().fields['unit']) }}</small>
+  </div>
 </article>

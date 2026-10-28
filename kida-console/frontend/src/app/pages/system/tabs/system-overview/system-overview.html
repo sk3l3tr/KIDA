@@ -1,10 +1,5 @@
 <ion-content class="console-content">
   <main class="system-page">
-    <!-- <header class="page-heading">
-      <span class="eyebrow">CONTROL DEL EQUIPO</span>
-      <h1>System · Resumen</h1>
-      <p></p>
-    </header> -->
     <section aria-label="Salud y sensores">
       <app-system-section [state]="state.health" (refresh)="state.refresh(state.health)" />
     </section>
@@ -38,6 +33,7 @@
           <section appMasonryItem class="panel sensor-group" [attr.aria-label]="group.title">
             <div class="section-header">
               <h2>
+                <span class="i i-{{ group.icon }} primary"></span>
                 {{ group.title }}
               </h2>
               <small>{{ group.readings.length }} lecturas</small>
@@ -85,11 +81,5 @@
         }
       }
     </app-masonry>
-    <!-- @if (state.health.data() !== null) {
-      <details class="panel">
-        <summary>Datos adicionales</summary>
-        <app-system-data [value]="extras()" />
-      </details>
-    } -->
   </main>
 </ion-content>

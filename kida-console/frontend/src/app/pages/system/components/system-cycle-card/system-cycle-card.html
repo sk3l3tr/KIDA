@@ -1,7 +1,10 @@
 <form (ngSubmit)="state.confirm('powerCycle')">
   <header class="cycle-header">
     <div>
-      <h2>Ciclo de energía</h2>
+      <h2>
+        <span class="i i-cycle primary"></span>
+        Ciclo de energía
+      </h2>
       <p>Programar encendido RTC y apagado opcional</p>
     </div>
     <span class="cycle-badge">RTC WAKE</span>
@@ -77,6 +80,7 @@
   </p>
   <div class="cycle-actions">
     <button class="danger" type="submit" [disabled]="state.busy() || !state.cycleBody()">
+      <span class="i i-cycle"></span>
       Programar ciclo
     </button>
     @if (!state.cycleBody()) {

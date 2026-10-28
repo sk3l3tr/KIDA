@@ -49,6 +49,14 @@ export function sensorGroups(readings: SensorReading[]) {
     key,
     title: groupLabels[key],
     readings: readings.filter((r) => sensorGroup(r.fields) === key),
+    icon:
+      key === 'processor'
+        ? 'core'
+        : key === 'cooling'
+          ? 'cooler'
+          : key === 'storage'
+            ? 'storage-box-2'
+            : 'sun',
   }));
 }
 export function finite(value: unknown): value is number {

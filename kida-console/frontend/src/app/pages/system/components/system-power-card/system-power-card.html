@@ -1,6 +1,9 @@
 <header class="power-header">
   <div>
-    <h2>Apagado y reinicio</h2>
+    <h2>
+      <span class="i i-power primary"></span>
+      Apagado y reinicio
+    </h2>
   </div>
   <span class="control-badge">Control</span>
 </header>
@@ -55,6 +58,7 @@
         type="submit"
         [disabled]="state.busy() || !state.validWhen(state.when)"
       >
+        <span class="i i-power"></span>
         Apagar
       </button>
       <button
@@ -63,6 +67,7 @@
         (click)="state.confirm('reboot')"
         [disabled]="state.busy() || !state.validWhen(state.when)"
       >
+        <span class="i i-cycle"></span>
         Reiniciar
       </button>
     </div>

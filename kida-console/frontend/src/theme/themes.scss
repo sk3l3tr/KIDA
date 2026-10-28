@@ -1,6 +1,7 @@
 @use 'sass:color';
 @use 'sass:list';
 @use 'components';
+@use 'icons';
 
 // Each palette is the single source for the app, Ionic and preview colours.
 $palettes: (
@@ -222,6 +223,10 @@ html[data-theme] :is(ion-button, ion-input, ion-select, ion-textarea, ion-card) 
   --border-radius: var(--kida-radius);
   --border-color: var(--ion-border-color);
   --highlight-color-focused: var(--ion-color-primary);
+}
+
+.primary {
+  color: var(--ion-color-primary);
 }
 
 .mutted {

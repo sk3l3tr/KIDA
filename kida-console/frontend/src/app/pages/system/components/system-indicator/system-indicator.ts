@@ -3,8 +3,14 @@ import { Component, input } from '@angular/core';
 @Component({
   selector: 'app-system-indicator',
   template: `<div class="panel">
-    <small>{{ label() }}</small
-    ><strong>{{ value() }}</strong>
+    <small>{{ label() }} </small
+    ><strong [class.primary]="value() === 'OK'">
+      @if (value() === 'OK') {
+        <span class="i i-check-circle"></span>
+      }
+
+      {{ value() }}</strong
+    >
     @if (detail()) {
       <small>{{ detail() }}</small>
     }
