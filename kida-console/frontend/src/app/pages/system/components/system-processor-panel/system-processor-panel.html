@@ -32,14 +32,20 @@
           </div>
           <div>
             <dt>Límite crítico</dt>
-            <dd>{{ display(reading.fields['critical']) }}@if (reading.fields['critical'] != null) { {{ display(reading.fields['unit']) }} }</dd>
+            <dd>
+              {{ display(reading.fields['critical']) }}
+              @if (reading.fields['critical'] != null) {
+                {{ display(reading.fields['unit']) }}
+              }
+            </dd>
           </div>
         </dl>
       </div>
     </div>
   }
   @if (cores().length) {
-    <h3>Mapa térmico por núcleo</h3>
+    <hr />
+    <h6>Mapa térmico por núcleo</h6>
     <div class="sensor-grid core-grid">
       @for (reading of cores(); track reading.index) {
         <app-system-sensor-card [reading]="reading" [compact]="true" />

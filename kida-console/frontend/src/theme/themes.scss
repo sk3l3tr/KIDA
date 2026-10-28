@@ -227,3 +227,9 @@ html[data-theme] :is(ion-button, ion-input, ion-select, ion-textarea, ion-card) 
 .mutted {
   color: var(--kida-muted);
 }
+
+hr {
+  color: var(--kida-muted);
+  background-color: var(--kida-muted);
+  opacity: 0.2;
+}

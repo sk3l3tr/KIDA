@@ -1,6 +1,7 @@
 <header class="app-header">
   <ion-menu-button aria-label="Abrir menú"></ion-menu-button>
-  <a href="/">KIDA Console</a><span>{{ ownUsername() }}</span>
+  <a href="/"> <strong>KIDA</strong><span class="mutted"> / Console</span></a
+  ><span>{{ ownUsername() }}</span>
   <button type="button" class="secondary" [disabled]="busy()" (click)="logout()">
     {{ busy() ? 'Cerrando sesión…' : 'Cerrar sesión' }}
   </button>
