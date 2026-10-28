@@ -1,5 +1,14 @@
 # Spec: operaciones Docker en KIDA Console
 
+> Referencia funcional de las operaciones existentes. Para el rediseño, prevalece
+> [la spec frontend de Docker](docker-redesign/spec.md), incluido su flujo obligatorio
+> `explore -> ask -> plan -> ask -> implement -> review`. Sustituye las dos secciones
+> simultáneas por tabs, los detalles en página por un panel lateral compartido y las
+> acciones solo en listado por controles en listado e inspector. Añade bloqueos de
+> Arrancar/Parar según `online`. Los contratos HTTP y las protecciones restantes se
+> conservan. Esta referencia anterior no autoriza implementar historias sin las
+> validaciones del nuevo flujo. CORE y API no se pueden modificar.
+
 ## Objetivo y alcance
 
 Completar `/docker` con las ocho operaciones existentes. Solo frontal y documentación;
