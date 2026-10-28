@@ -39,6 +39,15 @@ function reading<T>() {
   };
 }
 
+export function serviceKeys(project: ComposeProject): string[] {
+  const occurrences = new Map<string | null, number>();
+  return project.services.map((service) => {
+    const occurrence = occurrences.get(service.name) ?? 0;
+    occurrences.set(service.name, occurrence + 1);
+    return JSON.stringify([service.name, occurrence]);
+  });
+}
+
 @Injectable()
 export class DockerFacade implements OnDestroy {
   private readonly service = inject(DockerService);
@@ -51,6 +60,8 @@ export class DockerFacade implements OnDestroy {
   readonly version = reading<ComposeVersion>();
   readonly versionPanelOpen = signal<'projects' | 'containers' | null>(null);
   readonly projects = reading<ComposeProject[]>();
+  readonly expandedServices = signal<Record<string, string[]>>({});
+  readonly inspectedContainer = signal<{ project: string; service: string; id: string } | null>(null);
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
   readonly busy = signal(false);
@@ -98,6 +109,7 @@ export class DockerFacade implements OnDestroy {
   }
   leaveTab(): void {
     this.versionPanelOpen.set(null);
+    this.inspectedContainer.set(null);
     ++this.selectionRevision;
     this.closeConfirmation();
     this.selected.set(null);
@@ -120,6 +132,8 @@ export class DockerFacade implements OnDestroy {
       state.stale.set(false);
     }
     this.selected.set(null);
+    this.expandedServices.set({});
+    this.inspectedContainer.set(null);
     this.busy.set(false);
     this.uncertain.set(false);
     this.error.set('');
@@ -179,6 +193,22 @@ export class DockerFacade implements OnDestroy {
   }
   private loadProjects(): Observable<boolean> {
     return this.load(this.projects, this.service.projects(), (projects) => {
+      const previous = this.expandedServices();
+      const next: Record<string, string[]> = Object.create(null);
+      for (const project of projects) {
+        const keys = serviceKeys(project);
+        if (keys.length === 0 && !Object.hasOwn(previous, project.name)) continue;
+        next[project.name] = Object.hasOwn(previous, project.name)
+          ? previous[project.name].filter((key) => keys.includes(key))
+          : keys.slice(0, 1);
+      }
+      this.expandedServices.set(next);
+      const inspected = this.inspectedContainer();
+      if (inspected && !projects.some((project) =>
+        project.name === inspected.project && project.services.some((service, index) =>
+          serviceKeys(project)[index] === inspected.service && service.containers.some((container) => container.id === inspected.id),
+        ),
+      )) this.inspectedContainer.set(null);
       if (
         this.selected() !== null &&
         !projects.some((project) => project.name === this.selected())
@@ -189,6 +219,9 @@ export class DockerFacade implements OnDestroy {
         this.detail.stale.set(false);
       }
     });
+  }
+  setExpandedServices(project: string, values: string[]): void {
+    this.expandedServices.update((current) => ({ ...current, [project]: values }));
   }
   inspect(project: string, afterWrite = false): void {
     if (

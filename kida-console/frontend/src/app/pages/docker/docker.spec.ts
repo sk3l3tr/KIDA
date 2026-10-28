@@ -269,7 +269,7 @@ describe('Docker page', () => {
     expect(cards[0].querySelector('[role="progressbar"]').getAttribute('aria-valuetext')).toBe('1 de 2 activos');
     expect(cards[1].textContent).toContain('0 / 0 activos');
     expect(cards[1].querySelector('[role="progressbar"] span').style.width).toBe('0%');
-    cards[0].querySelector('button').click();
+    cards[0].querySelector('footer button').click();
     http.expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`).flush(project);
     v.changeDetectorRef.detectChanges();
     expect(v.location.nativeElement.textContent).toContain('Inspección: ' + project.name);
@@ -278,6 +278,66 @@ describe('Docker page', () => {
     v.changeDetectorRef.detectChanges();
     expect(v.location.nativeElement.textContent).toContain('Proyectos anteriores, desactualizados');
     expect(v.location.nativeElement.querySelectorAll('app-docker-project-card')).toHaveLength(2);
+  });
+  it('retains service expansion across refresh and tabs, and inspects Compose containers locally', () => {
+    const f = enter(), state = f.componentInstance.state;
+    const services = [
+      { name: null, containers: [container] },
+      { name: 'web', containers: [{ ...container, id: 'second', online: true }] },
+      { name: 'web', containers: [] },
+    ];
+    http.expectOne(`${base}/containers`).flush(inventory);
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services }]);
+    const v = view(f, 'projects');
+    const card = v.location.nativeElement.querySelector('app-docker-project-card');
+    const group = card.querySelector('ion-accordion-group');
+    const keys = Array.from(card.querySelectorAll('ion-accordion')).map((item: any) => item.value as string);
+    expect(new Set(keys).size).toBe(3);
+    expect(group.value).toEqual([keys[0]]);
+    expect(card.textContent).toContain('Sin nombre');
+    expect(card.textContent).toContain('1 / 1 activos');
+    group.dispatchEvent(new CustomEvent('ionChange', { detail: { value: [keys[1], keys[2]] } }));
+    state.leaveTab();
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [services[1], services[2], services[0]] }]);
+    v.changeDetectorRef.detectChanges();
+    expect(group.value).toEqual([keys[1], keys[2]]);
+    const button = card.querySelector('.inspect-container');
+    button.click();
+    v.changeDetectorRef.detectChanges();
+    expect(card.querySelector('app-container-details')?.textContent).toContain('ID: second');
+    http.expectNone(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [
+      { ...services[1], containers: [container, services[1].containers[0]] }, services[2], services[0],
+    ] }]);
+    v.changeDetectorRef.detectChanges();
+    expect(card.querySelector('app-container-details')?.textContent).toContain('ID: second');
+    state.leaveTab();
+    v.changeDetectorRef.detectChanges();
+    expect(card.querySelector('app-container-details')).toBeNull();
+    state.inspectedContainer.set({ project: project.name, service: keys[1], id: 'second' });
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [services[0]] }]);
+    expect(state.inspectedContainer()).toBeNull();
+    state.ionViewWillLeave();
+    expect(state.expandedServices()).toEqual({});
+  });
+  it('opens the first service when an initially empty project receives services', () => {
+    const f = enter(), state = f.componentInstance.state;
+    http.expectOne(`${base}/containers`).flush(inventory);
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [] }]);
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([project]);
+    const v = view(f, 'projects');
+    const group = v.location.nativeElement.querySelector('ion-accordion-group');
+    expect(group.value).toHaveLength(1);
+    group.dispatchEvent(new CustomEvent('ionChange', { detail: { value: [] } }));
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([project]);
+    expect(state.expandedServices()[project.name]).toEqual([]);
   });
   it('keeps initial failures separate from empty data and permits independent refresh', () => {
     const f = enter(),
