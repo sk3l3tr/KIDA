@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { SystemFacade } from '../../services/system.facade';
 import { SystemSensorCard } from './system-sensor-card';
-import { SystemInspector } from '../system-inspector/system-inspector';
-import { SystemOverview } from '../system-overview/system-overview';
+import { SystemInspector } from '../../tabs/system-inspector/system-inspector';
+import { SystemOverview } from '../../tabs/system-overview/system-overview';
 import {
   coreStatistics,
   criticalRatio,

@@ -30,6 +30,26 @@ ARCA 3.2.7, Ionic 8.8.19, Vitest 5.0.5 y Playwright 1.59.1 con Chromium existent
   materiales. Se amplió la comprobación de desbordamiento al scroll de Ionic.
 - Revisión del diff y espacios en archivos modificados y nuevos completada.
 
+## Historia #2: navegación por tabs (28 de octubre de 2026)
+
+- Docker usa tabs Ionic y rutas hijas `/docker/projects` y `/docker/containers`;
+  `/docker` redirige a proyectos. Las lecturas y el resultado se comparten entre
+  tabs y se reinician al salir o cambiar de sesión.
+- Pruebas Docker: 32 aprobadas. Playwright con API simulada: 14 combinaciones de
+  tema y viewport aprobadas, sin eventos `pageerror`; incluye historial, acceso
+  directo, recarga, reentrada y cancelación de confirmación al cambiar de tab.
+- Corregidos los imports desactualizados de pruebas de System: la suite completa
+  pasa con 479 pruebas. La compilación de producción conserva el aviso de presupuesto.
+  El servidor registró errores de consola en Backups durante la reentrada con
+  respuestas simuladas genéricas; el script solo recopila eventos `pageerror`.
+- La regresión visual de las tabs System se comparó en Professional claro a
+  360 px: las tres capturas coinciden píxel a píxel con el SCSS anterior. Se
+  verificó además el indicador y movimiento reducido en 21 combinaciones de tema
+  y ancho con API simulada. El recorrido completo de System en Playwright queda
+  pendiente: falla una aserción del segmento de energía.
+- La revisión independiente detectó y permitió corregir la restauración tardía
+  del foco y los estilos del diálogo; sin otros hallazgos concretos.
+
 ## Repetir
 
 Desde `kida-console/frontend`, con Node de `.nvmrc`:

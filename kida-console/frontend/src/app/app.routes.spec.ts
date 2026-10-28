@@ -50,7 +50,9 @@ describe('Console navigation', () => {
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl(path);
     expect(page).toBeInstanceOf(component);
-    expect(TestBed.inject(Router).url).toBe(path === '/system' ? '/system/overview' : path);
+    expect(TestBed.inject(Router).url).toBe(
+      path === '/system' ? '/system/overview' : path === '/docker' ? '/docker/projects' : path,
+    );
     expect(auth.restore).toHaveBeenCalledOnce();
     if (component === Settings) {
       expect(harness.routeNativeElement?.querySelectorAll('.theme-option').length).toBe(4);
@@ -62,6 +64,10 @@ describe('Console navigation', () => {
       expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe(
         'top',
       );
+    } else if (component === Docker) {
+      expect(auth.accounts).not.toHaveBeenCalled();
+      expect(harness.routeNativeElement?.querySelectorAll('ion-tab-button').length).toBe(2);
+      expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe('top');
     } else if (component !== Administrators) {
       expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe(title);
       expect(auth.accounts).not.toHaveBeenCalled();

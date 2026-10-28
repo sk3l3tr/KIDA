@@ -1,0 +1,191 @@
+<ion-content>
+  <div class="console-layout docker-layout">
+    <h1 tabindex="-1" #heading>Docker</h1>
+    <section class="panel" aria-labelledby="docker-compose-title">
+      <h2 id="docker-compose-title">Compose</h2>
+      <p>Los proyectos observados no acreditan propiedad KIDA.</p>
+      <button
+        type="button"
+        (click)="state.refreshVersion()"
+        [disabled]="state.version.loading() || state.busy() || state.pending() !== null"
+      >
+        Actualizar versión
+      </button>
+      @if (state.version.loading()) {
+        <p role="status">Cargando versión…</p>
+      }
+      @if (state.version.error()) {
+        <p class="error" role="alert">Error de versión: {{ state.version.error() }}</p>
+      }
+      @if (state.version.stale()) {
+        <p>Versión anterior, desactualizada.</p>
+      }
+      @if (state.version.data(); as data) {
+        <p>Versión de Compose: {{ data.version }}</p>
+        <details>
+          <summary>Datos de versión</summary>
+          <pre>{{ data | json }}</pre>
+        </details>
+      }
+    </section>
+      <div aria-live="polite">
+        @if (state.busy()) {
+          <p>Acción o actualización posterior pendiente…</p>
+        }
+        @if (state.error()) {
+          <p class="error" role="alert">{{ state.error() }}</p>
+        }
+        @if (state.result(); as response) {
+          <h3>Acción solicitada: {{ state.resultLabel() }}</h3>
+          <p>Respuesta de CORE: {{ response.container }} · {{ response.status }}</p>
+          <pre>{{ response | json }}</pre>
+        }
+      </div>
+    @if (tab === 'projects') {
+    <section class="panel" aria-labelledby="docker-projects-title">
+      <h2 id="docker-projects-title">Proyectos</h2>
+      <button
+        type="button"
+        (click)="state.refreshProjects()"
+        [disabled]="state.projects.loading() || state.busy() || state.pending() !== null"
+      >
+        Actualizar proyectos
+      </button>
+      @if (state.projects.loading()) {
+        <p role="status">Cargando proyectos…</p>
+      }
+      @if (state.projects.error()) {
+        <p class="error" role="alert">Error de proyectos: {{ state.projects.error() }}</p>
+      }
+      @if (state.projects.stale()) {
+        <p>Proyectos anteriores, desactualizados.</p>
+      }
+      @if (state.projects.data(); as data) {
+        <ul class="project-list">
+          @for (project of data; track project.name) {
+            <li>
+              <h4>{{ project.name }}</h4>
+              @for (service of project.services; track $index) {
+                <p>
+                  Servicio: {{ service.name === null ? 'Sin nombre' : service.name }} ·
+                  Contenedores: {{ service.containers.length }}
+                </p>
+              } @empty {
+                <p>Sin servicios.</p>
+              }
+              <button
+                type="button"
+                [disabled]="state.detail.loading() || state.busy() || state.pending() !== null || state.projects.loading()"
+                (click)="state.inspect(project.name)"
+                [attr.aria-label]="'Inspeccionar proyecto ' + project.name"
+              >
+                Inspeccionar
+              </button>
+            </li>
+          } @empty {
+            <li>No hay proyectos Compose.</li>
+          }
+        </ul>
+        <details>
+          <summary>Datos de proyectos (JSON interpretado)</summary>
+          <pre>{{ data | json }}</pre>
+        </details>
+      }
+      @if (state.selected() !== null) {
+        <h3>Inspección: {{ state.selected() }}</h3>
+        @if (state.detail.loading()) {
+          <p role="status">Inspeccionando proyecto…</p>
+        }
+        @if (state.detail.error()) {
+          <p class="error" role="alert">Error de inspección: {{ state.detail.error() }}</p>
+        }
+        @if (state.detail.stale()) {
+          <p>Inspección anterior, desactualizada.</p>
+        }
+        @if (state.detail.data(); as project) {
+          @for (service of project.services; track $index) {
+            <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
+            @for (container of service.containers; track container.id) {
+              <app-container-details [container]="container" />
+            } @empty {
+              <p>Sin contenedores.</p>
+            }
+          } @empty {
+            <p>Sin servicios.</p>
+          }
+          <details>
+            <summary>Datos de inspección (JSON interpretado)</summary>
+            <pre>{{ project | json }}</pre>
+          </details>
+        }
+      }
+    </section>
+    } @else {
+    <section
+      class="panel"
+      aria-labelledby="docker-containers-title"
+      [attr.aria-busy]="state.inventory.loading()"
+    >
+      <div class="section-header">
+        <h2 id="docker-containers-title" #listHeading tabindex="-1">Contenedores</h2>
+        <button
+          type="button"
+          (click)="state.refreshContainers()"
+          [disabled]="state.inventory.loading() || state.busy() || state.pending() !== null"
+        >
+          Actualizar contenedores
+        </button>
+      </div>
+      @if (state.inventory.loading()) {
+        <p role="status">Cargando contenedores…</p>
+      }
+      @if (state.inventory.error()) {
+        <p class="error" role="alert">Error de actualización: {{ state.inventory.error() }}</p>
+      }
+      @if (state.inventory.stale()) {
+        <p>Datos anteriores, desactualizados; actualiza contenedores.</p>
+      }
+      @if (state.inventory.data(); as data) {
+        <p>Total: {{ state.counter(data.total) }} · En ejecución: {{ state.counter(data.running) }}</p>
+        <ul class="container-list">
+          @for (container of data.containers; track container.id) {
+            <li>
+              <app-container-details [container]="container" />
+              <div class="action-buttons">
+                @for (action of state.actions; track action) {
+                  <button
+                    type="button"
+                    [disabled]="state.locked()"
+                    [attr.aria-label]="state.labels[action] + ' contenedor ' + container.name"
+                    (click)="state.prepare(action, container)"
+                  >
+                    {{ state.labels[action] }}
+                  </button>
+                }
+              </div>
+            </li>
+          } @empty {
+            <li>No hay contenedores.</li>
+          }
+        </ul>
+        <details>
+          <summary>Datos del inventario (JSON interpretado)</summary>
+          <pre>{{ data | json }}</pre>
+        </details>
+      }
+    </section>
+    }
+    <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>
+    @if (
+      state.limitedPrecision(state.inventory.data()) ||
+      state.limitedPrecision(state.projects.data()) ||
+      state.limitedPrecision(state.detail.data()) ||
+      state.limitedPrecision(state.result()) ||
+      state.limitedPrecision(state.version.data())
+    ) {
+      <p role="status">
+        Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
+      </p>
+    }
+  </div>
+</ion-content>

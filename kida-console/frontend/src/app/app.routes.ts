@@ -19,7 +19,7 @@ export const routes: Routes = [
   {
     path: 'docker',
     canActivate: [authGuard],
-    loadComponent: () => import('./pages/docker/docker').then((module) => module.Docker),
+    loadChildren: () => import('./pages/docker/docker.routes').then((m) => m.dockerRoutes),
   },
   {
     path: 'backups',

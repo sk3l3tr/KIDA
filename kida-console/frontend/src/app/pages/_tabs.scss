@@ -1,0 +1,76 @@
+@mixin tabs($count) {
+ion-tab-bar {
+  box-sizing: border-box !important;
+  position: relative;
+  isolation: isolate;
+  width: max-content;
+  height: 42px;
+  contain: layout paint;
+  max-width: calc(100% - 2rem);
+  margin: 1rem 1rem 0 auto;
+  padding: 0.25rem;
+  overflow-x: auto;
+  justify-content: flex-start;
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  --background: var(--ion-item-background);
+  --border: var(--kida-border-width) solid var(--ion-border-color);
+}
+
+ion-tab-bar::before {
+  content: '';
+  position: absolute;
+  inset-block: 0.25rem;
+  inset-inline-start: 0.25rem;
+  width: max(6.5rem, (100% - 0.5rem) / $count);
+  border-radius: var(--kida-radius);
+  background: color-mix(in srgb, var(--ion-color-primary) 14%, var(--ion-item-background));
+  box-shadow: inset 0 0 0 2px var(--ion-color-primary);
+  pointer-events: none;
+  transition: transform 220ms ease;
+}
+
+@for $i from 2 through $count {
+  ion-tab-bar:has(ion-tab-button:nth-child(#{$i}).tab-selected)::before { transform: translateX(#{($i - 1) * 100%}); }
+  ion-tab-bar:dir(rtl):has(ion-tab-button:nth-child(#{$i}).tab-selected)::before { transform: translateX(#{($i - 1) * -100%}); }
+}
+
+ion-tab-button {
+  position: relative;
+  flex: 1 0 0;
+  min-width: 6.5rem;
+  min-height: 34px;
+  border-radius: var(--kida-radius);
+  font-family: var(--kida-font);
+  font-size: 0.7rem;
+  --background: transparent;
+  --color: var(--kida-muted);
+  --color-selected: var(--ion-color-primary);
+}
+
+ion-tab-button.tab-selected {
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+  ion-tab-button:not(.tab-selected):hover {
+    --background: color-mix(in srgb, var(--ion-color-primary) 8%, var(--ion-item-background));
+  }
+}
+
+ion-tab-button::part(native):focus-visible {
+  outline: 3px solid var(--ion-color-primary);
+  outline-offset: -4px;
+}
+
+@media (max-width: 480px) {
+  ion-tab-bar {
+    width: calc(100% - 2rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ion-tab-bar::before { transition: none; }
+}
+
+}

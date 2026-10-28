@@ -126,7 +126,19 @@ const project = {
         const page = await context.newPage();
         page.on('pageerror', (e) => errors.push(e.message));
         await page.goto(`${base}/docker`);
-        const inventory = page.locator('app-docker .container-list');
+        await page.waitForURL('**/docker/projects');
+        const tab = (name) => page.getByRole('tab', { name, exact: true });
+        await page.getByRole('button', { name: `Inspeccionar proyecto ${project.name}`, exact: true }).waitFor();
+        const initialReads = reads.length;
+        await tab('Contenedores').click();
+        await page.waitForURL('**/docker/containers');
+        assert.equal(reads.length, initialReads);
+        await page.goBack();
+        await page.waitForURL('**/docker/projects');
+        await page.goForward();
+        await page.waitForURL('**/docker/containers');
+        assert.equal(reads.length, initialReads);
+        const inventory = page.locator('app-docker .ion-page:not(.ion-page-hidden) .container-list');
         const action = (name) =>
           inventory.getByRole('button', { name: `${name} contenedor ${remote}`, exact: true });
         const dialog = page.getByRole('dialog');
@@ -143,20 +155,21 @@ const project = {
         await inventory.getByText(`Detalles del contenedor ${remote}`, { exact: true }).click();
         assert.ok((await inventory.innerText()).includes('Salida: 0'));
         assert.ok((await inventory.innerText()).includes('precisión limitada'));
+        await tab('Proyectos').click();
         await page
           .getByRole('button', { name: `Inspeccionar proyecto ${project.name}`, exact: true })
           .click();
         await page
           .getByRole('heading', { name: `Inspección: ${project.name}`, exact: true })
           .waitFor();
-        await page.waitForFunction(
-          () => !document.querySelector('.container-list button').disabled,
-        );
-        assert.equal(await page.locator('app-docker app-container-details').count(), 2);
+        assert.ok(await page.locator('app-docker app-container-details:visible').count() >= 1);
+        await tab('Contenedores').click();
+        await page.waitForURL('**/docker/containers');
+        assert.equal(reads.filter((r) => r.endsWith('/inspect')).length, 1);
 
         const checkOverflow = async () => {
           const measurements = await page
-            .locator('app-docker ion-content')
+            .locator('app-docker .ion-page:not(.ion-page-hidden) ion-content').last()
             .evaluate(async (content) => {
               const scroll = await content.getScrollElement();
               const layout = content.querySelector('.docker-layout');
@@ -177,7 +190,7 @@ const project = {
           );
         };
         await checkOverflow();
-        await page.locator('app-docker ion-content').evaluate(async (content) => {
+        await page.locator('app-docker .ion-page:not(.ion-page-hidden) ion-content').last().evaluate(async (content) => {
           (await content.getScrollElement()).scrollTop = 0;
         });
         await page.screenshot({
@@ -303,7 +316,7 @@ const project = {
         await dialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
         await page.getByText('No hay contenedores.', { exact: true }).waitFor();
         await page.waitForFunction(
-          () => document.activeElement?.textContent?.trim() === 'Contenedores',
+          () => document.activeElement?.textContent?.trim() === 'Docker',
         );
         assert.equal(
           await page
@@ -331,14 +344,26 @@ const project = {
         containers = [structuredClone(container)];
         projects = [structuredClone(project)];
         await navigate('Docker');
-        await page.waitForURL('**/docker');
+        await page.waitForURL('**/docker/projects');
+        await tab('Contenedores').click();
+        await page.waitForURL('**/docker/containers');
         await action('Eliminar').waitFor();
         await page.waitForFunction(
           () => !document.querySelector('.container-list button').disabled,
         );
         await action('Eliminar').click();
         await dialog.waitFor();
-        await page.keyboard.press('Escape');
+        const writesBeforeTab = writes.length;
+        await page.goBack();
+        await page.waitForURL('**/docker/projects');
+        await dialog.waitFor({ state: 'hidden' });
+        assert.equal(writes.length, writesBeforeTab);
+        await page.goto(`${base}/docker/containers`);
+        await page.waitForURL('**/docker/containers');
+        await action('Eliminar').waitFor();
+        await page.reload();
+        await page.waitForURL('**/docker/containers');
+        await action('Eliminar').waitFor();
         expireVersion = true;
         await page.getByRole('button', { name: 'Actualizar versión', exact: true }).click();
         await page.waitForURL((url) => url.pathname === '/login');

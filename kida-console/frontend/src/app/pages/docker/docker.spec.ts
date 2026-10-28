@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { createComponent, EnvironmentInjector, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
@@ -12,6 +12,7 @@ import { ChannelBusyError } from '../../services/arca-request.service';
 import { Observable } from 'rxjs';
 import { DockerService } from './docker.service';
 import { Docker } from './docker';
+import { DockerView } from './docker-view';
 import { DockerContainer, ComposeProject } from './docker.models';
 import { dockerActions } from './docker.actions';
 import { counter, display, dockerFailure } from './docker-presentation';
@@ -170,10 +171,19 @@ describe('Docker page', () => {
     fixture.detectChanges();
     return fixture;
   }
+  function view(f: ReturnType<typeof initial>, tab: 'projects' | 'containers') {
+    const component = createComponent(DockerView, {
+      environmentInjector: TestBed.inject(EnvironmentInjector),
+      elementInjector: f.debugElement.injector,
+    });
+    component.instance.tab = tab;
+    component.changeDetectorRef.detectChanges();
+    return component;
+  }
   const fail = { status: 503, statusText: 'Unavailable' };
   it('keeps initial failures separate from empty data and permits independent refresh', () => {
     const f = enter(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.prepare('start', container);
     http.expectNone(`${base}/containers/start`);
     http.expectOne(`${base}/containers`).flush({ detail: { code: 'core_unavailable' } }, fail);
@@ -181,30 +191,31 @@ describe('Docker page', () => {
     http.expectOne(`${base}/compose/projects`).flush([]);
     f.detectChanges();
     expect(v.inventory.data()).toBeNull();
-    expect(f.nativeElement.textContent).not.toContain('No hay contenedores.');
-    expect(f.nativeElement.textContent).toContain('No hay proyectos Compose.');
+    expect(view(f, 'containers').location.nativeElement.textContent).not.toContain('No hay contenedores.');
+    expect(view(f, 'projects').location.nativeElement.textContent).toContain('No hay proyectos Compose.');
     v.refreshContainers();
     http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
     f.detectChanges();
-    expect(f.nativeElement.textContent).toContain('No hay contenedores.');
+    expect(view(f, 'containers').location.nativeElement.textContent).toContain('No hay contenedores.');
     expect(v.version.error()).not.toBe('');
   });
   it('shows API totals, future states, nulls, zero, anonymous services and safe remote text', () => {
     const f = initial();
-    expect(f.nativeElement.textContent).toContain('Total: 99');
-    expect(f.nativeElement.textContent).toContain(container.name);
-    expect(f.nativeElement.querySelector('img')).toBeNull();
-    expect(f.nativeElement.textContent).toContain('future-status');
-    expect(f.nativeElement.textContent).toContain('Salida: 0');
-    expect(f.nativeElement.textContent).toContain('Reinicios: 0');
-    expect(f.nativeElement.textContent).toContain('Desconocido / no disponible');
-    expect(f.nativeElement.textContent).toContain('Sin nombre');
-    expect(f.nativeElement.textContent).toContain('future');
-    expect(f.nativeElement.querySelectorAll('.container-list button:disabled')).toHaveLength(0);
+    const rendered = view(f, 'containers').location.nativeElement;
+    expect(rendered.textContent).toContain('Total: 99');
+    expect(rendered.textContent).toContain(container.name);
+    expect(rendered.querySelector('img')).toBeNull();
+    expect(rendered.textContent).toContain('future-status');
+    expect(rendered.textContent).toContain('Salida: 0');
+    expect(rendered.textContent).toContain('Reinicios: 0');
+    expect(rendered.textContent).toContain('Desconocido / no disponible');
+    expect(view(f, 'projects').location.nativeElement.textContent).toContain('Sin nombre');
+    expect(rendered.textContent).toContain('future');
+    expect(rendered.querySelectorAll('.container-list button:disabled')).toHaveLength(0);
   });
   it('freezes confirmations, cancels without writes and consumes double confirmation once', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     const mutable = { ...container };
     v.prepare('delete', mutable);
     mutable.id = 'changed';
@@ -231,7 +242,7 @@ describe('Docker page', () => {
   });
   it('recovers when opening a dialog fails', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementationOnce(() => {
       throw new Error();
     });
@@ -243,7 +254,7 @@ describe('Docker page', () => {
   });
   it('starts directly, blocks double click and separates write success from refresh failures', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.prepare('start', container);
     v.prepare('start', container);
     expect(v.pending()).toBeNull();
@@ -261,11 +272,11 @@ describe('Docker page', () => {
     expect(v.projects.stale()).toBe(true);
     expect(v.error()).toBe('');
     f.detectChanges();
-    expect(f.nativeElement.textContent).toContain('Acción solicitada: Arrancar');
+    expect(view(f, 'projects').location.nativeElement.textContent).toContain('Acción solicitada: Arrancar');
   });
   it('keeps uncertain warning and blocks actions until a successful inventory read', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.prepare('start', container);
     http
       .expectOne(`${base}/containers/start`)
@@ -288,7 +299,7 @@ describe('Docker page', () => {
   });
   it('serializes inspection, preserves stale detail and reinspects only after both inventories refresh', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.inspect(project.name);
     v.inspect(project.name);
     http
@@ -316,7 +327,7 @@ describe('Docker page', () => {
   });
   it('clears vanished project and ignores its late inspection', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.inspect(project.name);
     const r = http.expectOne(
       `${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`,
@@ -330,7 +341,7 @@ describe('Docker page', () => {
   });
   it('does not reinspect a selection removed by post-action refresh', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.inspect(project.name);
     http
       .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
@@ -350,7 +361,7 @@ describe('Docker page', () => {
     'cleans confirmation and ignores old responses on %s',
     (mode) => {
       const f = initial(),
-        v = f.componentInstance;
+        v = f.componentInstance.state;
       v.prepare('delete', container);
       v.cancel();
       v.refreshContainers();
@@ -369,7 +380,7 @@ describe('Docker page', () => {
     'ignores late write result after %s without refreshing or leaking data',
     (mode) => {
       const f = initial(),
-        v = f.componentInstance;
+        v = f.componentInstance.state;
       v.prepare('start', container);
       const old = http.expectOne(`${base}/containers/start`);
       if (mode === 'leave') v.ionViewWillLeave();
@@ -382,9 +393,40 @@ describe('Docker page', () => {
       http.expectNone(`${base}/compose/projects`);
     },
   );
+  it('keeps readings and a submitted write across tab changes while clearing confirmation and inspection', () => {
+    const f = initial(), v = f.componentInstance.state;
+    v.prepare('delete', container);
+    v.leaveTab();
+    expect(v.pending()).toBeNull();
+    v.confirm();
+    http.expectNone(`${base}/containers/delete`);
+    v.prepare('start', container);
+    const write = http.expectOne(`${base}/containers/start`);
+    v.leaveTab();
+    expect(v.busy()).toBe(true);
+    expect(v.inventory.data()).toEqual(inventory);
+    write.flush({ container: container.id, status: 'started' });
+    http.expectOne(`${base}/containers`).flush(inventory);
+    http.expectOne(`${base}/compose/projects`).flush([project]);
+    expect(v.result()?.status).toBe('started');
+    expect(v.busy()).toBe(false);
+    v.ionViewWillEnter();
+    http.expectNone(`${base}/containers`);
+    http.expectNone(`${base}/compose/version`);
+    http.expectNone(`${base}/compose/projects`);
+  });
+  it('ignores inspection responses after changing tabs', () => {
+    const f = initial(), v = f.componentInstance.state;
+    v.inspect(project.name);
+    const request = http.expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
+    v.leaveTab();
+    request.flush(project);
+    expect(v.selected()).toBeNull();
+    expect(v.detail.data()).toBeNull();
+  });
   it('closes an open confirmation on session expiry', () => {
     const f = initial(),
-      v = f.componentInstance;
+      v = f.componentInstance.state;
     v.prepare('delete', container);
     expect(f.nativeElement.querySelector('dialog').open).toBe(true);
     TestBed.inject(ThemeIdentity).begin();

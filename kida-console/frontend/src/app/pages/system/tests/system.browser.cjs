@@ -113,6 +113,7 @@ const wake = {
   try {
     for (const width of [360, 768, 1440])
       for (const [theme, mode] of combinations) {
+        if (process.env.SYSTEM_CASE && process.env.SYSTEM_CASE !== `${theme}-${mode}-${width}`) continue;
         const context = await browser.newContext({ viewport: { width, height: 1000 } });
         await context.addInitScript(
           ({ theme, mode }) => {
@@ -179,6 +180,9 @@ const wake = {
         const page = await context.newPage();
         page.setDefaultTimeout(12000);
         page.on('pageerror', (e) => errors.push(e.message));
+        page.on('console', (message) => {
+          if (message.type() === 'error') errors.push(message.text());
+        });
         const name = `${theme}-${mode}-${width}`;
         console.log(`${name} starting`);
         await page.goto(`${base}/system`);
@@ -287,6 +291,33 @@ const wake = {
           [theme, mode],
         );
         await page.screenshot({ path: `${output}/${name}-overview.png` });
+        if (process.env.SYSTEM_TABS_ONLY === '1') {
+          await page.emulateMedia({ reducedMotion: 'reduce' });
+          const bar = page.locator('app-system ion-tab-bar');
+          assert.equal(await bar.locator('ion-tab-button').count(), 3);
+          for (const [tab, path, index] of [['overview', 'overview', 0], ['energy', 'energy', 1], ['sensors', 'sensors', 2]]) {
+            await bar.locator(`ion-tab-button[tab="${tab}"]`).click();
+            await page.waitForURL(`**/system/${path}`);
+            await page.waitForFunction((name) => document.querySelector(`app-system ion-tab-button[tab="${name}"]`)?.classList.contains('tab-selected'), tab);
+            const style = await bar.evaluate((el) => {
+              const pseudo = getComputedStyle(el, '::before');
+              const matrix = new DOMMatrix(pseudo.transform === 'none' ? undefined : pseudo.transform);
+              return { width: parseFloat(pseudo.width), x: matrix.m41, transition: pseudo.transitionDuration };
+            });
+            assert.ok(Math.abs(style.x - style.width * index) < 1, JSON.stringify(style));
+            assert.ok(parseFloat(style.transition) <= 0.00001, JSON.stringify(style));
+            await page.mouse.move(0, 999);
+            await page.waitForTimeout(400);
+            await bar.screenshot({ path: `${output}/${name}-tabs-${tab}.png` });
+          }
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+          assert.deepEqual(errors, []);
+          results.push({ theme, mode, width, tabs: true, errors });
+          console.log(`${name} tabs passed`);
+          await context.close();
+          continue;
+        }
+
         await page.locator('ion-tab-button[tab="sensors"]').click();
         await page.waitForURL('**/system/sensors');
         const inspector = page.locator('app-system-inspector');
