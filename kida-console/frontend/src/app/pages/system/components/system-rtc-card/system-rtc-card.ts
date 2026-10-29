@@ -13,9 +13,9 @@ import { SystemSectionStatus } from '../system-section-status/system-section-sta
 })
 export class SystemRtcCard {
   readonly state = input.required<SystemSection>();
-  readonly refresh = output<void>();
   readonly fields = fields;
   readonly display = displaySystemValue;
+
   warnings(value: unknown): unknown[] {
     return Array.isArray(value) ? value : value == null ? [] : [value];
   }

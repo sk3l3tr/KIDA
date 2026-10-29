@@ -1,2 +1,2 @@
-@use '../tabs' as shared;
+@use '../../../theme/tabs' as shared;
 @include shared.tabs(3);

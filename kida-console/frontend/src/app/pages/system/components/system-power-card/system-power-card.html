@@ -2,26 +2,19 @@
   <div>
     <h2>
       <span class="i i-power primary"></span>
-      Apagado y reinicio
+      Power
     </h2>
   </div>
-  <span class="control-badge">Control</span>
 </header>
 <p class="mutted">
-  Las horas corresponden al servidor CORE. CORE validará las restricciones temporales. Al abandonar
+  Las horas corresponden al servidor. KIDA validará las restricciones temporales. Al abandonar
   System se descartan los resultados locales; una operación enviada puede seguir ejecutándose.
 </p>
 <form (ngSubmit)="state.confirm('shutdown')">
   <div class="timing-field">
     <label for="power-when">Momento de ejecución</label>
     <div class="timing-row">
-      <input
-        id="power-when"
-        name="when"
-        [(ngModel)]="state.when"
-        required
-        aria-describedby="when-help"
-      />
+      <input id="power-when" name="when" [(ngModel)]="state.when" required />
       <div
         class="quick-actions"
         role="group"
@@ -46,7 +39,6 @@
         }
       </div>
     </div>
-    <small id="when-help">now, +N minutos o una hora válida de 24 horas.</small>
   </div>
   @if (!state.validWhen(state.when)) {
     <p class="error">Introduce now, +N o una hora válida.</p>

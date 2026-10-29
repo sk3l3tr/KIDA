@@ -1,7 +1,11 @@
-@use '../tabs' as shared;
+@use '../../../theme/tabs' as shared;
 @include shared.tabs(2);
 
-dialog { width: min(36rem, 92vw); max-height: 85dvh; overflow: auto; }
+dialog {
+  width: min(36rem, 92vw);
+  max-height: 85dvh;
+  overflow: auto;
+}
 
 .dialog-buttons {
   display: flex;

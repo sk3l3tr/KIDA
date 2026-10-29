@@ -5,9 +5,6 @@
       Capacidades RTC
     </h2>
   </div>
-  <button class="secondary" (click)="refresh.emit()" [disabled]="state().loading()">
-    Actualizar Capacidades RTC
-  </button>
 </header>
 <app-system-section-status [state]="state()" [hideTimestamp]="true" />
 @let data = fields(state().data());
@@ -54,4 +51,3 @@
     }
   }
 }
-<footer><app-system-section-status [state]="state()" [timestampOnly]="true" /></footer>

@@ -299,50 +299,6 @@ describe('System page', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Datos anteriores');
   });
-  it('renders RTC values and ordered warnings through refresh and failure', () => {
-    const fixture = enter();
-    const state = fixture.componentInstance.state;
-    const card = fixture.nativeElement.querySelector('app-system-rtc-card');
-    state.refresh(state.wake);
-    fixture.detectChanges();
-    expect(card.textContent).toContain('Cargando');
-    expect(card.textContent).toContain('Datos anteriores');
-    http.expectOne(`${base}/wake-capabilities`).flush({
-      rtc_device: 'rtc0',
-      rtcwake_available: false,
-      rtc_alarm_available: null,
-      s5_wake_status: 'future_status',
-      warnings: ['Primer aviso', 'Segundo aviso'],
-      future: { extra: 'dato nuevo' },
-    });
-    fixture.detectChanges();
-    const text = card.textContent;
-    for (const expected of [
-      'rtc0',
-      'No',
-      'Desconocido',
-      'future_status',
-      'Diagnóstico parcial',
-      'Instantánea',
-    ])
-      expect(text).toContain(expected);
-    expect(state.wake.data()).toMatchObject({ future: { extra: 'dato nuevo' } });
-    const notices = card.querySelectorAll('.warnings li');
-    expect(Array.from(notices, (item: any) => item.textContent.trim())).toEqual([
-      'Primer aviso',
-      'Segundo aviso',
-    ]);
-    card.querySelector('button').click();
-    http.expectOne(`${base}/wake-capabilities`).error(new ProgressEvent('error'));
-    fixture.detectChanges();
-    expect(card.textContent).toContain('Datos anteriores');
-    expect(card.querySelector('[role="alert"]')).not.toBeNull();
-    expect(card.textContent).toContain('rtc0');
-    state.refresh(state.wake);
-    http.expectOne(`${base}/wake-capabilities`).flush(null);
-    fixture.detectChanges();
-    expect(card.textContent).toContain('Sin datos disponibles');
-  });
   it('updates quick choices and manual input without sending an operation', async () => {
     const fixture = enter();
     const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');

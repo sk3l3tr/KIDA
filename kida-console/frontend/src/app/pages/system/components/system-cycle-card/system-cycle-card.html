@@ -3,15 +3,13 @@
     <div>
       <h2>
         <span class="i i-cycle primary"></span>
-        Ciclo de energía
+        RTC Wake
       </h2>
-      <p>Programar encendido RTC y apagado opcional</p>
     </div>
-    <span class="cycle-badge">RTC WAKE</span>
   </header>
 
   <div class="mode-field">
-    <span id="wake-mode-label">Modalidad de encendido</span>
+    <span id="wake-mode-label">Modo</span>
     <ion-segment
       mode="ios"
       name="wakeMode"
@@ -44,7 +42,7 @@
           inputmode="numeric"
           aria-describedby="wake-help"
         />
-        <small id="wake-help">HH:MM · reloj del servidor CORE</small>
+        <small id="wake-help">HH:MM · reloj del servidor</small>
       } @else {
         <label for="wake-seconds">Segundos hasta el encendido</label>
         <input
@@ -75,7 +73,7 @@
     <span class="notice-icon" aria-hidden="true">ⓘ</span>
     <span
       ><strong>El encendido desde S5 requiere verificación.</strong> Depende del hardware y los
-      permisos RTC. CORE valida la relación temporal y exige un mínimo de 120 segundos.</span
+      permisos RTC. KIDA valida la relación temporal y exige un mínimo de 120 segundos.</span
     >
   </p>
   <div class="cycle-actions">
@@ -83,8 +81,5 @@
       <span class="i i-cycle"></span>
       Programar ciclo
     </button>
-    @if (!state.cycleBody()) {
-      <small>Completa el encendido y, si la indicas, una hora de apagado válida.</small>
-    }
   </div>
 </form>

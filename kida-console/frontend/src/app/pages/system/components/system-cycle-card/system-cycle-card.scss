@@ -20,13 +20,7 @@ h2 {
   margin: 0.25rem 0 0;
   color: var(--kida-muted);
 }
-.cycle-badge {
-  color: var(--ion-color-primary);
-  border: var(--kida-border-width) solid var(--ion-color-primary);
-  border-radius: var(--kida-radius);
-  padding: 0.3rem 0.65rem;
-  font-weight: 700;
-}
+
 .mode-field > span {
   display: block;
   font-weight: 600;
@@ -93,7 +87,7 @@ ion-segment-button.segment-button-checked .mode-indicator {
 
 .cycle-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
