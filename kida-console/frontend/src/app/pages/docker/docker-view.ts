@@ -53,6 +53,7 @@ export class DockerView {
   }
   closePanel(): void {
     if (!this.panelOpen()) return;
+    this.state.invalidateConfirmation();
     this.state.inventoryPanelOpen.set(false);
     this.state.projectPanelOpen.set(null);
     this.state.versionPanelOpen.set(null);

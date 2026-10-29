@@ -192,3 +192,31 @@ despliegue.
 - Sin Playwright por instrucción expresa. Foco real, overlays, temas y responsive
   pendientes en navegador; pruebas de página con proyección simulada existente.
   Sin backend ni Docker real. Cambio ajeno de System preservado.
+
+## Historia #14: parar contenedor (29 de octubre de 2026)
+
+- Parar se incorpora al inspector mediante los controles compartidos; las cuatro
+  operaciones siguen en inventario. Botón y preparación bloquean Parar si
+  online=false según el inventario actual, con independencia del estado literal
+  Docker o de la copia Compose. Sin cambios de contratos, canales ni dependencias.
+- La confirmación existente conserva nombre/ID completos, aviso de interrupción,
+  instantánea inmutable y Cancelar/Confirmar. No se envía hasta confirmar; doble
+  clic/doble confirmación no duplican el POST ni se actualiza actividad de forma
+  optimista. Se conservan resultado, refrescos y bloqueo por resultado incierto.
+- El panel recibe focusTrap=false solo mientras existe una confirmación pendiente.
+  Desde el inspector, el diálogo nativo se abre después de aplicar esa entrada al
+  renderizar. Cancelar/Escape no envían; Escape no se propaga al cierre de Ionic.
+  El helper existente solicita foco al control del inspector después del render.
+- Cerrar o sustituir contenido/tab/sesión invalida la confirmación y su apertura
+  diferida. Los callbacks de retorno de foco comprueban además el contenido actual
+  del panel, para no devolver foco a una selección anterior.
+- Node 24.15.0: 104/104 pruebas Docker aprobadas; suite global 547/550. Persisten
+  los fallos ajenos de Auth, SystemSensors y SystemFanRow descritos en #13.
+  Build de producción bloqueado por presupuesto inicial de 1 MB, exceso actual
+  22.30 kB. Sin modificar presupuestos. `git diff --check` correcto.
+- Revisión independiente sin hallazgos pendientes. Sin Playwright por instrucción
+  expresa: las pruebas simulan showModal/close y la proyección del panel; para
+  retorno de foco simulan activeElement y verifican la llamada al disparador.
+  Interacción real diálogo nativo/modal Ionic, foco, accesibilidad, temas y
+  responsive pendientes de navegador. Sin backend ni Docker real.
+- Cambios ajenos presentes en System y themes.scss preservados.

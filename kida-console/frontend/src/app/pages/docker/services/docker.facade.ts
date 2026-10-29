@@ -1,5 +1,13 @@
 import { trapDialogFocus, restoreDialogFocus } from '../../../services/dialog-focus';
-import { Injectable, Injector, OnDestroy, computed, inject, signal } from '@angular/core';
+import {
+  Injectable,
+  Injector,
+  OnDestroy,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Observable, Subscription, catchError, finalize, forkJoin, map, of, tap } from 'rxjs';
 import { ThemeIdentity } from '../../../../theme/integration';
@@ -114,20 +122,23 @@ export class DockerFacade implements OnDestroy {
     return this.inventory.data()?.containers.find((c) => c.id === selected?.id) ?? null;
   });
   openContainer(id: string, source: 'inventory' | 'projects' | 'detail', project?: string): void {
-    if (!this.active || this.pending() !== null) return;
+    if (!this.active) return;
+    this.invalidateConfirmation();
     this.inventoryPanelOpen.set(false);
     this.versionPanelOpen.set(null);
     this.projectPanelOpen.set(null);
     this.inspectedContainer.set({ id, source, project });
   }
   openVersion(tab: 'projects' | 'containers'): void {
+    this.invalidateConfirmation();
     this.inventoryPanelOpen.set(false);
     this.inspectedContainer.set(null);
     this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(tab);
   }
   openInventory(): void {
-    if (!this.active || this.pending() !== null || this.inventory.data() === null) return;
+    if (!this.active || this.inventory.data() === null) return;
+    this.invalidateConfirmation();
     this.inspectedContainer.set(null);
     this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(null);
@@ -307,10 +318,11 @@ export class DockerFacade implements OnDestroy {
     if (
       !this.active ||
       this.detail.loading() ||
-      (!afterWrite && (this.busy() || this.pending() !== null)) ||
+      (!afterWrite && this.busy()) ||
       !this.projects.data()?.some((p) => p.name === project)
     )
       return;
+    if (!afterWrite) this.invalidateConfirmation();
     if (this.selected() !== project) {
       this.detail.data.set(null);
       this.detail.stale.set(false);
@@ -359,7 +371,12 @@ export class DockerFacade implements OnDestroy {
   }
   actionLocked(action: ContainerAction, id: string): boolean {
     const container = this.inventory.data()?.containers.find((c) => c.id === id);
-    return this.locked() || !container || (action === 'start' && container.online);
+    return (
+      this.locked() ||
+      !container ||
+      (action === 'start' && container.online) ||
+      (action === 'stop' && !container.online)
+    );
   }
   prepare(action: ContainerAction, container: DockerContainer): void {
     const current = this.inventory.data()?.containers.find((c) => c.id === container.id);
@@ -372,16 +389,22 @@ export class DockerFacade implements OnDestroy {
     }
     this.error.set('');
     this.pending.set(snapshot);
-    try {
-      const dialog = this.dialog();
-      if (!dialog) throw new Error('Confirmation unavailable');
-      dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>('[autofocus]')?.focus();
-    } catch {
-      this.closeConfirmation();
-      this.error.set('No se pudo abrir la confirmación.');
-      this.restoreFocus();
-    }
+    const show = () => {
+      if (!this.active || this.pending() !== snapshot) return;
+      try {
+        const dialog = this.dialog();
+        if (!dialog) throw new Error('Confirmation unavailable');
+        dialog.showModal();
+        dialog.querySelector<HTMLButtonElement>('[autofocus]')?.focus();
+      } catch {
+        this.closeConfirmation();
+        this.error.set('No se pudo abrir la confirmación.');
+        this.restoreFocus();
+      }
+    };
+    // Apply the lower modal's focusTrap binding before opening the native dialog.
+    if (this.inspectedContainer()) afterNextRender(show, { injector: this.injector });
+    else show();
   }
   cancel(): void {
     if (!this.pending()) return;
@@ -393,9 +416,13 @@ export class DockerFacade implements OnDestroy {
     const dialog = this.dialog();
     if (dialog?.open) dialog.close();
   }
+  invalidateConfirmation(): void {
+    this.closeConfirmation();
+    this.trigger = null;
+  }
   confirm(): void {
     const pending = this.pending();
-    if (!this.active || !pending || this.busy()) return;
+    if (!this.active || !pending || this.busy() || !this.dialog()?.open) return;
     this.closeConfirmation();
     this.execute(pending);
   }
@@ -442,6 +469,12 @@ export class DockerFacade implements OnDestroy {
     );
   }
   trapFocus(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.pending()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancel();
+      return;
+    }
     trapDialogFocus(event, this.dialog(), this.document);
   }
   private restoreFocus(): void {
@@ -449,6 +482,10 @@ export class DockerFacade implements OnDestroy {
     const trigger = this.trigger;
     if (!trigger) return;
     const selectionRevision = this.selectionRevision;
+    const container = this.inspectedContainer();
+    const version = this.versionPanelOpen();
+    const project = this.projectPanelOpen();
+    const inventory = this.inventoryPanelOpen();
     restoreDialogFocus(
       this.injector,
       trigger,
@@ -456,7 +493,11 @@ export class DockerFacade implements OnDestroy {
       () =>
         this.active &&
         generation === this.generation &&
-        selectionRevision === this.selectionRevision,
+        selectionRevision === this.selectionRevision &&
+        container === this.inspectedContainer() &&
+        version === this.versionPanelOpen() &&
+        project === this.projectPanelOpen() &&
+        inventory === this.inventoryPanelOpen(),
     );
   }
 }

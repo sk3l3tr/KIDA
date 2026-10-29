@@ -228,6 +228,7 @@
     }
     <app-side-panel
       [open]="panelOpen()"
+      [focusTrap]="state.pending() === null"
       [title]="
         state.inspectedContainer()
           ? 'Inspeccionar contenedor'
@@ -274,7 +275,7 @@
                   Sin el mismo ID en el inventario principal, las operaciones no están disponibles.
                 </p>
               } @else {
-                <app-container-actions [containerId]="container.id" [actions]="['start']" />
+                <app-container-actions [containerId]="container.id" [actions]="['start', 'stop']" />
                 <p>Las demás operaciones están disponibles desde el inventario.</p>
               }
             </section>
