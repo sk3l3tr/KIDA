@@ -54,6 +54,7 @@ export class DockerFacade implements OnDestroy {
   readonly version = reading<ComposeVersion>();
   readonly versionPanelOpen = signal<'projects' | 'containers' | null>(null);
   readonly projectPanelOpen = signal<string | null>(null);
+  readonly inventoryPanelOpen = signal(false);
   readonly projects = reading<ComposeProject[]>();
   readonly associations = computed(() => {
     const projects = this.projects.data();
@@ -114,14 +115,23 @@ export class DockerFacade implements OnDestroy {
   });
   openContainer(id: string, source: 'inventory' | 'projects' | 'detail', project?: string): void {
     if (!this.active || this.pending() !== null) return;
+    this.inventoryPanelOpen.set(false);
     this.versionPanelOpen.set(null);
     this.projectPanelOpen.set(null);
     this.inspectedContainer.set({ id, source, project });
   }
   openVersion(tab: 'projects' | 'containers'): void {
+    this.inventoryPanelOpen.set(false);
     this.inspectedContainer.set(null);
     this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(tab);
+  }
+  openInventory(): void {
+    if (!this.active || this.pending() !== null || this.inventory.data() === null) return;
+    this.inspectedContainer.set(null);
+    this.projectPanelOpen.set(null);
+    this.versionPanelOpen.set(null);
+    this.inventoryPanelOpen.set(true);
   }
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
@@ -178,6 +188,7 @@ export class DockerFacade implements OnDestroy {
     this.sessionChanges.unsubscribe();
   }
   leaveTab(): void {
+    this.inventoryPanelOpen.set(false);
     this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(null);
     this.inspectedContainer.set(null);
@@ -190,6 +201,7 @@ export class DockerFacade implements OnDestroy {
     this.trigger = null;
   }
   private reset(): void {
+    this.inventoryPanelOpen.set(false);
     this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(null);
     this.active = false;
@@ -305,6 +317,7 @@ export class DockerFacade implements OnDestroy {
     }
     this.selected.set(project);
     if (!afterWrite) {
+      this.inventoryPanelOpen.set(false);
       this.versionPanelOpen.set(null);
       this.inspectedContainer.set(null);
       this.projectPanelOpen.set(project);

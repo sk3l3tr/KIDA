@@ -146,3 +146,22 @@ despliegue.
   no enfocaba el botón dentro del fixture Ionic ni antes de abrir el panel.
 - Sin Playwright por instrucción expresa. Validación real de foco, Escape/fondo,
   overlays, temas y responsive pendiente en navegador. Sin backend/Docker real.
+
+## Historia #12: JSON del inventario (29 de octubre de 2026)
+
+- «Ver JSON del inventario» sustituye el desplegable del pie y abre el panel
+  compartido. Muestra directamente la respuesta completa con JsonPipe dentro
+  de «JSON interpretado», sin peticiones, campos derivados ni filtros locales.
+- Conserva campos adicionales, null, ceros y el aviso de precisión limitada.
+  El panel sigue la lectura actual, muestra carga/error/desactualización y
+  conserva la respuesta anterior cuando falla el refresco. Cerrar, cambiar
+  contenido/tab, salir o cambiar sesión impide su reapertura por respuestas tardías.
+- Node 24.15.0: 66/66 pruebas Docker aprobadas; suite global 510/512. Persisten
+  los dos fallos preexistentes de Auth/System descritos en #9. Build de producción
+  bloqueado por el mismo presupuesto inicial de 1 MB (exceso 22.28 kB).
+  No se modificaron presupuestos, contratos, dependencias ni operaciones.
+- Revisión independiente del código y pruebas sin hallazgos. Comprobación de
+  whitespace correcta. Sin Playwright por instrucción expresa; foco real,
+  Escape/fondo, overlays, temas y responsive pendientes en navegador. Las pruebas
+  de página proyectan el contenido del panel mediante el host simulado existente.
+  Sin backend ni Docker real.

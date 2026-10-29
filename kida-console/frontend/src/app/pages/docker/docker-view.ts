@@ -44,12 +44,14 @@ export class DockerView {
     const selected = this.state.inspectedContainer();
     return (
       this.state.versionPanelOpen() === this.tab ||
+      (this.tab === 'containers' && this.state.inventoryPanelOpen()) ||
       (this.tab === 'projects' && this.state.projectPanelOpen() !== null) ||
       (!!selected && (selected.source === 'inventory' ? 'containers' : 'projects') === this.tab)
     );
   }
   closePanel(): void {
     if (!this.panelOpen()) return;
+    this.state.inventoryPanelOpen.set(false);
     this.state.projectPanelOpen.set(null);
     this.state.versionPanelOpen.set(null);
     this.state.inspectedContainer.set(null);

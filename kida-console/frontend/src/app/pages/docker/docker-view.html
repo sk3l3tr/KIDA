@@ -234,10 +234,7 @@
               <p>No hay contenedores que coincidan con la búsqueda y los filtros.</p>
             }
             <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
-            <details>
-              <summary>Datos del inventario (JSON interpretado)</summary>
-              <pre>{{ data | json }}</pre>
-            </details>
+            <button type="button" (click)="state.openInventory()">Ver JSON del inventario</button>
           }
         </div>
       </section>
@@ -249,10 +246,14 @@
           ? 'Inspeccionar contenedor'
           : state.projectPanelOpen() !== null
             ? 'Inspeccionar proyecto'
-            : 'Docker Compose'
+            : state.inventoryPanelOpen()
+              ? 'JSON del inventario'
+              : 'Docker Compose'
       "
       [subtitle]="
-        state.inspectedContainer()?.id ?? state.projectPanelOpen() ?? 'Lectura de versión'
+        state.inspectedContainer()?.id ??
+        state.projectPanelOpen() ??
+        (state.inventoryPanelOpen() ? 'Lectura completa del inventario' : 'Lectura de versión')
       "
       [fallbackFocus]="heading"
       (closed)="closePanel()"
@@ -354,6 +355,30 @@
               <pre>{{ project | json }}</pre>
             </details>
           }
+        }
+      } @else if (state.inventoryPanelOpen()) {
+        @if (state.inventory.loading()) {
+          <p role="status">Actualizando inventario…</p>
+        }
+        @if (state.inventory.error()) {
+          <p role="alert">Error de inventario: {{ state.inventory.error() }}</p>
+        }
+        @if (state.inventory.stale()) {
+          <p>Inventario anterior, desactualizado.</p>
+        }
+        @if (state.inventory.data(); as data) {
+          <details>
+            <summary>JSON interpretado</summary>
+            <p>
+              Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.
+            </p>
+            @if (state.limitedPrecision(data)) {
+              <p role="status">
+                Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
+              </p>
+            }
+            <pre>{{ data | json }}</pre>
+          </details>
         }
       } @else {
         @if (state.version.data(); as data) {

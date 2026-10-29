@@ -183,6 +183,108 @@ describe('Docker page', () => {
     return component;
   }
   const fail = { status: 503, statusText: 'Unavailable' };
+  it('opens complete interpreted inventory JSON locally despite filters and retains extra fields and precision warnings', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.refreshContainers();
+    const data = { ...inventory, extra: null, count: 9007199254740992 };
+    http.expectOne(`${base}/containers`).flush(data);
+    state.search.set('no match');
+    state.activity.set('online');
+    const v = view(f, 'containers');
+    const root = v.location.nativeElement as HTMLElement;
+    const trigger = Array.from(root.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Ver JSON del inventario',
+    )!;
+    trigger.click();
+    v.changeDetectorRef.detectChanges();
+    const host = root.querySelector('app-side-panel')!;
+    const panel = getDebugNode(host)!.injector.get(SidePanel);
+    expect(panel.open()).toBe(true);
+    expect(panel.title()).toBe('JSON del inventario');
+    expect(panel.fallbackFocus()).toBe(root.querySelector('h1'));
+    expect(root.querySelectorAll('app-side-panel')).toHaveLength(1);
+    expect(root.querySelector('.inventory-panel > details')).toBeNull();
+    expect(host.querySelector('summary')!.textContent).toBe('JSON interpretado');
+    expect(JSON.parse(host.querySelector('pre')!.textContent!)).toEqual(data);
+    expect(host.textContent).toContain('no representan el JSON original exacto');
+    expect(host.textContent).toContain('Precisión limitada');
+    expect(host.querySelector('img')).toBeNull();
+    expect(state.visibleContainers()).toEqual([]);
+    http.expectNone(() => true);
+  });
+  it('updates inventory JSON during refresh, retains stale data on failure and displays an empty response with zeros', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const v = view(f, 'containers');
+    state.openInventory();
+    state.refreshContainers();
+    v.changeDetectorRef.detectChanges();
+    const host = v.location.nativeElement.querySelector('app-side-panel');
+    expect(host.textContent).toContain('Actualizando inventario');
+    expect(JSON.parse(host.querySelector('pre').textContent)).toEqual(inventory);
+    http.expectOne(`${base}/containers`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain('Error de inventario');
+    expect(host.textContent).toContain('Inventario anterior, desactualizado');
+    expect(JSON.parse(host.querySelector('pre').textContent)).toEqual(inventory);
+    state.refreshContainers();
+    const empty = { total: 0, running: 0, containers: [], future: null };
+    http.expectOne(`${base}/containers`).flush(empty);
+    v.changeDetectorRef.detectChanges();
+    expect(JSON.parse(host.querySelector('pre').textContent)).toEqual(empty);
+    expect(host.textContent).not.toContain('desactualizado');
+    expect(host.textContent).not.toContain('Error de inventario');
+  });
+  it.each(['close', 'version', 'container', 'tab', 'leave', 'session'] as const)(
+    'does not reopen inventory JSON or replace another panel after a late refresh on %s',
+    (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      const v = view(f, 'containers');
+      state.openInventory();
+      v.changeDetectorRef.detectChanges();
+      state.refreshContainers();
+      const request = http.expectOne(`${base}/containers`);
+      if (mode === 'close') {
+        getDebugNode(v.location.nativeElement.querySelector('app-side-panel'))!
+          .injector.get(SidePanel)
+          .closed.emit();
+      } else if (mode === 'version') state.openVersion('containers');
+      else if (mode === 'container') state.openContainer(container.id, 'inventory');
+      else if (mode === 'tab') state.leaveTab();
+      else if (mode === 'leave') state.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).begin();
+      request.flush(inventory);
+      v.changeDetectorRef.detectChanges();
+      expect(state.inventoryPanelOpen()).toBe(false);
+      if (mode === 'version' || mode === 'container') {
+        const panel = getDebugNode(
+          v.location.nativeElement.querySelector('app-side-panel'),
+        )!.injector.get(SidePanel);
+        expect(panel.open()).toBe(true);
+        expect(panel.title()).toBe(
+          mode === 'version' ? 'Docker Compose' : 'Inspeccionar contenedor',
+        );
+      } else expect(v.instance.panelOpen()).toBe(false);
+    },
+  );
+  it('replaces inventory JSON with project inspection and keeps the cached containers panel closed', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const containers = view(f, 'containers');
+    const projects = view(f, 'projects');
+    state.openInventory();
+    expect(containers.instance.panelOpen()).toBe(true);
+    expect(projects.instance.panelOpen()).toBe(false);
+    state.inspect(project.name);
+    expect(state.inventoryPanelOpen()).toBe(false);
+    expect(containers.instance.panelOpen()).toBe(false);
+    expect(projects.instance.panelOpen()).toBe(true);
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+      .flush(project);
+  });
   it('opens the existing version reading without a request and keeps refresh failures independent', () => {
     const f = initial(),
       state = f.componentInstance.state;
@@ -804,12 +906,10 @@ describe('Docker page', () => {
     expect(state.inventory.data()).toEqual(data);
     expect(state.projects.data()).toEqual(compose);
     expect(root.querySelector('app-docker-indicators').textContent).toContain('99');
-    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain(
-      'preserved',
-    );
-    expect(root.querySelector('.inventory-panel > details > pre').textContent).toContain(
-      'full-id-beta',
-    );
+    state.openInventory();
+    v.changeDetectorRef.detectChanges();
+    expect(root.querySelector('app-side-panel pre').textContent).toContain('preserved');
+    expect(root.querySelector('app-side-panel pre').textContent).toContain('full-id-beta');
     state.leaveTab();
     expect(state.search()).toBe('servicio web');
     search('no coincide');
@@ -872,7 +972,9 @@ describe('Docker page', () => {
     expect(state.inventory.data()).toEqual(data);
     expect(state.projects.data()).toEqual([project]);
     expect(root.querySelector('app-docker-indicators')!.textContent).toContain('99');
-    expect(root.querySelector('.inventory-panel > details > pre')!.textContent).toContain('third');
+    state.openInventory();
+    v.changeDetectorRef.detectChanges();
+    expect(root.querySelector('app-side-panel pre')!.textContent).toContain('third');
     state.search.set('other');
     choose('offline');
     expect(root.textContent).toContain('0 resultados');
