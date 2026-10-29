@@ -12,14 +12,9 @@
 </p>
 <form (ngSubmit)="state.confirm('shutdown')">
   <div class="timing-field">
-    <label for="power-when">Momento de ejecución</label>
     <div class="timing-row">
       <input id="power-when" name="when" [(ngModel)]="state.when" required />
-      <div
-        class="quick-actions"
-        role="group"
-        aria-label="Accesos rápidos para el momento de ejecución"
-      >
+      <div class="quick-actions" role="group">
         @for (
           option of [
             { label: 'Ahora', value: 'now' },

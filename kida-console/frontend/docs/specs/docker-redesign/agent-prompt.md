@@ -1,6 +1,6 @@
 Implementa únicamente la historia indicada en este repositorio KIDA.
 
-Historia: kida-console/frontend/docs/specs/docker-redesign/08-container-inventory.md
+Historia: kida-console/frontend/docs/specs/docker-redesign/09-container-inventory.md
 Spec global: kida-console/frontend/docs/specs/docker-redesign/spec.md
 
 Sigue este flujo obligatorio:
