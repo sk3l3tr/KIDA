@@ -15,7 +15,6 @@ import { classifyCoreFailure } from '../../../services/core-failure';
 import { DockerService } from './docker.service';
 import {
   ComposeProject,
-  ComposeVersion,
   ContainerAction,
   ContainerResult,
   DockerContainer,
@@ -56,13 +55,13 @@ export class DockerFacade implements OnDestroy {
   private readonly identity = inject(ThemeIdentity);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
+
   dialog: () => HTMLDialogElement | undefined = () => undefined;
   heading: () => HTMLElement | undefined = () => undefined;
+
   readonly inventory = reading<DockerContainers>();
-  readonly version = reading<ComposeVersion>();
-  readonly versionPanelOpen = signal<'projects' | 'containers' | null>(null);
   readonly projectPanelOpen = signal<string | null>(null);
-  readonly inventoryPanelOpen = signal(false);
+
   readonly projects = reading<ComposeProject[]>();
   readonly associations = computed(() => {
     const projects = this.projects.data();
@@ -124,26 +123,10 @@ export class DockerFacade implements OnDestroy {
   openContainer(id: string, source: 'inventory' | 'projects' | 'detail', project?: string): void {
     if (!this.active) return;
     this.invalidateConfirmation();
-    this.inventoryPanelOpen.set(false);
-    this.versionPanelOpen.set(null);
     this.projectPanelOpen.set(null);
     this.inspectedContainer.set({ id, source, project });
   }
-  openVersion(tab: 'projects' | 'containers'): void {
-    this.invalidateConfirmation();
-    this.inventoryPanelOpen.set(false);
-    this.inspectedContainer.set(null);
-    this.projectPanelOpen.set(null);
-    this.versionPanelOpen.set(tab);
-  }
-  openInventory(): void {
-    if (!this.active || this.inventory.data() === null) return;
-    this.invalidateConfirmation();
-    this.inspectedContainer.set(null);
-    this.projectPanelOpen.set(null);
-    this.versionPanelOpen.set(null);
-    this.inventoryPanelOpen.set(true);
-  }
+
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
   readonly inspectedProjectTotals = computed(() => {
@@ -188,7 +171,6 @@ export class DockerFacade implements OnDestroy {
     this.reset();
     this.active = true;
     this.refreshContainers();
-    this.refreshVersion();
     this.refreshProjects();
   }
   ionViewWillLeave(): void {
@@ -199,9 +181,7 @@ export class DockerFacade implements OnDestroy {
     this.sessionChanges.unsubscribe();
   }
   leaveTab(): void {
-    this.inventoryPanelOpen.set(false);
     this.projectPanelOpen.set(null);
-    this.versionPanelOpen.set(null);
     this.inspectedContainer.set(null);
     ++this.selectionRevision;
     this.closeConfirmation();
@@ -212,15 +192,13 @@ export class DockerFacade implements OnDestroy {
     this.trigger = null;
   }
   private reset(): void {
-    this.inventoryPanelOpen.set(false);
     this.projectPanelOpen.set(null);
-    this.versionPanelOpen.set(null);
     this.active = false;
     ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
     this.closeConfirmation();
-    for (const state of [this.inventory, this.version, this.projects, this.detail]) {
+    for (const state of [this.inventory, this.projects, this.detail]) {
       state.data.set(null);
       state.loading.set(false);
       state.error.set('');
@@ -280,10 +258,6 @@ export class DockerFacade implements OnDestroy {
   private loadContainers(): Observable<boolean> {
     return this.load(this.inventory, this.service.list(), () => this.uncertain.set(false));
   }
-  refreshVersion(): void {
-    if (!this.canRefresh() || this.version.loading()) return;
-    this.subscriptions.add(this.load(this.version, this.service.version()).subscribe());
-  }
   refreshProjects(): void {
     if (!this.canRefresh() || this.projects.loading()) return;
     this.subscriptions.add(this.loadProjects().subscribe());
@@ -329,8 +303,6 @@ export class DockerFacade implements OnDestroy {
     }
     this.selected.set(project);
     if (!afterWrite) {
-      this.inventoryPanelOpen.set(false);
-      this.versionPanelOpen.set(null);
       this.inspectedContainer.set(null);
       this.projectPanelOpen.set(project);
     }
@@ -493,9 +465,7 @@ export class DockerFacade implements OnDestroy {
     if (!trigger) return;
     const selectionRevision = this.selectionRevision;
     const container = this.inspectedContainer();
-    const version = this.versionPanelOpen();
     const project = this.projectPanelOpen();
-    const inventory = this.inventoryPanelOpen();
     restoreDialogFocus(
       this.injector,
       trigger,
@@ -505,9 +475,7 @@ export class DockerFacade implements OnDestroy {
         generation === this.generation &&
         selectionRevision === this.selectionRevision &&
         container === this.inspectedContainer() &&
-        version === this.versionPanelOpen() &&
-        project === this.projectPanelOpen() &&
-        inventory === this.inventoryPanelOpen(),
+        project === this.projectPanelOpen(),
     );
   }
 }

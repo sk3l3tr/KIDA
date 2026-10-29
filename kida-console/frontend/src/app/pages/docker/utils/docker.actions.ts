@@ -4,7 +4,6 @@ import { environment } from '../../../../environments/environment';
 export const dockerActions: IactionDefinition[] = (
   [
     ['CONTAINERS_LIST', '/containers', UrlRequestType.GET],
-    ['COMPOSE_VERSION', '/compose/version', UrlRequestType.GET],
     ['COMPOSE_PROJECTS', '/compose/projects', UrlRequestType.GET],
     ['COMPOSE_INSPECT', '/compose/projects/inspect?project={project}', UrlRequestType.GET],
     ['CONTAINER_START', '/containers/start', UrlRequestType.POST],

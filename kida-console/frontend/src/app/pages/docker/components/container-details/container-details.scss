@@ -2,18 +2,6 @@
   display: block;
   min-width: 0;
 }
-p,
-summary {
+p {
   overflow-wrap: anywhere;
-}
-summary {
-  cursor: pointer;
-  padding: 0.75rem 0;
-}
-pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 22rem;
-  overflow: auto;
-  font-size: 0.85rem;
 }

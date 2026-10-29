@@ -7,7 +7,6 @@ import { ContainerDetails } from './components/container-details/container-detai
 import { ContainerActions } from './components/container-actions/container-actions';
 import { DockerFacade } from './services/docker.facade';
 import { DockerIndicators } from './components/docker-indicators/docker-indicators';
-import { DockerComposeVersion } from './components/docker-compose-version/docker-compose-version';
 import { DockerProjectCard } from './components/docker-project-card/docker-project-card';
 
 @Component({
@@ -19,7 +18,6 @@ import { DockerProjectCard } from './components/docker-project-card/docker-proje
     ContainerDetails,
     ContainerActions,
     DockerIndicators,
-    DockerComposeVersion,
     DockerProjectCard,
   ],
   templateUrl: './docker-view.html',
@@ -28,7 +26,7 @@ import { DockerProjectCard } from './components/docker-project-card/docker-proje
 export class DockerView {
   readonly state = inject(DockerFacade);
   private readonly document = inject(DOCUMENT);
-  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
+  readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
 
   tab = inject(ActivatedRoute).snapshot.data['tab'] as 'projects' | 'containers';
 
@@ -45,8 +43,6 @@ export class DockerView {
   panelOpen(): boolean {
     const selected = this.state.inspectedContainer();
     return (
-      this.state.versionPanelOpen() === this.tab ||
-      (this.tab === 'containers' && this.state.inventoryPanelOpen()) ||
       (this.tab === 'projects' && this.state.projectPanelOpen() !== null) ||
       (!!selected && (selected.source === 'inventory' ? 'containers' : 'projects') === this.tab)
     );
@@ -54,13 +50,11 @@ export class DockerView {
   closePanel(): void {
     if (!this.panelOpen()) return;
     this.state.invalidateConfirmation();
-    this.state.inventoryPanelOpen.set(false);
     this.state.projectPanelOpen.set(null);
-    this.state.versionPanelOpen.set(null);
     this.state.inspectedContainer.set(null);
   }
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();
-    this.state.heading = () => this.heading()?.nativeElement;
+    this.state.heading = () => this.listHeading()?.nativeElement;
   }
 }

@@ -33,10 +33,10 @@
           <div>
             <dt>Límite crítico</dt>
             <dd>
-              {{ display(reading.fields['critical']) }}
-              @if (reading.fields['critical'] != null) {
-                {{ display(reading.fields['unit']) }}
-              }
+              {{
+                display(reading.fields['critical']) +
+                  (reading.fields['critical'] != null ? ' ' + display(reading.fields['unit']) : '')
+              }}
             </dd>
           </div>
         </dl>

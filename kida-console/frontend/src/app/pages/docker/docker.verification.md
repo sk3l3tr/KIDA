@@ -1,5 +1,29 @@
 # Verificación de Docker
 
+## Limpieza de vistas (29 de octubre de 2026)
+
+- Retirados los restos de los visores JSON eliminados y el circuito frontend de
+  versión Compose: lectura, panel, canal, método del servicio y modelo exclusivo.
+  Se conserva el JSON del resultado de operaciones y el contrato del backend.
+- Corregida la apertura incondicional del panel en Contenedores. Los inspectores
+  usan como destino alternativo del foco los títulos de sección existentes.
+- Por decisión expresa del usuario se eliminan 21 declaraciones de tests
+  (43 casos parametrizados incluidos) y el recorrido completo de navegador.
+  Solo se adaptan los siete tests autorizados y la preparación compartida.
+- `ng test --watch=false --include=src/app/pages/docker/tests/docker.spec.ts`:
+  114/114 aprobados tras la limpieza final. Suite global final: 558/558 aprobados.
+  Por autorización posterior se eliminan los tests obsoletos de cabecera Auth
+  y avisos de SystemFanRow. Se corrige el espacio duplicado entre límite crítico
+  y unidad en el template del procesador; su test permanece intacto.
+- Build de desarrollo aprobado. Producción bloqueada por presupuesto inicial:
+  1,02 MB, exceso de 22,01 kB sobre el límite de 1 MB. Presupuestos intactos.
+- Revisión independiente completada sin hallazgos pendientes tras retirar
+  dos restos adicionales de propiedad/import y estilos sin consumidores.
+  `git diff --check` correcto.
+- No se utiliza Playwright por instrucción actual del usuario. Interacción,
+  foco real y overlays Ionic pendientes de navegador. Sin acciones reales ni
+  contacto con backend/CORE/Docker. Los resultados siguientes son históricos.
+
 Fecha: 26 de octubre de 2026. Node 24.15.0 (`.nvmrc`), Angular 22,
 ARCA 3.2.7, Ionic 8.8.19, Vitest 5.0.5 y Playwright 1.59.1 con Chromium existente.
 
@@ -14,7 +38,8 @@ ARCA 3.2.7, Ionic 8.8.19, Vitest 5.0.5 y Playwright 1.59.1 con Chromium existent
 - `pnpm exec ng build --configuration production`: aprobado con los presupuestos
   existentes. Bundle inicial: 986,38 kB; mantiene el aviso de 500 kB y queda por
   debajo del límite de error de 1 MB. No se cambiaron límites ni dependencias.
-- `docker.browser.cjs`: matriz de 14 casos, escritorio 1440×1000 y móvil 390×844,
+- Recorrido histórico de navegador (script retirado en la limpieza del 29 de octubre):
+  matriz de 14 casos, escritorio 1440×1000 y móvil 390×844,
   Professional, Neobrutalism y Sakura claro/oscuro, Tokyo oscuro. Comprueba ocho
   operaciones, cuerpos/CSRF/ID completo, codificación, contenido remoto como
   texto, cero/nulos/estado futuro, precisión limitada, confirmaciones,
@@ -60,18 +85,9 @@ pnpm exec ng build --configuration production
 pnpm exec ng serve --port 4227
 ```
 
-En otra terminal, usar instalaciones existentes, sin añadir dependencias:
-
-```bash
-PLAYWRIGHT_MODULE=/ruta/existente/node_modules/playwright \
-CHROMIUM_PATH=/ruta/existente/chrome \
-node src/app/pages/docker/docker.browser.cjs
-```
-
-`DOCKER_TEST_URL` permite cambiar `http://localhost:4227`;
-`DOCKER_TEST_OUTPUT` permite cambiar `/tmp/kida-docker-evidence`.
-Todas las rutas `**/api/**` se interceptan antes de navegar, incluidas sesión y
-CSRF. Los contenedores/proyectos son fixtures locales del script.
+El recorrido automatizado de navegador anterior se ha eliminado por decisión
+expresa del usuario. Los resultados históricos siguientes no describen la
+cobertura actual.
 
 ## Límites
 

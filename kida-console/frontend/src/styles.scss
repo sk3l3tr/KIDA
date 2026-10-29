@@ -44,7 +44,7 @@ app-root arca-core > arca-footer.footer {
   .menuItem {
     min-height: 44px;
     padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    border-radius: var(--kida-radius);
   }
 
   .menuItem:hover,

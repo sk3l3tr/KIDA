@@ -2,7 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import { ArcaRequestService } from '../../../services/arca-request.service';
 import {
   ComposeProject,
-  ComposeVersion,
   ContainerAction,
   ContainerResult,
   DockerContainers,
@@ -13,9 +12,6 @@ export class DockerService {
   private readonly requests = inject(ArcaRequestService);
   list() {
     return this.requests.request<DockerContainers>('DOCKER_CONTAINERS_LIST');
-  }
-  version() {
-    return this.requests.request<ComposeVersion>('DOCKER_COMPOSE_VERSION');
   }
   projects() {
     return this.requests.request<ComposeProject[]>('DOCKER_COMPOSE_PROJECTS');

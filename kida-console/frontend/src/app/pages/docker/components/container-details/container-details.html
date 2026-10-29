@@ -32,11 +32,3 @@
   <p>Sin redes.</p>
 }
 <ng-content select="[container-operations]" />
-<details>
-  <summary>JSON interpretado</summary>
-  <p>Datos recibidos, interpretados por JavaScript (JSON).</p>
-  @if (limitedPrecision(container())) {
-    <p>Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.</p>
-  }
-  <pre>{{ container() | json }}</pre>
-</details>

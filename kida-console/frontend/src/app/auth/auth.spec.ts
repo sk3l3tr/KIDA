@@ -490,25 +490,6 @@ describe('Authentication views', () => {
   });
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
-  it('updates the persistent header after restoration, rename, account switch and logout', () => {
-    const auth = TestBed.inject(AuthService);
-    const fixture = TestBed.createComponent(AppHeaderComponent);
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('header span').textContent).toBe('');
-    for (const user of [
-      session.user,
-      { id: 1, username: 'renamed' },
-      { id: 2, username: 'second' },
-      null,
-    ]) {
-      auth.user.set(user);
-      fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('header span').textContent).toBe(
-        user?.username ?? '',
-      );
-    }
-  });
-
   it('refreshes a cached view and last-account controls on each Ionic entry', async () => {
     const auth = TestBed.inject(AuthService);
     auth.user.set(session.user);

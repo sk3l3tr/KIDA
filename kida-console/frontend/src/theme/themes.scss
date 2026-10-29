@@ -34,53 +34,88 @@ $palettes: (
   ),
   neobrutalism: (
     light: (
-      #fff6df,
+      // Background principal
       #ffffff,
-      #171717,
-      #454545,
-      #7137b9,
-      #ffffff,
-      #171717,
+      // Superficie / Cards: gris acero
+      #cdd3dd,
+      // Texto principal
+      #111318,
+      // Texto secundario
+      #363a46,
+      // Accent / Primary: cobalto eléctrico
+      #1744ca,
+      // Superficie secundaria: azul industrial
+      #a4b8d2,
+      // Bordes / Elementos secundarios
+      #0a0b0d,
     ),
     dark: (
-      #161616,
-      #262626,
-      #fff6df,
-      #d5ccba,
-      #edbaff,
-      #24132d,
-      #e5dabd,
+      // Background principal
+      #101014,
+      // Superficie / Cards
+      #292832,
+      // Texto principal
+      #f8f8f2,
+      // Texto secundario
+      #ceccd1,
+      // Accent / Primary: amarillo neón
+      #fcee09,
+      // Superficie secundaria
+      #393724,
+      // Bordes / Elementos secundarios
+      #9c9da5,
     ),
   ),
   sakura: (
     light: (
-      #fcf2f5,
-      #fffbfc,
-      #452b38,
-      #745264,
-      #9a365d,
+      // Background principal: crema muy suave
+      #faf6f3,
+      // Superficie / Cards: blanco puro
       #ffffff,
-      #a06d83,
+      // Texto principal: ciruela oscuro
+      #392c34,
+      // Texto secundario
+      #705965,
+      // Accent / Primary: rosa sakura
+      #b34b77,
+      // Superficie con tinte rosa empolvado
+      #f5dfe8,
+      // Bordes / Elementos secundarios
+      #c99aaf,
     ),
     dark: (
-      #241b25,
-      #332635,
-      #f9e9f0,
-      #dab9cc,
-      #f1a8c7,
-      #381d2a,
-      #b68ba4,
+      // Background principal: ciruela casi negro
+      #1d181e,
+      // Superficie / Cards
+      #302630,
+      // Texto principal
+      #faf0f4,
+      // Texto secundario
+      #d2b9c5,
+      // Accent / Primary: rosa pastel
+      #efa8c7,
+      // Superficie con tinte ciruela rosado
+      #483440,
+      // Bordes / Elementos secundarios
+      #b88da2,
     ),
   ),
   tokyo: (
     dark: (
-      #101321,
-      #1b2035,
-      #ecf0ff,
-      #b4bfdc,
-      #68e3e1,
-      #09282c,
-      #7d91bc,
+      // Background principal: azul noche profundo
+      #0b1020,
+      // Superficie / Cards: azul pizarra
+      #202b45,
+      // Texto principal: blanco azulado
+      #f0f5ff,
+      // Texto secundario: azul lavanda
+      #b3c3e1,
+      // Accent / Primary: cyan eléctrico
+      #4deaf2,
+      // Superficie con tinte cyan oscuro
+      #113944,
+      // Bordes / Elementos secundarios
+      #5876a4,
     ),
   ),
 );

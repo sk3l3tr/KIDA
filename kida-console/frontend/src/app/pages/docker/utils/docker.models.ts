@@ -35,10 +35,6 @@ export interface DockerContainers {
   containers: DockerContainer[];
   [key: string]: unknown;
 }
-export interface ComposeVersion {
-  version: string;
-  [key: string]: unknown;
-}
 export interface ComposeService {
   name: string | null;
   containers: DockerContainer[];

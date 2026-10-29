@@ -33,18 +33,6 @@ describe('SystemFanRow', () => {
     }
   });
 
-  it('shows received values and unknown warnings without inventing a temperature', () => {
-    const fixture = TestBed.createComponent(SystemFanRow);
-    fixture.componentRef.setInput('reading', sensorReadings({ sensors: [{
-      label: 'fan1', device: 'device', value: 0, unit: 'RPM', status: 'FUTURE', alarm: null,
-    }] })[0]);
-    fixture.detectChanges();
-    const text = fixture.nativeElement.textContent;
-    for (const value of ['fan1', 'device', '0', 'RPM', 'FUTURE', 'Alarma: Desconocido', 'Fallo: Desconocido']) expect(text).toContain(value);
-    expect(text).not.toContain('Temperatura');
-    expect(fixture.nativeElement.querySelector('.danger')).toBeNull();
-  });
-
   it('marks alarms, faults and critical status as danger even while spinning', () => {
     const fixture = TestBed.createComponent(SystemFanRow);
     for (const warning of [{ alarm: true }, { fault: true }, { status: 'CRITICAL' }]) {

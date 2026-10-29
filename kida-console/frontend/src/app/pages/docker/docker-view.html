@@ -1,11 +1,6 @@
 <ion-content>
   <div class="console-layout docker-layout">
-    <header class="docker-heading">
-      <h1 tabindex="-1" #heading>Docker &amp; Compose</h1>
-      <p>Consulta el inventario de contenedores y los proyectos Compose observados.</p>
-    </header>
     <app-docker-indicators />
-    <app-docker-compose-version [tab]="tab" />
     <div aria-live="polite">
       @if (state.busy()) {
         <p>Acción o actualización posterior pendiente…</p>
@@ -23,8 +18,7 @@
       <section aria-labelledby="docker-projects-title">
         <div class="section-header">
           <div>
-            <h2 id="docker-projects-title">Proyectos observados</h2>
-            <p>Servicios y contenedores agrupados por proyecto.</p>
+            <h2 id="docker-projects-title" #listHeading tabindex="-1">Proyectos observados</h2>
           </div>
           <button
             type="button"
@@ -60,14 +54,6 @@
               <p>No hay proyectos Compose.</p>
             }
           </div>
-          <p>
-            Los proyectos se han observado en Docker Compose. Observado no significa creado ni
-            administrado por KIDA.
-          </p>
-          <details>
-            <summary>Datos de proyectos (JSON interpretado)</summary>
-            <pre>{{ data | json }}</pre>
-          </details>
         }
       </section>
     } @else {
@@ -78,7 +64,6 @@
         <div class="section-header">
           <div>
             <h2 id="docker-containers-title" #listHeading tabindex="-1">Contenedores Docker</h2>
-            <p>Consulta el inventario de contenedores del servidor.</p>
           </div>
           <button
             type="button"
@@ -165,14 +150,13 @@
                       [inert]="!state.visibleContainerIds().has(container.id)"
                     >
                       <td>
-                        <span class="mobile-label">Contenedor</span
-                        ><strong>{{ container.name }}</strong>
+                        <span class="mobile-label">Contenedor</span>
                         <button
                           type="button"
                           [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
                           (click)="state.openContainer(container.id, 'inventory')"
                         >
-                          Inspeccionar
+                          {{ container.name }}
                         </button>
                       </td>
                       <td>
@@ -220,8 +204,6 @@
             } @else if (!state.visibleContainers().length) {
               <p>No hay contenedores que coincidan con la búsqueda y los filtros.</p>
             }
-            <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
-            <button type="button" (click)="state.openInventory()">Ver JSON del inventario</button>
           }
         </div>
       </section>
@@ -229,21 +211,9 @@
     <app-side-panel
       [open]="panelOpen()"
       [focusTrap]="state.pending() === null"
-      [title]="
-        state.inspectedContainer()
-          ? 'Inspeccionar contenedor'
-          : state.projectPanelOpen() !== null
-            ? 'Inspeccionar proyecto'
-            : state.inventoryPanelOpen()
-              ? 'JSON del inventario'
-              : 'Docker Compose'
-      "
-      [subtitle]="
-        state.inspectedContainer()?.id ??
-        state.projectPanelOpen() ??
-        (state.inventoryPanelOpen() ? 'Lectura completa del inventario' : 'Lectura de versión')
-      "
-      [fallbackFocus]="heading"
+      [title]="state.inspectedContainer() ? 'Inspeccionar contenedor' : 'Inspeccionar proyecto'"
+      [subtitle]="state.inspectedContainer()?.id ?? state.projectPanelOpen() ?? undefined"
+      [fallbackFocus]="listHeading()?.nativeElement ?? null"
       (closed)="closePanel()"
     >
       @if (state.inspectedContainer(); as selected) {
@@ -339,74 +309,15 @@
             } @empty {
               <p>Sin servicios.</p>
             }
-            <details>
-              <summary>Datos de inspección (JSON interpretado)</summary>
-              <p>
-                Los datos JSON se interpretan con JavaScript; no representan el JSON original
-                exacto.
-              </p>
-              @if (state.limitedPrecision(project)) {
-                <p role="status">
-                  Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
-                </p>
-              }
-              <pre>{{ project | json }}</pre>
-            </details>
           }
-        }
-      } @else if (state.inventoryPanelOpen()) {
-        @if (state.inventory.loading()) {
-          <p role="status">Actualizando inventario…</p>
-        }
-        @if (state.inventory.error()) {
-          <p role="alert">Error de inventario: {{ state.inventory.error() }}</p>
-        }
-        @if (state.inventory.stale()) {
-          <p>Inventario anterior, desactualizado.</p>
-        }
-        @if (state.inventory.data(); as data) {
-          <details>
-            <summary>JSON interpretado</summary>
-            <p>
-              Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.
-            </p>
-            @if (state.limitedPrecision(data)) {
-              <p role="status">
-                Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
-              </p>
-            }
-            <pre>{{ data | json }}</pre>
-          </details>
-        }
-      } @else {
-        @if (state.version.data(); as data) {
-          <h3>Versión detectada</h3>
-          <p>{{ data.version }}</p>
-          @if (state.version.stale()) {
-            <p>Versión anterior, desactualizada.</p>
-          }
-          <details>
-            <summary>JSON interpretado</summary>
-            <p>
-              Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.
-            </p>
-            @if (state.limitedPrecision(data)) {
-              <p role="status">
-                Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
-              </p>
-            }
-            <pre>{{ data | json }}</pre>
-          </details>
         }
       }
     </app-side-panel>
-    <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>
     @if (
       state.limitedPrecision(state.inventory.data()) ||
       state.limitedPrecision(state.projects.data()) ||
       state.limitedPrecision(state.detail.data()) ||
-      state.limitedPrecision(state.result()) ||
-      state.limitedPrecision(state.version.data())
+      state.limitedPrecision(state.result())
     ) {
       <p role="status">
         Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
