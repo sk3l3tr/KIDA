@@ -343,7 +343,7 @@ describe('Docker page', () => {
     expect(panel.fallbackFocus()).toBe(root.querySelector('h1'));
     expect(state.currentContainer()).toEqual(container);
     expect(root.querySelectorAll('tbody .action-buttons button')).toHaveLength(4);
-    expect(root.querySelectorAll('app-side-panel .action-buttons button')).toHaveLength(2);
+    expect(root.querySelectorAll('app-side-panel .action-buttons button')).toHaveLength(3);
     http.expectNone(() => true);
     state.refreshContainers();
     const changed = { ...container, name: 'updated', online: true };
@@ -1108,7 +1108,7 @@ describe('Docker page', () => {
       const scope =
         source === 'row' ? root.querySelector('tbody')! : root.querySelector('app-side-panel')!;
       const buttons = scope.querySelectorAll<HTMLButtonElement>('.action-buttons button');
-      expect(buttons).toHaveLength(source === 'row' ? 4 : 2);
+      expect(buttons).toHaveLength(source === 'row' ? 4 : 3);
       const start = buttons[0];
       expect(start.disabled).toBe(false);
       expect(start.getAttribute('aria-label')).toBe('Arrancar contenedor ' + container.name);
@@ -1183,7 +1183,7 @@ describe('Docker page', () => {
     state.openContainer(container.id, 'projects', project.name);
     const v = view(f, 'projects');
     const host = v.location.nativeElement.querySelector('app-side-panel');
-    expect(host.querySelectorAll('.action-buttons button')).toHaveLength(2);
+    expect(host.querySelectorAll('.action-buttons button')).toHaveLength(3);
     state.inventory.data.set({ ...inventory, containers: [] });
     v.changeDetectorRef.detectChanges();
     expect(host.textContent).toContain('Sin el mismo ID');
@@ -1219,7 +1219,7 @@ describe('Docker page', () => {
       const buttons = root.querySelectorAll<HTMLButtonElement>(
         'app-container-actions .action-buttons button',
       );
-      expect(buttons).toHaveLength(6);
+      expect(buttons).toHaveLength(7);
       expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
     }
     state.prepare('start', container);
@@ -1304,13 +1304,23 @@ describe('Docker page', () => {
       } else expect(state.inspectedContainer()?.id).toBe('another');
     },
   );
-  it.each(['row', 'inventory', 'projects', 'detail'] as const)(
-    'confirms stop from %s with current inventory identity and refreshes without duplicate POSTs',
-    (source) => {
+  it.each(
+    (['row', 'inventory', 'projects', 'detail'] as const).flatMap((source) =>
+      (
+        [
+          ['stop', true],
+          ['restart', true],
+          ['restart', false],
+        ] as const
+      ).map(([action, online]) => ({ source, action, online })),
+    ),
+  )(
+    'confirms $action from $source (online=$online) using current inventory without duplicate POSTs',
+    ({ source, action, online }) => {
       const f = initial(),
         state = f.componentInstance.state;
-      const current = { ...container, online: true, status: 'future-status' };
-      const observed = { ...container, name: 'Compose stale name', online: false };
+      const current = { ...container, online, status: online ? 'exited' : 'running' };
+      const observed = { ...container, name: 'Compose stale name', online: !online };
       const compose = { ...project, services: [{ name: null, containers: [observed] }] };
       state.inventory.data.set({ ...inventory, containers: [current] });
       state.projects.data.set([compose]);
@@ -1326,35 +1336,43 @@ describe('Docker page', () => {
       const root = v.location.nativeElement as HTMLElement;
       const scope =
         source === 'row' ? root.querySelector('tbody')! : root.querySelector('app-side-panel')!;
-      const stop = scope.querySelector<HTMLButtonElement>(
-        'button[aria-label^="Parar contenedor"]',
+      const control = scope.querySelector<HTMLButtonElement>(
+        `button[aria-label^="${action === 'stop' ? 'Parar' : 'Reiniciar'} contenedor"]`,
       )!;
-      expect(stop.disabled).toBe(false);
-      stop.click();
-      stop.click();
+      expect(control.disabled).toBe(false);
+      control.click();
+      control.click();
       v.changeDetectorRef.detectChanges();
       f.detectChanges();
       TestBed.tick();
       expect(Object.isFrozen(state.pending())).toBe(true);
-      expect(state.pending()).toEqual({ action: 'stop', name: container.name, id: container.id });
+      expect(state.pending()).toEqual({ action, name: container.name, id: container.id });
       const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
       expect(dialog.open).toBe(true);
       expect(dialog.textContent).toContain(container.name);
       expect(dialog.textContent).toContain(container.id);
-      expect(dialog.textContent).toContain('interrumpir los servicios');
+      expect(dialog.textContent).toContain(
+        action === 'restart'
+          ? 'interrumpir temporalmente los servicios'
+          : 'interrumpir los servicios',
+      );
       expect(dialog.querySelector('img')).toBeNull();
-      http.expectNone(`${base}/containers/stop`);
+      http.expectNone(`${base}/containers/${action}`);
       state.inventory.data.set({
         ...inventory,
         containers: [{ ...current, name: 'new inventory name' }],
       });
       f.nativeElement.querySelector('.dialog-buttons button:last-child').click();
       state.confirm();
-      const request = http.expectOne(`${base}/containers/stop`);
+      const request = http.expectOne(`${base}/containers/${action}`);
       expect(request.request.body).toEqual({ container: container.id });
-      expect(state.resultLabel()).toBe(`stop: ${container.name} (${container.id})`);
-      expect(state.inventory.data()?.containers[0].online).toBe(true);
-      request.flush({ container: container.id, status: 'stopped', extra: null });
+      expect(state.resultLabel()).toBe(`${action}: ${container.name} (${container.id})`);
+      expect(state.inventory.data()?.containers[0].online).toBe(online);
+      request.flush({
+        container: container.id,
+        status: action === 'stop' ? 'stopped' : 'restarted',
+        extra: null,
+      });
       http.expectOne(`${base}/containers`).flush(inventory);
       http.expectOne(`${base}/compose/projects`).flush([compose]);
       if (source === 'detail')
@@ -1363,14 +1381,18 @@ describe('Docker page', () => {
           .flush(compose);
       v.changeDetectorRef.detectChanges();
       expect(state.busy()).toBe(false);
-      expect(state.result()).toEqual({ container: container.id, status: 'stopped', extra: null });
-      expect(stop.disabled).toBe(true);
+      expect(state.result()).toEqual({
+        container: container.id,
+        status: action === 'stop' ? 'stopped' : 'restarted',
+        extra: null,
+      });
+      expect(control.disabled).toBe(action === 'stop');
       if (source !== 'row') {
         const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(SidePanel);
         expect(panel.open()).toBe(true);
         expect(panel.focusTrap()).toBe(true);
         expect(scope.textContent).toContain('Respuesta de CORE:');
-        expect(scope.textContent).toContain('stopped');
+        expect(scope.textContent).toContain(action === 'stop' ? 'stopped' : 'restarted');
       }
     },
   );
@@ -1396,164 +1418,187 @@ describe('Docker page', () => {
     v.changeDetectorRef.detectChanges();
     expect(stop.disabled).toBe(false);
   });
-  it.each(['button', 'escape', 'cancel-event'] as const)(
-    'cancels inspector stop by %s, restores the lower focus trap and requests focus on its trigger',
-    async (mode) => {
+  describe.each(['stop', 'restart'] as const)('%s confirmation safeguards', (action) => {
+    const label = action === 'stop' ? 'Parar' : 'Reiniciar';
+    it.each(['button', 'escape', 'cancel-event'] as const)(
+      'cancels inspector action by %s, restores the lower focus trap and requests focus on its trigger',
+      async (mode) => {
+        const f = initial(),
+          state = f.componentInstance.state;
+        state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
+        state.openContainer(container.id, 'inventory');
+        const v = view(f, 'containers');
+        const root = v.location.nativeElement as HTMLElement;
+        document.body.append(root);
+        const stop = root.querySelector<HTMLButtonElement>(
+          `app-side-panel button[aria-label^="${label} contenedor"]`,
+        )!;
+        const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(SidePanel);
+        const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(stop);
+        const focus = vi.spyOn(stop, 'focus').mockImplementation(() => {});
+        const show = vi
+          .spyOn(HTMLDialogElement.prototype, 'showModal')
+          .mockImplementation(function (this: HTMLDialogElement) {
+            expect(panel.focusTrap()).toBe(false);
+            this.open = true;
+          });
+        const documentKeydown = vi.fn();
+        document.addEventListener('keydown', documentKeydown);
+        try {
+          stop.click();
+          expect(show).not.toHaveBeenCalled();
+          v.changeDetectorRef.detectChanges();
+          f.detectChanges();
+          TestBed.tick();
+          expect(show).toHaveBeenCalledOnce();
+          const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
+          if (mode === 'button') dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
+          else if (mode === 'escape') {
+            const event = new KeyboardEvent('keydown', {
+              key: 'Escape',
+              bubbles: true,
+              cancelable: true,
+            });
+            dialog.dispatchEvent(event);
+            expect(event.defaultPrevented).toBe(true);
+            expect(documentKeydown).not.toHaveBeenCalled();
+          } else {
+            const event = new Event('cancel', { cancelable: true });
+            dialog.dispatchEvent(event);
+            expect(event.defaultPrevented).toBe(true);
+          }
+          v.changeDetectorRef.detectChanges();
+          f.detectChanges();
+          TestBed.tick();
+          await f.whenStable();
+          expect(dialog.open).toBe(false);
+          expect(state.pending()).toBeNull();
+          expect(panel.focusTrap()).toBe(true);
+          expect(panel.open()).toBe(true);
+          expect(focus).toHaveBeenCalledOnce();
+          state.confirm();
+          http.expectNone(() => true);
+        } finally {
+          state.cancel();
+          show.mockRestore();
+          active.mockRestore();
+          focus.mockRestore();
+          document.removeEventListener('keydown', documentKeydown);
+          root.remove();
+        }
+      },
+    );
+    it.each([
+      'close',
+      'version',
+      'container',
+      'inventory',
+      'project',
+      'tab',
+      'leave',
+      'session',
+    ] as const)('invalidates an inspector action confirmation on %s without sending', (mode) => {
       const f = initial(),
         state = f.componentInstance.state;
       state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
       state.openContainer(container.id, 'inventory');
       const v = view(f, 'containers');
-      const root = v.location.nativeElement as HTMLElement;
-      document.body.append(root);
-      const stop = root.querySelector<HTMLButtonElement>(
-        'app-side-panel button[aria-label^="Parar contenedor"]',
-      )!;
-      const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(SidePanel);
-      const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(stop);
-      const focus = vi.spyOn(stop, 'focus').mockImplementation(() => {});
-      const show = vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
-        this: HTMLDialogElement,
-      ) {
-        expect(panel.focusTrap()).toBe(false);
-        this.open = true;
-      });
-      const documentKeydown = vi.fn();
-      document.addEventListener('keydown', documentKeydown);
-      try {
-        stop.click();
-        expect(show).not.toHaveBeenCalled();
-        v.changeDetectorRef.detectChanges();
-        f.detectChanges();
-        TestBed.tick();
-        expect(show).toHaveBeenCalledOnce();
-        const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
-        if (mode === 'button') dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
-        else if (mode === 'escape') {
-          const event = new KeyboardEvent('keydown', {
-            key: 'Escape',
-            bubbles: true,
-            cancelable: true,
-          });
-          dialog.dispatchEvent(event);
-          expect(event.defaultPrevented).toBe(true);
-          expect(documentKeydown).not.toHaveBeenCalled();
-        } else {
-          const event = new Event('cancel', { cancelable: true });
-          dialog.dispatchEvent(event);
-          expect(event.defaultPrevented).toBe(true);
-        }
-        v.changeDetectorRef.detectChanges();
-        f.detectChanges();
-        TestBed.tick();
-        await f.whenStable();
-        expect(dialog.open).toBe(false);
-        expect(state.pending()).toBeNull();
-        expect(panel.focusTrap()).toBe(true);
-        expect(panel.open()).toBe(true);
-        expect(focus).toHaveBeenCalledOnce();
-        state.confirm();
-        http.expectNone(() => true);
-      } finally {
-        state.cancel();
-        show.mockRestore();
-        active.mockRestore();
-        focus.mockRestore();
-        document.removeEventListener('keydown', documentKeydown);
-        root.remove();
-      }
-    },
-  );
-  it.each([
-    'close',
-    'version',
-    'container',
-    'inventory',
-    'project',
-    'tab',
-    'leave',
-    'session',
-  ] as const)('invalidates an inspector stop confirmation on %s without sending', (mode) => {
-    const f = initial(),
-      state = f.componentInstance.state;
-    state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
-    state.openContainer(container.id, 'inventory');
-    const v = view(f, 'containers');
-    state.prepare('stop', container);
-    v.changeDetectorRef.detectChanges();
-    f.detectChanges();
-    TestBed.tick();
-    expect(f.nativeElement.querySelector('dialog').open).toBe(true);
-    if (mode === 'close') v.instance.closePanel();
-    else if (mode === 'version') state.openVersion('containers');
-    else if (mode === 'container') state.openContainer('another', 'inventory');
-    else if (mode === 'inventory') state.openInventory();
-    else if (mode === 'project') {
-      state.inspect(project.name);
-      http
-        .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
-        .flush(project);
-    } else if (mode === 'tab') state.leaveTab();
-    else if (mode === 'leave') state.ionViewWillLeave();
-    else TestBed.inject(ThemeIdentity).begin();
-    v.changeDetectorRef.detectChanges();
-    expect(state.pending()).toBeNull();
-    expect(f.nativeElement.querySelector('dialog').open).toBe(false);
-    expect(
-      getDebugNode(v.location.nativeElement.querySelector('app-side-panel'))!
-        .injector.get(SidePanel)
-        .focusTrap(),
-    ).toBe(true);
-    state.confirm();
-    http.expectNone(`${base}/containers/stop`);
-  });
-  it('does not open a deferred confirmation after the inspector closes before rendering', () => {
-    const f = initial(),
-      state = f.componentInstance.state;
-    state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
-    state.openContainer(container.id, 'inventory');
-    const v = view(f, 'containers');
-    state.prepare('stop', container);
-    v.instance.closePanel();
-    v.changeDetectorRef.detectChanges();
-    f.detectChanges();
-    TestBed.tick();
-    expect(state.pending()).toBeNull();
-    expect(f.nativeElement.querySelector('dialog').open).toBe(false);
-    state.confirm();
-    http.expectNone(() => true);
-  });
-  it('retains a successful stop result after failed refreshes and blocks uncertain stop without retrying', () => {
-    const f = initial(),
-      state = f.componentInstance.state;
-    state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
-    state.openContainer(container.id, 'inventory');
-    const v = view(f, 'containers');
-    const host = v.location.nativeElement.querySelector('app-side-panel');
-    const prepare = () => {
-      host.querySelector('button[aria-label^="Parar contenedor"]').click();
+      state.prepare(action, container);
       v.changeDetectorRef.detectChanges();
       f.detectChanges();
       TestBed.tick();
+      expect(f.nativeElement.querySelector('dialog').open).toBe(true);
+      if (mode === 'close') v.instance.closePanel();
+      else if (mode === 'version') state.openVersion('containers');
+      else if (mode === 'container') state.openContainer('another', 'inventory');
+      else if (mode === 'inventory') state.openInventory();
+      else if (mode === 'project') {
+        state.inspect(project.name);
+        http
+          .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+          .flush(project);
+      } else if (mode === 'tab') state.leaveTab();
+      else if (mode === 'leave') state.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).begin();
+      v.changeDetectorRef.detectChanges();
+      expect(state.pending()).toBeNull();
+      expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+      expect(
+        getDebugNode(v.location.nativeElement.querySelector('app-side-panel'))!
+          .injector.get(SidePanel)
+          .focusTrap(),
+      ).toBe(true);
       state.confirm();
-    };
-    prepare();
-    http.expectOne(`${base}/containers/stop`).flush({ container: container.id, status: 'stopped' });
-    http.expectOne(`${base}/containers`).flush({}, fail);
-    http.expectOne(`${base}/compose/projects`).flush({}, fail);
-    v.changeDetectorRef.detectChanges();
-    expect(host.textContent).toContain('stopped');
-    expect(state.inventory.stale()).toBe(true);
-    expect(state.inventory.error()).not.toBe('');
-    prepare();
-    http
-      .expectOne(`${base}/containers/stop`)
-      .flush({ detail: { code: 'core_timeout' } }, { status: 504, statusText: 'Timeout' });
-    v.changeDetectorRef.detectChanges();
-    expect(host.textContent).toContain('No se pudo confirmar el resultado');
-    expect(host.querySelector('button[aria-label^="Parar contenedor"]').disabled).toBe(true);
-    state.prepare('stop', container);
-    http.expectNone(() => true);
+      http.expectNone(`${base}/containers/${action}`);
+    });
+    it('does not open a deferred confirmation after the inspector closes before rendering', () => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
+      state.openContainer(container.id, 'inventory');
+      const v = view(f, 'containers');
+      state.prepare(action, container);
+      v.instance.closePanel();
+      v.changeDetectorRef.detectChanges();
+      f.detectChanges();
+      TestBed.tick();
+      expect(state.pending()).toBeNull();
+      expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+      state.confirm();
+      http.expectNone(() => true);
+    });
+    it('retains a successful action result after failed refreshes and blocks uncertain action without retrying', () => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
+      state.openContainer(container.id, 'inventory');
+      const v = view(f, 'containers');
+      const host = v.location.nativeElement.querySelector('app-side-panel');
+      const prepare = () => {
+        host.querySelector(`button[aria-label^="${label} contenedor"]`).click();
+        v.changeDetectorRef.detectChanges();
+        f.detectChanges();
+        TestBed.tick();
+        state.confirm();
+      };
+      prepare();
+      http
+        .expectOne(`${base}/containers/${action}`)
+        .flush({ container: container.id, status: action === 'stop' ? 'stopped' : 'restarted' });
+      http.expectOne(`${base}/containers`).flush({}, fail);
+      http.expectOne(`${base}/compose/projects`).flush({}, fail);
+      v.changeDetectorRef.detectChanges();
+      expect(host.textContent).toContain(action === 'stop' ? 'stopped' : 'restarted');
+      expect(state.inventory.stale()).toBe(true);
+      expect(state.inventory.error()).not.toBe('');
+      prepare();
+      http
+        .expectOne(`${base}/containers/${action}`)
+        .flush({ detail: { code: 'core_timeout' } }, { status: 504, statusText: 'Timeout' });
+      v.changeDetectorRef.detectChanges();
+      expect(host.textContent).toContain('No se pudo confirmar el resultado');
+      expect(host.querySelector(`button[aria-label^="${label} contenedor"]`).disabled).toBe(true);
+      state.prepare(action, container);
+      http.expectNone(() => true);
+      state.refreshProjects();
+      http.expectOne(`${base}/compose/projects`).flush([project]);
+      expect(state.uncertain()).toBe(true);
+      state.refreshContainers();
+      http.expectOne(`${base}/containers`).flush({}, fail);
+      expect(state.actionLocked(action, container.id)).toBe(true);
+      state.prepare(action, container);
+      http.expectNone(`${base}/containers/${action}`);
+      state.refreshContainers();
+      http.expectOne(`${base}/containers`).flush({
+        ...inventory,
+        containers: [{ ...container, online: true }],
+      });
+      v.changeDetectorRef.detectChanges();
+      expect(state.uncertain()).toBe(false);
+      expect(state.actionLocked(action, container.id)).toBe(false);
+      expect(host.textContent).toContain('No se pudo confirmar el resultado');
+      http.expectNone(`${base}/containers/${action}`);
+    });
   });
   it('freezes confirmations, cancels without writes and consumes double confirmation once', () => {
     const f = initial(),

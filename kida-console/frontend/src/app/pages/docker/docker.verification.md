@@ -220,3 +220,31 @@ despliegue.
   Interacción real diálogo nativo/modal Ionic, foco, accesibilidad, temas y
   responsive pendientes de navegador. Sin backend ni Docker real.
 - Cambios ajenos presentes en System y themes.scss preservados.
+
+## Historia #15: reiniciar contenedor (29 de octubre de 2026)
+
+- Reiniciar se incorpora al inspector con los controles compartidos; las cuatro
+  operaciones siguen disponibles en inventario. Se conserva la preparación y
+  ejecución única de la fachada, sin restricciones adicionales por online, estado
+  literal, salud ni asociación. Sin cambios de contratos, canales o dependencias.
+- La confirmación añade aviso de interrupción temporal para Reiniciar. Conserva
+  nombre/ID completos del inventario actual, instantánea inmutable, cancelación,
+  coordinación de foco y protección contra doble clic/doble confirmación.
+- Pruebas de fila e inspectores de inventario, proyectos e inspección: Reiniciar
+  online y offline, fuentes discordantes, sin cambios optimistas, refrescos y
+  resultado conservado. Se reutilizan los casos de Parar también para Reiniciar:
+  cancelación por botón/Escape/evento nativo, retorno de foco, invalidación por
+  selección/tab/salida/sesión y apertura diferida invalidada. Ningún caso previo
+  se retira; se actualizan las cantidades esperadas al añadir el tercer control.
+- Resultado incierto sin reenvío: ni actualizar proyectos ni fallar el refresco
+  del inventario desbloquean escrituras. Solo una lectura correcta del inventario
+  permite una nueva acción, conservando el aviso anterior y sin POST automático.
+- Node 24.15.0: 125/125 pruebas Docker aprobadas; suite global 568/571. Persisten
+  los tres fallos documentados en #14: cabecera Auth, valores desconocidos de
+  SystemFanRow y espacio de la unidad en SystemSensors. Build de producción
+  bloqueado por presupuesto inicial de 1 MB, exceso 22.30 kB. Sin modificar
+  presupuestos ni código ajeno. `git diff --check` correcto.
+- Sin Playwright por instrucción expresa. Las pruebas simulan el diálogo nativo
+  y la proyección del panel; foco real, interacción con Ionic, accesibilidad,
+  temas y responsive pendientes de navegador. Sin backend ni Docker real.
+- Revisión independiente del diff y la cobertura completada sin hallazgos.

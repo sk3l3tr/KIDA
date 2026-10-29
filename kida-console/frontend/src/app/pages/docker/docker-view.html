@@ -275,7 +275,7 @@
                   Sin el mismo ID en el inventario principal, las operaciones no están disponibles.
                 </p>
               } @else {
-                <app-container-actions [containerId]="container.id" [actions]="['start', 'stop']" />
+                <app-container-actions [containerId]="container.id" [actions]="['start', 'stop', 'restart']" />
                 <p>Las demás operaciones están disponibles desde el inventario.</p>
               }
             </section>

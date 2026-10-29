@@ -18,6 +18,8 @@
       <p>ID: {{ action.id }}</p>
       @if (action.action === 'delete') {
         <p>Eliminar es irreversible. CORE decidirá si puede eliminar el contenedor.</p>
+      } @else if (action.action === 'restart') {
+        <p>Reiniciar puede interrumpir temporalmente los servicios del contenedor.</p>
       } @else {
         <p>Esta operación puede interrumpir los servicios del contenedor.</p>
       }
