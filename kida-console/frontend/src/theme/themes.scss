@@ -7,13 +7,20 @@
 $palettes: (
   professional: (
     light: (
-      #f3f6fa,
+      // Background principal
+      #eaf1f5,
+      // Superficie / Cards
       #ffffff,
-      #182b3d,
-      #526579,
-      #155f75,
-      #ffffff,
-      #718497,
+      // Texto principal
+      #142b38,
+      // Texto secundario
+      #405b6b,
+      // Accent / Primary
+      #08796f,
+      // Superficie con tinte turquesa
+      #d8eee9,
+      // Bordes / Elementos secundarios
+      #9eb3bf,
     ),
     dark: (
       #080f17,
