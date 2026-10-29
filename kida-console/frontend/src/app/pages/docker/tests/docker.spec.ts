@@ -503,6 +503,87 @@ describe('Docker page', () => {
     TestBed.inject(ThemeIdentity).begin();
     expect(state.search()).toBe('');
   });
+  it('combines activity based on online with search, preserving source readings and order', () => {
+    const f = enter(),
+      state = f.componentInstance.state;
+    const first = {
+      ...container,
+      id: 'first',
+      name: 'match first',
+      online: true,
+      status: 'exited',
+    };
+    const second = {
+      ...container,
+      id: 'second',
+      name: 'match second',
+      online: false,
+      status: 'running',
+    };
+    const third = { ...container, id: 'third', name: 'other', online: true };
+    const data = { ...inventory, containers: [first, second, third] };
+    http.expectOne(`${base}/containers`).flush(data);
+    http.expectOne(`${base}/compose/version`).flush({ version: 'v2' });
+    http.expectOne(`${base}/compose/projects`).flush([project]);
+    const v = view(f, 'containers');
+    const root = v.location.nativeElement as HTMLElement;
+    const select = root.querySelector<HTMLSelectElement>('#docker-activity')!;
+    const choose = (value: string) => {
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      v.changeDetectorRef.detectChanges();
+    };
+    expect(select.value).toBe('all');
+    expect(state.visibleContainers()).toEqual([first, second, third]);
+    choose('online');
+    expect(state.visibleContainers()).toEqual([first, third]);
+    expect(root.textContent).toContain('2 resultados');
+    expect(root.querySelectorAll('tbody tr:not(.row-hidden)')).toHaveLength(2);
+    state.search.set(' MATCH ');
+    choose('online');
+    expect(state.visibleContainers()).toEqual([first]);
+    choose('offline');
+    expect(state.visibleContainers()).toEqual([second]);
+    expect(root.textContent).toContain('1 resultado');
+    choose('all');
+    expect(state.visibleContainers()).toEqual([first, second]);
+    expect(state.inventory.data()).toEqual(data);
+    expect(state.projects.data()).toEqual([project]);
+    expect(root.querySelector('app-docker-indicators')!.textContent).toContain('99');
+    expect(root.querySelector('.inventory-panel > details > pre')!.textContent).toContain('third');
+    state.search.set('other');
+    choose('offline');
+    expect(root.textContent).toContain('0 resultados');
+    expect(root.textContent).toContain('No hay contenedores que coincidan');
+    expect(root.textContent).not.toContain('No hay contenedores.');
+    expect(
+      Array.from(root.querySelectorAll<HTMLElement>('tbody tr')).every((row) => row.inert),
+    ).toBe(true);
+    http.expectNone(() => true);
+  });
+  it.each(['leave', 'session'] as const)(
+    'retains activity across tabs and refresh, resets on %s',
+    (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.activity.set('offline');
+      state.leaveTab();
+      expect(state.activity()).toBe('offline');
+      state.refreshContainers();
+      http
+        .expectOne(`${base}/containers`)
+        .flush({ ...inventory, containers: [{ ...container, online: true }] });
+      expect(state.activity()).toBe('offline');
+      expect(state.visibleContainers()).toEqual([]);
+      state.refreshContainers();
+      http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+      const v = view(f, 'containers');
+      expect(v.location.nativeElement.textContent).toContain('No hay contenedores.');
+      if (mode === 'leave') state.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).begin();
+      expect(state.activity()).toBe('all');
+    },
+  );
   it('recalculates search for unavailable, stale and ambiguous associations and refreshed inventories', () => {
     const f = enter(),
       state = f.componentInstance.state;

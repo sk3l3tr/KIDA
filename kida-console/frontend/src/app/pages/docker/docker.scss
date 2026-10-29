@@ -79,6 +79,10 @@ dialog {
   flex: 1 1 16rem;
   min-width: 0;
 }
+.inventory-tools select {
+  max-width: 100%;
+  min-width: 0;
+}
 .table-wrap {
   overflow-x: auto;
 }

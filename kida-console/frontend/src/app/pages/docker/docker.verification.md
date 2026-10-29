@@ -85,3 +85,19 @@ de archivos y sockets.
 Solo cambian el frontal y su documentación; sin cambios de backend, CORE, CLI,
 vendor, autenticación, transporte compartido ni dependencias. Sin commit, push o
 despliegue.
+
+## Historia #9: filtro de actividad (29 de octubre de 2026)
+
+- Selector local Todos / En ejecución / Fuera de línea, basado en `online` y
+  combinado mediante AND con la búsqueda. Conserva orden, indicadores, JSON y
+  operaciones; persiste entre tabs/refrescos y se reinicia al salir/cambiar sesión.
+- Node 24.15.0: suite Docker 44/44 aprobadas; suite global 488/490. Fallan
+  la cabecera de Auth (` / Console`) y el texto de límite crítico de System
+  (`100  C` frente a `100 C`), fuera de los archivos modificados. Ambos
+  fallos se reproducen en la copia temporal sin los cambios de esta historia.
+- Build de producción: falla el presupuesto inicial de 1 MB (exceso 22.28 kB).
+  Una copia temporal sin los cambios de esta historia reproduce el mismo exceso;
+  no se modifican presupuestos ni se amplía el alcance para corregirlo.
+- Revisión independiente sin hallazgos; `git diff --check` correcto.
+- Sin Playwright por instrucción expresa. Pendientes comprobaciones visuales,
+  temas, responsive y accesibilidad real en navegador. Sin backend/Docker real.

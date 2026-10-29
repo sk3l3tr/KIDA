@@ -146,6 +146,17 @@
                 [value]="state.search()"
                 (input)="state.search.set($any($event.target).value)"
               />
+              <label for="docker-activity">Actividad</label>
+              <select
+                id="docker-activity"
+                class="console-control"
+                [value]="state.activity()"
+                (change)="state.activity.set($any($event.target).value)"
+              >
+                <option value="all">Todos</option>
+                <option value="online">En ejecución</option>
+                <option value="offline">Fuera de línea</option>
+              </select>
               <span aria-live="polite"
                 >{{ state.visibleContainers().length }}
                 {{ state.visibleContainers().length === 1 ? 'resultado' : 'resultados' }}</span
@@ -245,7 +256,7 @@
             @if (!data.containers.length) {
               <p>No hay contenedores.</p>
             } @else if (!state.visibleContainers().length) {
-              <p>No hay contenedores que coincidan con la búsqueda.</p>
+              <p>No hay contenedores que coincidan con la búsqueda y los filtros.</p>
             }
             <p>El código de salida 137 no establece por sí solo la causa de la detención.</p>
             <details>

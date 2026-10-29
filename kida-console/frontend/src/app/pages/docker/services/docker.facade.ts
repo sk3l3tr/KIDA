@@ -59,12 +59,16 @@ export class DockerFacade implements OnDestroy {
     return projects === null ? null : composeAssociations(projects);
   });
   readonly search = signal('');
+  readonly activity = signal<'all' | 'online' | 'offline'>('all');
   readonly visibleContainers = computed(() => {
     const containers = this.inventory.data()?.containers ?? [];
     const query = this.search().trim().toLowerCase();
-    if (!query) return containers;
+    const activity = this.activity();
     const associations = this.associations();
     return containers.filter((container) => {
+      if (activity === 'online' && !container.online) return false;
+      if (activity === 'offline' && container.online) return false;
+      if (!query) return true;
       const association = associations?.get(container.id);
       const fields = [container.name, container.id, container.image];
       if (association && association !== 'ambiguous') {
@@ -154,6 +158,7 @@ export class DockerFacade implements OnDestroy {
     this.expandedServices.set({});
     this.inspectedContainer.set(null);
     this.search.set('');
+    this.activity.set('all');
     this.busy.set(false);
     this.uncertain.set(false);
     this.error.set('');
