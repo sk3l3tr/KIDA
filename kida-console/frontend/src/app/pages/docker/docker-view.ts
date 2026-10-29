@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
 import { SidePanel } from '../../components/side-panel/side-panel';
 import { ContainerDetails } from './components/container-details/container-details';
+import { ContainerActions } from './components/container-actions/container-actions';
 import { DockerFacade } from './services/docker.facade';
 import { DockerIndicators } from './components/docker-indicators/docker-indicators';
 import { DockerComposeVersion } from './components/docker-compose-version/docker-compose-version';
@@ -16,6 +17,7 @@ import { DockerProjectCard } from './components/docker-project-card/docker-proje
     SidePanel,
     JsonPipe,
     ContainerDetails,
+    ContainerActions,
     DockerIndicators,
     DockerComposeVersion,
     DockerProjectCard,

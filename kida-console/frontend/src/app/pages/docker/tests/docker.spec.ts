@@ -342,7 +342,8 @@ describe('Docker page', () => {
     expect(panel.open()).toBe(true);
     expect(panel.fallbackFocus()).toBe(root.querySelector('h1'));
     expect(state.currentContainer()).toEqual(container);
-    expect(root.querySelectorAll('.action-buttons button')).toHaveLength(4);
+    expect(root.querySelectorAll('tbody .action-buttons button')).toHaveLength(4);
+    expect(root.querySelectorAll('app-side-panel .action-buttons button')).toHaveLength(1);
     http.expectNone(() => true);
     state.refreshContainers();
     const changed = { ...container, name: 'updated', online: true };
@@ -1085,6 +1086,223 @@ describe('Docker page', () => {
     expect(rendered.textContent).toContain('future');
     expect(rendered.querySelectorAll('.container-list button:disabled')).toHaveLength(0);
   });
+  it.each(['row', 'inventory', 'projects', 'detail'] as const)(
+    'starts from %s using current inventory identity, sends once and refreshes both sources',
+    (source) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      const observed = { ...container, name: 'Compose old name', online: true };
+      const compose = { ...project, services: [{ name: null, containers: [observed] }] };
+      state.projects.data.set([compose]);
+      if (source === 'detail') {
+        state.inspect(project.name);
+        http
+          .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+          .flush(compose);
+      }
+      const v = view(f, source === 'projects' || source === 'detail' ? 'projects' : 'containers');
+      if (source !== 'row') state.openContainer(container.id, source, project.name);
+      v.changeDetectorRef.detectChanges();
+      const root = v.location.nativeElement as HTMLElement;
+      const scope =
+        source === 'row' ? root.querySelector('tbody')! : root.querySelector('app-side-panel')!;
+      const buttons = scope.querySelectorAll<HTMLButtonElement>('.action-buttons button');
+      expect(buttons).toHaveLength(source === 'row' ? 4 : 1);
+      const start = buttons[0];
+      expect(start.disabled).toBe(false);
+      expect(start.getAttribute('aria-label')).toBe('Arrancar contenedor ' + container.name);
+      start.click();
+      start.click();
+      v.changeDetectorRef.detectChanges();
+      expect(start.disabled).toBe(true);
+      expect(state.pending()).toBeNull();
+      expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+      const request = http.expectOne(`${base}/containers/start`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual({ container: container.id });
+      expect(state.resultLabel()).toBe(`play: ${container.name} (${container.id})`);
+      expect(state.inventory.data()?.containers[0].online).toBe(false);
+      request.flush({ container: 'canonical', status: 'accepted', extra: null });
+      expect(state.busy()).toBe(true);
+      http
+        .expectOne(`${base}/containers`)
+        .flush({ ...inventory, containers: [{ ...container, online: true }] });
+      http.expectOne(`${base}/compose/projects`).flush([compose]);
+      if (source === 'detail') {
+        expect(state.busy()).toBe(true);
+        http
+          .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+          .flush(compose);
+      }
+      v.changeDetectorRef.detectChanges();
+      expect(state.busy()).toBe(false);
+      expect(start.disabled).toBe(true);
+      expect(state.result()).toEqual({ container: 'canonical', status: 'accepted', extra: null });
+      if (source !== 'row') {
+        expect(state.inspectedContainer()?.source).toBe(source);
+        expect(root.querySelector('app-side-panel')!.textContent).toContain(
+          'Respuesta de CORE: canonical · accepted',
+        );
+      }
+    },
+  );
+  it('blocks start by current online state in both controls and prepare while keeping other row operations', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.inventory.data.set({
+      ...inventory,
+      containers: [{ ...container, online: true, status: 'exited' }],
+    });
+    state.openContainer(container.id, 'inventory');
+    const v = view(f, 'containers');
+    const root = v.location.nativeElement as HTMLElement;
+    const row = root.querySelectorAll<HTMLButtonElement>('tbody .action-buttons button');
+    expect(row).toHaveLength(4);
+    expect(row[0].disabled).toBe(true);
+    expect(
+      Array.from(row)
+        .slice(1)
+        .every((button) => !button.disabled),
+    ).toBe(true);
+    const start = root.querySelector<HTMLButtonElement>('app-side-panel .action-buttons button')!;
+    expect(start.disabled).toBe(true);
+    state.prepare('start', container);
+    http.expectNone(() => true);
+    state.inventory.data.set({
+      ...inventory,
+      containers: [{ ...container, online: false, status: 'running' }],
+    });
+    v.changeDetectorRef.detectChanges();
+    expect(row[0].disabled).toBe(false);
+    expect(start.disabled).toBe(false);
+  });
+  it('removes operations when a Compose target disappears from inventory and rejects absent IDs in prepare', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.openContainer(container.id, 'projects', project.name);
+    const v = view(f, 'projects');
+    const host = v.location.nativeElement.querySelector('app-side-panel');
+    expect(host.querySelectorAll('.action-buttons button')).toHaveLength(1);
+    state.inventory.data.set({ ...inventory, containers: [] });
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain('Sin el mismo ID');
+    expect(host.querySelectorAll('.action-buttons button')).toHaveLength(0);
+    for (const action of state.actions) {
+      expect(state.actionLocked(action, container.id)).toBe(true);
+      state.prepare(action, container);
+    }
+    expect(state.pending()).toBeNull();
+    http.expectNone(() => true);
+  });
+  it.each([
+    'busy',
+    'confirmation',
+    'inventory',
+    'projects',
+    'detail',
+    'uncertain',
+    'missing',
+  ] as const)('blocks both start controls and direct preparation during %s', (mode) => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.openContainer(container.id, 'inventory');
+    const v = view(f, 'containers');
+    if (mode === 'busy') state.busy.set(true);
+    else if (mode === 'confirmation') state.prepare('stop', container);
+    else if (mode === 'uncertain') state.uncertain.set(true);
+    else if (mode === 'missing') state.inventory.data.set(null);
+    else state[mode].loading.set(true);
+    v.changeDetectorRef.detectChanges();
+    const root = v.location.nativeElement as HTMLElement;
+    if (mode !== 'missing') {
+      const buttons = root.querySelectorAll<HTMLButtonElement>(
+        'app-container-actions .action-buttons button',
+      );
+      expect(buttons).toHaveLength(5);
+      expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
+    }
+    state.prepare('start', container);
+    expect(state.actionLocked('start', container.id)).toBe(true);
+    http.expectNone(() => true);
+    if (mode === 'confirmation') state.cancel();
+  });
+  it('keeps inspector start results separate from refresh failures and never retries an uncertain write', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.openContainer(container.id, 'inventory');
+    const v = view(f, 'containers');
+    const host = v.location.nativeElement.querySelector('app-side-panel');
+    host.querySelector('.action-buttons button').click();
+    http
+      .expectOne(`${base}/containers/start`)
+      .flush({ container: container.id, status: 'accepted' });
+    http.expectOne(`${base}/containers`).flush({}, fail);
+    http.expectOne(`${base}/compose/projects`).flush({}, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain('Respuesta de CORE:');
+    expect(host.textContent).toContain('accepted');
+    expect(state.inventory.stale()).toBe(true);
+    expect(state.result()?.status).toBe('accepted');
+    host.querySelector('.action-buttons button').click();
+    http
+      .expectOne(`${base}/containers/start`)
+      .flush({ detail: { code: 'core_timeout' } }, { status: 504, statusText: 'Timeout' });
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain('No se pudo confirmar el resultado');
+    expect(host.querySelector('.action-buttons button').disabled).toBe(true);
+    state.prepare('start', container);
+    http.expectNone(() => true);
+  });
+  it.each(['inventory', 'projects'] as const)(
+    'retains the start result in the %s inspector after inventory refresh removes the target',
+    (source) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.openContainer(container.id, source, project.name);
+      const v = view(f, source === 'inventory' ? 'containers' : 'projects');
+      const host = v.location.nativeElement.querySelector('app-side-panel');
+      host.querySelector('.action-buttons button').click();
+      http
+        .expectOne(`${base}/containers/start`)
+        .flush({ container: container.id, status: 'accepted' });
+      http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+      http.expectOne(`${base}/compose/projects`).flush([project]);
+      v.changeDetectorRef.detectChanges();
+      expect(host.querySelector('.action-buttons button')).toBeNull();
+      expect(host.textContent).toContain(
+        source === 'inventory' ? 'Contenedor no disponible' : 'Sin el mismo ID',
+      );
+      expect(host.textContent).toContain('Acción solicitada:');
+      expect(host.textContent).toContain('Respuesta de CORE:');
+      expect(host.textContent).toContain('accepted');
+      expect(v.instance.panelOpen()).toBe(true);
+    },
+  );
+  it.each(['close', 'version', 'container', 'tab'] as const)(
+    'does not reopen or replace the inspector after a start response on %s',
+    (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.openContainer(container.id, 'inventory');
+      const v = view(f, 'containers');
+      v.location.nativeElement.querySelector('app-side-panel .action-buttons button').click();
+      const request = http.expectOne(`${base}/containers/start`);
+      if (mode === 'close') v.instance.closePanel();
+      else if (mode === 'version') state.openVersion('containers');
+      else if (mode === 'container') state.openContainer('another', 'inventory');
+      else state.leaveTab();
+      request.flush({ container: container.id, status: 'accepted' });
+      http.expectOne(`${base}/containers`).flush(inventory);
+      http.expectOne(`${base}/compose/projects`).flush([project]);
+      v.changeDetectorRef.detectChanges();
+      expect(state.result()?.status).toBe('accepted');
+      if (mode === 'close' || mode === 'tab') expect(v.instance.panelOpen()).toBe(false);
+      else if (mode === 'version') {
+        expect(state.inspectedContainer()).toBeNull();
+        expect(state.versionPanelOpen()).toBe('containers');
+      } else expect(state.inspectedContainer()?.id).toBe('another');
+    },
+  );
   it('freezes confirmations, cancels without writes and consumes double confirmation once', () => {
     const f = initial(),
       v = f.componentInstance.state;

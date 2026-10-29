@@ -208,20 +208,7 @@
                       </td>
                       <td>
                         <span class="mobile-label">Operaciones</span>
-                        <div class="action-buttons">
-                          @for (action of state.actions; track action) {
-                            <button
-                              type="button"
-                              [disabled]="state.locked()"
-                              [attr.aria-label]="
-                                state.labels[action] + ' contenedor ' + container.name
-                              "
-                              (click)="state.prepare(action, container)"
-                            >
-                              <span class="i i-{{ state.labels[action] }}"></span>
-                            </button>
-                          }
-                        </div>
+                        <app-container-actions [containerId]="container.id" [compact]="true" />
                       </td>
                     </tr>
                   }
@@ -286,16 +273,27 @@
                 <p>
                   Sin el mismo ID en el inventario principal, las operaciones no están disponibles.
                 </p>
-              } @else if (state.locked()) {
-                <p>Operaciones temporalmente bloqueadas. Los controles están en el inventario.</p>
               } @else {
-                <p>Operaciones disponibles desde el inventario de contenedores.</p>
+                <app-container-actions [containerId]="container.id" [actions]="['start']" />
+                <p>Las demás operaciones están disponibles desde el inventario.</p>
               }
             </section>
           </app-container-details>
         } @else {
           <p role="status">Contenedor no disponible en esta lectura</p>
         }
+        <div aria-live="polite">
+          @if (state.busy()) {
+            <p>Acción o actualización posterior pendiente…</p>
+          }
+          @if (state.error()) {
+            <p role="alert">{{ state.error() }}</p>
+          }
+          @if (state.result(); as response) {
+            <p>Acción solicitada: {{ state.resultLabel() }}</p>
+            <p>Respuesta de CORE: {{ response.container }} · {{ response.status }}</p>
+          }
+        </div>
       } @else if (state.projectPanelOpen() !== null) {
         @let name = state.projectPanelOpen();
         <h3>Inspección: {{ name }}</h3>

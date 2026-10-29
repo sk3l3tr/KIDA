@@ -357,10 +357,15 @@ export class DockerFacade implements OnDestroy {
         }),
     );
   }
+  actionLocked(action: ContainerAction, id: string): boolean {
+    const container = this.inventory.data()?.containers.find((c) => c.id === id);
+    return this.locked() || !container || (action === 'start' && container.online);
+  }
   prepare(action: ContainerAction, container: DockerContainer): void {
-    if (!this.active || this.locked()) return;
+    const current = this.inventory.data()?.containers.find((c) => c.id === container.id);
+    if (!this.active || !current || this.actionLocked(action, current.id)) return;
     this.trigger = this.document.activeElement;
-    const snapshot = Object.freeze({ action, id: container.id, name: container.name });
+    const snapshot = Object.freeze({ action, id: current.id, name: current.name });
     if (action === 'start') {
       this.execute(snapshot);
       return;

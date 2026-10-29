@@ -1,0 +1,16 @@
+@let current = container();
+<div class="action-buttons">
+  @for (action of actions(); track action) {
+    <button
+      type="button"
+      [disabled]="state.actionLocked(action, containerId())"
+      [attr.aria-label]="labels[action] + ' contenedor ' + (current?.name ?? containerId())"
+      (click)="current && state.prepare(action, current)"
+    >
+      <span class="i i-{{ state.labels[action] }}" aria-hidden="true"></span>
+      @if (!compact()) {
+        {{ labels[action] }}
+      }
+    </button>
+  }
+</div>

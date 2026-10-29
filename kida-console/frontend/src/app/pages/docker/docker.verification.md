@@ -165,3 +165,30 @@ despliegue.
   Escape/fondo, overlays, temas y responsive pendientes en navegador. Las pruebas
   de página proyectan el contenido del panel mediante el host simulado existente.
   Sin backend ni Docker real.
+
+## Historia #13: arrancar contenedor (29 de octubre de 2026)
+
+- Controles compartidos en ContainerActions: las cuatro operaciones siguen en
+  las filas, y el inspector incorpora únicamente Arrancar. Se conservan estilos
+  compactos/adaptables y temas existentes, sin dependencias ni cambios de API.
+- Botón y preparación comprueban los bloqueos comunes y el ID completo en el
+  inventario actual. Arrancar se bloquea con online=true; estado, nombre y actividad
+  de una copia Compose no autorizan la escritura. Sin confirmación para Arrancar,
+  cambios optimistas ni reenvíos; se mantienen los refrescos y resultado compartido.
+- El inspector muestra espera, error y resultado, incluso si el refresco elimina
+  el destino. Cerrar o sustituir el panel durante la escritura no lo reabre ni
+  reemplaza la selección. Las demás operaciones conservan sus confirmaciones.
+- Node 24.15.0: 86/86 pruebas Docker aprobadas. Suite global: 529/532; persisten
+  Auth (cabecera) y System (espaciado de temperatura), y aparece SystemFanRow
+  (espera «Alarma: Desconocido»), coincidiendo con la eliminación de ese texto
+  en la modificación ajena de system-fan-row.html presente durante esta historia.
+  Ese archivo y sus pruebas no se modificaron como parte de #13.
+- Producción sigue bloqueada por presupuesto inicial de 1 MB, exceso 22.28 kB;
+  presupuesto intacto. Whitespace comprobado también en los archivos nuevos.
+- Revisión independiente detectó pérdida del resultado al desaparecer el destino:
+  corregida manteniendo los mensajes fuera de los controles condicionales, con
+  regresiones de desaparición desde inventario y Compose. Segunda revisión sin
+  hallazgos pendientes; pruebas Docker repetidas tras la corrección.
+- Sin Playwright por instrucción expresa. Foco real, overlays, temas y responsive
+  pendientes en navegador; pruebas de página con proyección simulada existente.
+  Sin backend ni Docker real. Cambio ajeno de System preservado.

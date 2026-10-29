@@ -6,8 +6,7 @@
   min-width: 0;
 }
 .section-header,
-.dialog-buttons,
-.action-buttons {
+.dialog-buttons {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -26,10 +25,6 @@
   .project-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-.action-buttons {
-  justify-content: flex-start;
-  margin-top: 0.75rem;
 }
 ul {
   list-style: none;
@@ -108,14 +103,6 @@ dialog {
 .container-list td small {
   display: block;
 }
-.container-list .action-buttons {
-  justify-content: flex-end;
-  gap: 0.25rem;
-  margin: 0;
-}
-.container-list .action-buttons button {
-  padding-inline: 0.45rem;
-}
 .mobile-label {
   display: none;
 }
@@ -167,8 +154,5 @@ dialog {
     display: block;
     font-weight: 600;
     margin-bottom: 0.25rem;
-  }
-  .container-list .action-buttons {
-    justify-content: flex-start;
   }
 }
