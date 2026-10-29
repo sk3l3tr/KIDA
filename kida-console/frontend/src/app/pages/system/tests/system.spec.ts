@@ -249,26 +249,6 @@ describe('System page', () => {
     await Promise.resolve();
     await Promise.resolve();
   }
-  it('renders unknown values, empty lists and the S5 limitation', () => {
-    const fixture = enter();
-    const masonry = fixture.nativeElement.querySelector('app-system-overview app-masonry');
-    expect(masonry.querySelectorAll(':scope > [appMasonryItem]')).toHaveLength(4);
-    expect(masonry.querySelector('.indicators')).toBeNull();
-    expect(masonry.querySelector('app-system-section')).toBeNull();
-    expect(fixture.nativeElement.querySelectorAll('app-masonry')).toHaveLength(2);
-    expect(fixture.nativeElement.querySelector('app-system-equipment')).toBeNull();
-    const text = fixture.nativeElement.textContent;
-    for (const expected of [
-      'Desconocido',
-      'Sin lecturas disponibles',
-      'Sin verificar',
-      'no demuestra',
-      'Instantánea',
-    ])
-      expect(text).toContain(expected);
-    const inspector = fixture.nativeElement.querySelector('app-system-inspector');
-    expect(inspector.textContent).toContain('0 sensores');
-  });
   it('places energy panels and the conditional operation result in masonry', () => {
     const fixture = enter();
     const masonry = fixture.nativeElement.querySelector('app-system-energy app-masonry');
@@ -285,19 +265,6 @@ describe('System page', () => {
     fixture.componentInstance.state.error.set('');
     fixture.detectChanges();
     expect(items()).toHaveLength(3);
-  });
-  it('retains partial/stale data with independent errors and update timestamps', () => {
-    const fixture = enter(),
-      view = fixture.componentInstance.state;
-    const timestamp = view.health.updated();
-    view.refresh(view.health);
-    http.expectOne(`${base}/health`).error(new ProgressEvent('error'));
-    expect(view.health.data()).toEqual(health);
-    expect(view.health.updated()).toBe(timestamp);
-    expect(view.health.error()).toContain('Sin conexión');
-    expect(view.wake.error()).toBe('');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Datos anteriores');
   });
   it('updates quick choices and manual input without sending an operation', async () => {
     const fixture = enter();

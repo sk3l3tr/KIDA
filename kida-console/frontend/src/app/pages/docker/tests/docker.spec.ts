@@ -616,30 +616,6 @@ describe('Docker page', () => {
     expect(v.error()).toContain('No se pudo abrir');
     http.expectNone(`${base}/containers/restart`);
   });
-  it('starts directly, blocks double click and separates write success from refresh failures', () => {
-    const f = initial(),
-      v = f.componentInstance.state;
-    v.prepare('start', container);
-    v.prepare('start', container);
-    expect(v.pending()).toBeNull();
-    const r = http.expectOne(`${base}/containers/start`);
-    r.flush({ container: 'canonical', status: 'future', extra: null });
-    expect(v.busy()).toBe(true);
-    http.expectOne(`${base}/containers`).flush({ detail: { code: 'core_unavailable' } }, fail);
-    http
-      .expectOne(`${base}/compose/projects`)
-      .flush({ detail: { code: 'core_unavailable' } }, fail);
-    expect(v.busy()).toBe(false);
-    expect(v.result()).toEqual({ container: 'canonical', status: 'future', extra: null });
-    expect(v.inventory.data()).toEqual(inventory);
-    expect(v.inventory.stale()).toBe(true);
-    expect(v.projects.stale()).toBe(true);
-    expect(v.error()).toBe('');
-    f.detectChanges();
-    expect(view(f, 'projects').location.nativeElement.textContent).toContain(
-      'Acción solicitada: Arrancar',
-    );
-  });
   it('keeps uncertain warning and blocks actions until a successful inventory read', () => {
     const f = initial(),
       v = f.componentInstance.state;

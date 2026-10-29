@@ -1,7 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
 import { SystemFacade } from '../../services/system.facade';
-import { SystemSectionView } from '../../components/system-section/system-section';
 import {
   SystemStorageCard,
   storageDevices,
@@ -17,7 +16,6 @@ import { Masonry, MasonryItem } from '../../../../components/masonry/masonry';
   selector: 'app-system-overview',
   imports: [
     IonContent,
-    SystemSectionView,
     SystemStorageCard,
     SystemFanRow,
     SystemProcessorPanel,

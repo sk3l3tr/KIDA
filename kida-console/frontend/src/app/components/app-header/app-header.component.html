@@ -3,7 +3,7 @@
   <a href="/"> <strong>KIDA</strong><span class="mutted"> / Console</span></a
   ><span>{{ ownUsername() }}</span>
   <button type="button" class="secondary" [disabled]="busy()" (click)="logout()">
-    {{ busy() ? 'Cerrando sesión…' : 'Cerrar sesión' }}
+    <span class="i i-power"></span>
   </button>
   @if (error()) {
     <p class="error" role="alert">{{ error() }}</p>

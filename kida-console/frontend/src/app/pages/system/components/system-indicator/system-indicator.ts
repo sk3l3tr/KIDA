@@ -18,6 +18,7 @@ import { Component, input } from '@angular/core';
   styles: `
     :host {
       min-width: 0;
+      max-height: 7.5rem;
     }
     .panel {
       height: 100%;
