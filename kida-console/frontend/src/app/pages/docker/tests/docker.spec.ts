@@ -343,7 +343,7 @@ describe('Docker page', () => {
     expect(panel.fallbackFocus()).toBe(root.querySelector('h1'));
     expect(state.currentContainer()).toEqual(container);
     expect(root.querySelectorAll('tbody .action-buttons button')).toHaveLength(4);
-    expect(root.querySelectorAll('app-side-panel .action-buttons button')).toHaveLength(3);
+    expect(root.querySelectorAll('app-side-panel .action-buttons button')).toHaveLength(4);
     http.expectNone(() => true);
     state.refreshContainers();
     const changed = { ...container, name: 'updated', online: true };
@@ -1108,7 +1108,7 @@ describe('Docker page', () => {
       const scope =
         source === 'row' ? root.querySelector('tbody')! : root.querySelector('app-side-panel')!;
       const buttons = scope.querySelectorAll<HTMLButtonElement>('.action-buttons button');
-      expect(buttons).toHaveLength(source === 'row' ? 4 : 3);
+      expect(buttons).toHaveLength(4);
       const start = buttons[0];
       expect(start.disabled).toBe(false);
       expect(start.getAttribute('aria-label')).toBe('Arrancar contenedor ' + container.name);
@@ -1183,7 +1183,7 @@ describe('Docker page', () => {
     state.openContainer(container.id, 'projects', project.name);
     const v = view(f, 'projects');
     const host = v.location.nativeElement.querySelector('app-side-panel');
-    expect(host.querySelectorAll('.action-buttons button')).toHaveLength(3);
+    expect(host.querySelectorAll('.action-buttons button')).toHaveLength(4);
     state.inventory.data.set({ ...inventory, containers: [] });
     v.changeDetectorRef.detectChanges();
     expect(host.textContent).toContain('Sin el mismo ID');
@@ -1203,7 +1203,7 @@ describe('Docker page', () => {
     'detail',
     'uncertain',
     'missing',
-  ] as const)('blocks both start controls and direct preparation during %s', (mode) => {
+  ] as const)('blocks shared controls and direct preparation of every action during %s', (mode) => {
     const f = initial(),
       state = f.componentInstance.state;
     state.openContainer(container.id, 'inventory');
@@ -1219,11 +1219,15 @@ describe('Docker page', () => {
       const buttons = root.querySelectorAll<HTMLButtonElement>(
         'app-container-actions .action-buttons button',
       );
-      expect(buttons).toHaveLength(7);
+      expect(buttons).toHaveLength(8);
       expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
     }
-    state.prepare('start', container);
-    expect(state.actionLocked('start', container.id)).toBe(true);
+    const pending = state.pending();
+    for (const action of state.actions) {
+      expect(state.actionLocked(action, container.id)).toBe(true);
+      state.prepare(action, container);
+    }
+    expect(state.pending()).toBe(pending);
     http.expectNone(() => true);
     if (mode === 'confirmation') state.cancel();
   });
@@ -1311,12 +1315,16 @@ describe('Docker page', () => {
           ['stop', true],
           ['restart', true],
           ['restart', false],
+          ['delete', true],
+          ['delete', false],
         ] as const
       ).map(([action, online]) => ({ source, action, online })),
     ),
   )(
     'confirms $action from $source (online=$online) using current inventory without duplicate POSTs',
     ({ source, action, online }) => {
+      const label = { stop: 'Parar', restart: 'Reiniciar', delete: 'Eliminar' }[action];
+      const status = { stop: 'stopped', restart: 'restarted', delete: 'deleted' }[action];
       const f = initial(),
         state = f.componentInstance.state;
       const current = { ...container, online, status: online ? 'exited' : 'running' };
@@ -1337,7 +1345,7 @@ describe('Docker page', () => {
       const scope =
         source === 'row' ? root.querySelector('tbody')! : root.querySelector('app-side-panel')!;
       const control = scope.querySelector<HTMLButtonElement>(
-        `button[aria-label^="${action === 'stop' ? 'Parar' : 'Reiniciar'} contenedor"]`,
+        `button[aria-label^="${label} contenedor"]`,
       )!;
       expect(control.disabled).toBe(false);
       control.click();
@@ -1352,9 +1360,11 @@ describe('Docker page', () => {
       expect(dialog.textContent).toContain(container.name);
       expect(dialog.textContent).toContain(container.id);
       expect(dialog.textContent).toContain(
-        action === 'restart'
-          ? 'interrumpir temporalmente los servicios'
-          : 'interrumpir los servicios',
+        action === 'delete'
+          ? 'Eliminar es irreversible'
+          : action === 'restart'
+            ? 'interrumpir temporalmente los servicios'
+            : 'interrumpir los servicios',
       );
       expect(dialog.querySelector('img')).toBeNull();
       http.expectNone(`${base}/containers/${action}`);
@@ -1366,11 +1376,13 @@ describe('Docker page', () => {
       state.confirm();
       const request = http.expectOne(`${base}/containers/${action}`);
       expect(request.request.body).toEqual({ container: container.id });
-      expect(state.resultLabel()).toBe(`${action}: ${container.name} (${container.id})`);
+      expect(state.resultLabel()).toBe(
+        `${action === 'delete' ? 'trash' : action}: ${container.name} (${container.id})`,
+      );
       expect(state.inventory.data()?.containers[0].online).toBe(online);
       request.flush({
         container: container.id,
-        status: action === 'stop' ? 'stopped' : 'restarted',
+        status,
         extra: null,
       });
       http.expectOne(`${base}/containers`).flush(inventory);
@@ -1383,16 +1395,157 @@ describe('Docker page', () => {
       expect(state.busy()).toBe(false);
       expect(state.result()).toEqual({
         container: container.id,
-        status: action === 'stop' ? 'stopped' : 'restarted',
+        status,
         extra: null,
       });
-      expect(control.disabled).toBe(action === 'stop');
+      if (action === 'delete' && source !== 'row') {
+        expect(scope.querySelector('.action-buttons')).toBeNull();
+        expect(state.inspectedContainer()).toBeNull();
+      } else expect(control.disabled).toBe(action === 'stop');
       if (source !== 'row') {
         const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(SidePanel);
-        expect(panel.open()).toBe(true);
+        expect(panel.open()).toBe(action !== 'delete');
         expect(panel.focusTrap()).toBe(true);
-        expect(scope.textContent).toContain('Respuesta de CORE:');
-        expect(scope.textContent).toContain(action === 'stop' ? 'stopped' : 'restarted');
+        expect(root.textContent).toContain('Respuesta de CORE:');
+        expect(root.textContent).toContain(status);
+      }
+    },
+  );
+  it.each(['row', 'inventory', 'projects', 'detail'] as const)(
+    'keeps deletion results and closes the %s inspector before requesting fallback focus',
+    async (source) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      if (source === 'detail') {
+        state.inspect(project.name);
+        http
+          .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+          .flush(project);
+      }
+      const v = view(f, source === 'projects' || source === 'detail' ? 'projects' : 'containers');
+      v.instance.ionViewWillEnter();
+      if (source !== 'row') state.openContainer(container.id, source, project.name);
+      v.changeDetectorRef.detectChanges();
+      const root = v.location.nativeElement as HTMLElement;
+      document.body.append(root);
+      const scope =
+        source === 'row' ? root.querySelector('tbody')! : root.querySelector('app-side-panel')!;
+      const control = scope.querySelector<HTMLButtonElement>(
+        'button[aria-label^="Eliminar contenedor"]',
+      )!;
+      const heading = root.querySelector('h1')!;
+      const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(control);
+      const focus = vi.spyOn(heading, 'focus').mockImplementation(() => {});
+      try {
+        control.click();
+        v.changeDetectorRef.detectChanges();
+        f.detectChanges();
+        TestBed.tick();
+        state.confirm();
+        const request = http.expectOne(`${base}/containers/delete`);
+        expect(state.inventory.data()?.containers).toHaveLength(1);
+        expect(control.isConnected).toBe(true);
+        request.flush({ container: container.id, status: 'deleted', extra: null });
+        http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+        http.expectOne(`${base}/compose/projects`).flush([]);
+        v.changeDetectorRef.detectChanges();
+        f.detectChanges();
+        TestBed.tick();
+        await f.whenStable();
+        expect(control.isConnected).toBe(false);
+        if (source !== 'row') {
+          expect(v.instance.panelOpen()).toBe(false);
+          expect(focus).not.toHaveBeenCalled();
+          const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(
+            SidePanel,
+          );
+          panel.didDismiss();
+          await new Promise((resolve) => setTimeout(resolve));
+        }
+        expect(focus).toHaveBeenCalledOnce();
+        expect(state.result()).toEqual({ container: container.id, status: 'deleted', extra: null });
+        expect(root.textContent).toContain('deleted');
+        expect(state.busy()).toBe(false);
+        expect(state.actionLocked('delete', container.id)).toBe(true);
+        state.prepare('delete', container);
+        if (source !== 'row') {
+          expect(v.instance.panelOpen()).toBe(false);
+          expect(scope.querySelector('.action-buttons')).toBeNull();
+        }
+        if (source === 'detail') expect(state.selected()).toBeNull();
+        http.expectNone(() => true);
+      } finally {
+        active.mockRestore();
+        focus.mockRestore();
+        root.remove();
+      }
+    },
+  );
+  it.each(['close', 'version', 'container', 'same-container', 'tab', 'leave', 'session'] as const)(
+    'handles a late deletion result after %s without replacing content or restoring stale focus',
+    async (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.openContainer(container.id, 'inventory');
+      const v = view(f, 'containers');
+      v.instance.ionViewWillEnter();
+      const root = v.location.nativeElement as HTMLElement;
+      document.body.append(root);
+      const control = root.querySelector<HTMLButtonElement>(
+        'app-side-panel button[aria-label^="Eliminar contenedor"]',
+      )!;
+      const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(control);
+      const focus = vi.spyOn(control, 'focus').mockImplementation(() => {});
+      const headingFocus = vi
+        .spyOn(root.querySelector('h1')!, 'focus')
+        .mockImplementation(() => {});
+      try {
+        control.click();
+        v.changeDetectorRef.detectChanges();
+        f.detectChanges();
+        TestBed.tick();
+        state.confirm();
+        const request = http.expectOne(`${base}/containers/delete`);
+        if (mode === 'close') v.instance.closePanel();
+        else if (mode === 'version') state.openVersion('containers');
+        else if (mode === 'container') state.openContainer('another', 'inventory');
+        else if (mode === 'same-container') state.openContainer(container.id, 'inventory');
+        else if (mode === 'tab') state.leaveTab();
+        else if (mode === 'leave') state.ionViewWillLeave();
+        else TestBed.inject(ThemeIdentity).begin();
+        request.flush({ container: container.id, status: 'deleted' });
+        const abandoned = mode === 'leave' || mode === 'session';
+        if (!abandoned) {
+          http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+          http.expectOne(`${base}/compose/projects`).flush([]);
+        }
+        v.changeDetectorRef.detectChanges();
+        f.detectChanges();
+        TestBed.tick();
+        await f.whenStable();
+        expect(state.result()?.status ?? null).toBe(abandoned ? null : 'deleted');
+        if (mode === 'version') {
+          expect(state.versionPanelOpen()).toBe('containers');
+          expect(state.inspectedContainer()).toBeNull();
+        } else if (mode === 'container') expect(state.inspectedContainer()?.id).toBe('another');
+        else if (mode === 'same-container') {
+          expect(state.inspectedContainer()?.id).toBe(container.id);
+          expect(v.instance.panelOpen()).toBe(true);
+        } else expect(v.instance.panelOpen()).toBe(false);
+        expect(focus).not.toHaveBeenCalled();
+        expect(headingFocus).not.toHaveBeenCalled();
+        if (abandoned) expect(state.inventory.data()).toBeNull();
+        else {
+          const other = view(f, 'projects');
+          expect(other.location.nativeElement.textContent).toContain('deleted');
+          expect(state.result()?.status).toBe('deleted');
+        }
+        http.expectNone(() => true);
+      } finally {
+        active.mockRestore();
+        focus.mockRestore();
+        headingFocus.mockRestore();
+        root.remove();
       }
     },
   );
@@ -1418,8 +1571,9 @@ describe('Docker page', () => {
     v.changeDetectorRef.detectChanges();
     expect(stop.disabled).toBe(false);
   });
-  describe.each(['stop', 'restart'] as const)('%s confirmation safeguards', (action) => {
-    const label = action === 'stop' ? 'Parar' : 'Reiniciar';
+  describe.each(['stop', 'restart', 'delete'] as const)('%s confirmation safeguards', (action) => {
+    const label = { stop: 'Parar', restart: 'Reiniciar', delete: 'Eliminar' }[action];
+    const status = { stop: 'stopped', restart: 'restarted', delete: 'deleted' }[action];
     it.each(['button', 'escape', 'cancel-event'] as const)(
       'cancels inspector action by %s, restores the lower focus trap and requests focus on its trigger',
       async (mode) => {
@@ -1555,6 +1709,8 @@ describe('Docker page', () => {
       const v = view(f, 'containers');
       const host = v.location.nativeElement.querySelector('app-side-panel');
       const prepare = () => {
+        state.openContainer(container.id, 'inventory');
+        v.changeDetectorRef.detectChanges();
         host.querySelector(`button[aria-label^="${label} contenedor"]`).click();
         v.changeDetectorRef.detectChanges();
         f.detectChanges();
@@ -1562,14 +1718,13 @@ describe('Docker page', () => {
         state.confirm();
       };
       prepare();
-      http
-        .expectOne(`${base}/containers/${action}`)
-        .flush({ container: container.id, status: action === 'stop' ? 'stopped' : 'restarted' });
+      http.expectOne(`${base}/containers/${action}`).flush({ container: container.id, status });
       http.expectOne(`${base}/containers`).flush({}, fail);
       http.expectOne(`${base}/compose/projects`).flush({}, fail);
       v.changeDetectorRef.detectChanges();
-      expect(host.textContent).toContain(action === 'stop' ? 'stopped' : 'restarted');
+      expect(v.location.nativeElement.textContent).toContain(status);
       expect(state.inventory.stale()).toBe(true);
+      expect(v.instance.panelOpen()).toBe(action !== 'delete');
       expect(state.inventory.error()).not.toBe('');
       prepare();
       http
@@ -1577,6 +1732,7 @@ describe('Docker page', () => {
         .flush({ detail: { code: 'core_timeout' } }, { status: 504, statusText: 'Timeout' });
       v.changeDetectorRef.detectChanges();
       expect(host.textContent).toContain('No se pudo confirmar el resultado');
+      expect(v.instance.panelOpen()).toBe(true);
       expect(host.querySelector(`button[aria-label^="${label} contenedor"]`).disabled).toBe(true);
       state.prepare(action, container);
       http.expectNone(() => true);
@@ -1597,6 +1753,7 @@ describe('Docker page', () => {
       expect(state.uncertain()).toBe(false);
       expect(state.actionLocked(action, container.id)).toBe(false);
       expect(host.textContent).toContain('No se pudo confirmar el resultado');
+      expect(v.instance.panelOpen()).toBe(true);
       http.expectNone(`${base}/containers/${action}`);
     });
   });

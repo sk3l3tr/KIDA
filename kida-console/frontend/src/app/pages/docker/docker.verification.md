@@ -248,3 +248,39 @@ despliegue.
   y la proyección del panel; foco real, interacción con Ionic, accesibilidad,
   temas y responsive pendientes de navegador. Sin backend ni Docker real.
 - Revisión independiente del diff y la cobertura completada sin hallazgos.
+
+## Historia #16: eliminar contenedor (29 de octubre de 2026)
+
+- El inspector incorpora Eliminar usando los mismos cuatro controles compartidos
+  del inventario. Se retira el aviso de operaciones restantes en inventario.
+  La fachada cierra únicamente la selección vigente del contenedor eliminado
+  tras éxito y refrescos, aunque fallen. Sin cambios de contratos, canales,
+  dependencias ni opciones de API.
+- Se conserva la confirmación existente: nombre/ID completos del inventario
+  actual, instantánea inmutable y advertencia irreversible. Pruebas de las cuatro
+  superficies de acceso con online=true/false, fuentes discordantes, ausencia de
+  POST antes de confirmar, doble clic y doble confirmación sin duplicados.
+- Las pruebas compartidas de cancelación, foco, invalidación y resultado incierto
+  incluyen ahora Eliminar sin retirar casos anteriores. Los bloqueos comunes se
+  comprueban también en preparación para las cuatro acciones, además del botón.
+- Tras eliminación y refrescos vacíos, las pruebas de fila e inspectores verifican
+  desaparición del control, cierre del inspector y resultado conservado en página.
+  El panel compartido solicita foco al destino alternativo tras didDismiss; la
+  fachada no intenta sacar el foco de un modal que aún se está cerrando.
+  Sin borrado optimista; no se reinspecciona un proyecto desaparecido.
+- Respuestas tardías después de cerrar, sustituir contenido, cambiar tab, salir o
+  cambiar sesión: no reabren ni sustituyen paneles ni restauran foco anterior.
+  Resultado compartido entre tabs; salida/sesión descartan resultado y refrescos.
+- Node 24.15.0: los 157 casos Docker pasan en la suite global (600/603).
+  Persisten los tres fallos ajenos de Auth,
+  SystemFanRow y SystemSensors descritos en #15. Build de producción bloqueado
+  por presupuesto inicial de 1 MB, exceso 22.30 kB. Presupuestos intactos.
+- Sin Playwright por instrucción expresa. Diálogo nativo y proyección del panel
+  simulados; las pruebas de foco verifican llamadas con activeElement simulado.
+  Foco real, overlays Ionic, accesibilidad, temas y responsive pendientes en
+  navegador. Sin backend ni Docker real. `git diff --check` correcto.
+- Primera revisión independiente detectó foco solicitado fuera del modal activo.
+  El usuario acordó cerrar su inspector tras eliminación exitosa; spec §6 #10
+  actualizada. Se comprueba cierre antes del fallback, ausencia de cierre por
+  resultado incierto y conservación de selecciones sustituidas, incluso del mismo
+  ID. Segunda revisión independiente sin hallazgos pendientes.

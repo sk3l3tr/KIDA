@@ -185,7 +185,11 @@ texto. Colecciones vacías: «Sin puertos» / «Sin redes».
 
 Seguir ID y origen de lectura. Tras refrescar esa fuente, actualizar el objeto;
 si desaparece, mostrar «Contenedor no disponible en esta lectura» y desactivar
-acciones. Un objeto solo observado en Compose puede inspeccionarse, pero no
+acciones. Excepción: tras una eliminación confirmada y exitosa, cerrar su inspector
+al terminar los refrescos, aunque fallen. Solo cerrar si sigue siendo la misma
+selección; una respuesta tardía nunca cierra otro contenido. El panel compartido
+restaura el foco después de cerrarse, al disparador o a la cabecera si desapareció.
+El resultado permanece visible en la página. Un objeto solo observado en Compose puede inspeccionarse, pero no
 operarse sin el mismo ID en el inventario principal. Las acciones toman el objeto
 actual de ese inventario y sus bloqueos, nunca una copia anterior de Compose.
 

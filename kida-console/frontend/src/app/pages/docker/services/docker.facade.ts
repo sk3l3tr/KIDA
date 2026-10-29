@@ -427,6 +427,7 @@ export class DockerFacade implements OnDestroy {
     this.execute(pending);
   }
   private execute(snapshot: PendingContainer): void {
+    const inspector = this.inspectedContainer();
     this.busy.set(true);
     this.error.set('');
     this.result.set(null);
@@ -444,6 +445,15 @@ export class DockerFacade implements OnDestroy {
           this.subscriptions.add(
             forkJoin([this.loadContainers(), this.loadProjects()]).subscribe(([_, projectsOk]) => {
               if (!this.valid(generation, revision)) return;
+              if (
+                snapshot.action === 'delete' &&
+                inspector?.id === snapshot.id &&
+                this.inspectedContainer() === inspector
+              ) {
+                // Let SidePanel restore focus after Ionic has dismissed the modal.
+                this.inspectedContainer.set(null);
+                this.trigger = null;
+              }
               const selected = this.selected();
               if (projectsOk && selected !== null) this.inspect(selected, true);
               else {
