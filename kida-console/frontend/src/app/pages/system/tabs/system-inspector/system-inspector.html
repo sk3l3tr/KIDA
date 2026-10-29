@@ -5,19 +5,29 @@
     </section>
     <section class="panel inspector" aria-labelledby="inspector-title">
       <header class="inspector-heading">
-        <div><h1 id="inspector-title">Inspector de sensores</h1><p>Lecturas originales sin agrupar</p></div>
+        <div>
+          <h1 id="inspector-title">Inspector de sensores</h1>
+          <p>Lecturas originales sin agrupar</p>
+        </div>
+        <label class="search-label" for="sensor-search">Buscar sensor</label>
+        <input
+          id="sensor-search"
+          class="console-control sensor-search"
+          type="search"
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          placeholder="Dispositivo, etiqueta, tipo, estado o campo…"
+        />
         @if (state.sensorsAvailable()) {
           <span class="sensor-count">{{ state.sensors().length }} sensores</span>
         } @else {
           <span class="sensor-count">Número de sensores desconocido</span>
         }
       </header>
-      <label class="search-label" for="sensor-search">Buscar sensor</label>
-      <input id="sensor-search" class="console-control sensor-search" type="search"
-        [ngModel]="query()" (ngModelChange)="query.set($event)"
-        placeholder="Dispositivo, etiqueta, tipo, estado o campo…" />
       @if (!state.sensorsAvailable()) {
-        <p class="unavailable" aria-live="polite">Número de lecturas desconocido; sin lista de sensores disponible.</p>
+        <p class="unavailable" aria-live="polite">
+          Número de lecturas desconocido; sin lista de sensores disponible.
+        </p>
       }
       <app-system-sensor-table [readings]="readings()" />
     </section>
