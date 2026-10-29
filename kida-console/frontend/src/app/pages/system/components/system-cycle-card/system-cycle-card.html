@@ -8,6 +8,11 @@
     </div>
   </header>
 
+  <p>
+    <strong>El encendido desde S5 requiere verificación.</strong> Depende del hardware y los
+    permisos RTC. KIDA valida la relación temporal y exige un mínimo de 120 segundos.
+  </p>
+
   <div class="mode-field">
     <span id="wake-mode-label">Modo</span>
     <ion-segment
@@ -68,18 +73,10 @@
       <small id="shutdown-help">HH:MM · vacío equivale a +1 minuto</small>
     </div>
   </div>
-
-  <p class="cycle-notice">
-    <span class="notice-icon" aria-hidden="true">ⓘ</span>
-    <span
-      ><strong>El encendido desde S5 requiere verificación.</strong> Depende del hardware y los
-      permisos RTC. KIDA valida la relación temporal y exige un mínimo de 120 segundos.</span
-    >
-  </p>
   <div class="cycle-actions">
     <button class="danger" type="submit" [disabled]="state.busy() || !state.cycleBody()">
       <span class="i i-cycle"></span>
-      Programar ciclo
+      Programar
     </button>
   </div>
 </form>

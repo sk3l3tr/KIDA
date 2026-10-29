@@ -5,11 +5,10 @@
   <div class="fan-details">
     <strong>{{ display(reading().fields['label']) }}</strong>
     <small>{{ display(reading().fields['device']) }}</small>
-    <span>Estado: {{ display(reading().fields['status']) }}</span>
-    <span
-      >Avisos · Alarma: {{ display(reading().fields['alarm']) }} · Fallo:
-      {{ display(reading().fields['fault']) }}</span
-    >
+
+    @if (reading().fields['status'] === 'OK') {
+      <small class="primary">Sin fallo reportado</small>
+    }
   </div>
   <div class="fan-speed">
     {{ display(reading().fields['value']) }} <small>{{ display(reading().fields['unit']) }}</small>

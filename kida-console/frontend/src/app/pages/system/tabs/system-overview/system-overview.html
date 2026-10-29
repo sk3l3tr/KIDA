@@ -39,6 +39,9 @@
               <div class="fan-list">
                 @for (reading of group.readings; track reading.index) {
                   <app-system-fan-row [reading]="reading" />
+                  @if ($index < group.readings.length - 1) {
+                    <hr />
+                  }
                 } @empty {
                   <p>Sin lecturas disponibles.</p>
                 }
