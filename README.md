@@ -70,4 +70,14 @@ Start with [installation](resources/docs/en/001-installation.md) or browse the
 
 ## .✦ ݁˖ License
 
-This checkout does not currently include a license file or licensing terms in its package manifests.
+KIDA is open-source software licensed under the **Apache License, Version 2.0**.
+
+This license applies to all three components:
+
+- **kida-core**: Server management agent.
+- **kida-cli**: Command-line interface.
+- **kida-console**: Web management interface.
+
+You are free to use, modify, distribute, and commercially exploit KIDA under the terms of the Apache License 2.0.
+
+See the [LICENSE](./LICENSE) file for the full license text.

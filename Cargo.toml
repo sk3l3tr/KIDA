@@ -1,3 +1,4 @@
 [workspace]
+license = "Apache-2.0"
 resolver = "1"
 members = ["kida-core", "kida-cli"]

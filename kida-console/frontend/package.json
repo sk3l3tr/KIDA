@@ -1,7 +1,8 @@
 {
   "name": "frontend",
-  "version": "0.0.0",
-  "description": "",
+  "version": "0.0.6",
+  "license": "Apache-2.0",
+  "description": "KIDA is the intelligent agent at the heart of your server, quietly watching over the place, automating operations, and keeping everything under control.",
   "engines": {
     "node": "^24.15.0 || >= 26.0.0",
     "pnpm": ">=10"
