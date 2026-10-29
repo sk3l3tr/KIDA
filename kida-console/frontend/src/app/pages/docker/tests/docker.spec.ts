@@ -373,6 +373,174 @@ describe('Docker page', () => {
     );
     expect(sections.slice(-2)).toEqual(['Operaciones', 'JSON interpretado']);
   });
+  it('shows project inspection loading, totals and full JSON in the shared panel and retains the list JSON', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const v = view(f, 'projects');
+    const root = v.location.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('app-docker-project-card footer button')!.click();
+    v.changeDetectorRef.detectChanges();
+    const host = root.querySelector('app-side-panel')!;
+    const panel = getDebugNode(host)!.injector.get(SidePanel);
+    expect(panel.open()).toBe(true);
+    expect(panel.title()).toBe('Inspeccionar proyecto');
+    expect(host.textContent).toContain('Inspeccionando proyecto');
+    state.inspect(project.name);
+    const response = {
+      ...project,
+      extra: { preserved: null },
+      services: [
+        {
+          name: null,
+          containers: [container, { ...container, id: 'online', online: true, status: 'future' }],
+        },
+        { name: 'empty', containers: [] },
+      ],
+    };
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+      .flush(response);
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain(project.name);
+    expect(host.textContent).toContain('2 servicios · 2 contenedores · 1 en ejecución');
+    expect(host.textContent).toContain('no acredita propiedad');
+    expect(host.textContent).toContain('Sin nombre');
+    expect(host.textContent).toContain('Sin contenedores');
+    expect(JSON.parse(host.querySelector('pre')!.textContent!)).toEqual(response);
+    const listJson = Array.from(root.querySelectorAll('section details')).find((details) =>
+      details.querySelector('summary')?.textContent?.includes('Datos de proyectos'),
+    )!;
+    expect(JSON.parse(listJson.querySelector('pre')!.textContent!)).toEqual([project]);
+    expect(root.querySelectorAll('app-side-panel')).toHaveLength(1);
+    expect(root.querySelector('section > h3')).toBeNull();
+  });
+  it('retains only the same project reading on failure and never displays another project detail', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.projects.data.set([project, { name: 'second', services: [] }]);
+    const v = view(f, 'projects');
+    state.inspect(project.name);
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+      .flush(project);
+    state.inspect(project.name);
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+      .flush({}, fail);
+    v.changeDetectorRef.detectChanges();
+    const host = v.location.nativeElement.querySelector('app-side-panel');
+    expect(host.textContent).toContain('Error de inspección');
+    expect(host.textContent).toContain('desactualizada');
+    expect(host.querySelector('pre')).not.toBeNull();
+    state.inspect('second');
+    state.inspect(project.name);
+    http.expectNone(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).not.toContain(project.name);
+    expect(host.querySelector('pre')).toBeNull();
+    http.expectOne(`${base}/compose/projects/inspect?project=second`).flush({}, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain('Error de inspección');
+    expect(host.textContent).not.toContain('desactualizada');
+    state.inspect('second');
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=second`)
+      .flush({ name: 'second', services: [] });
+    v.changeDetectorRef.detectChanges();
+    expect(host.textContent).toContain('0 servicios · 0 contenedores · 0 en ejecución');
+    expect(host.textContent).toContain('Sin servicios');
+  });
+  it.each(['close', 'version', 'container', 'tab', 'session'] as const)(
+    'does not reopen or replace panel contents after a late project response on %s',
+    (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      const v = view(f, 'projects');
+      state.inspect(project.name);
+      const request = http.expectOne(
+        `${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`,
+      );
+      if (mode === 'close') v.instance.closePanel();
+      else if (mode === 'version') state.openVersion('projects');
+      else if (mode === 'container') state.openContainer(container.id, 'projects', project.name);
+      else if (mode === 'tab') state.leaveTab();
+      else TestBed.inject(ThemeIdentity).begin();
+      if (!request.cancelled) request.flush(project);
+      v.changeDetectorRef.detectChanges();
+      expect(state.projectPanelOpen()).toBeNull();
+      if (mode === 'version') {
+        expect(state.versionPanelOpen()).toBe('projects');
+        expect(v.location.nativeElement.querySelector('app-side-panel h3').textContent).toContain(
+          'Versión detectada',
+        );
+      } else if (mode === 'container') {
+        expect(state.currentContainer()).toEqual(container);
+        expect(v.location.nativeElement.querySelector('app-container-details')).not.toBeNull();
+      } else expect(v.instance.panelOpen()).toBe(false);
+    },
+  );
+  it('shows unavailable project after a successful list refresh and ignores its late response', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const v = view(f, 'projects');
+    state.inspect(project.name);
+    const request = http.expectOne(
+      `${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`,
+    );
+    state.refreshProjects();
+    http.expectOne(`${base}/compose/projects`).flush([]);
+    request.flush(project);
+    v.changeDetectorRef.detectChanges();
+    expect(state.selected()).toBeNull();
+    expect(state.detail.data()).toBeNull();
+    expect(v.instance.panelOpen()).toBe(true);
+    const host = v.location.nativeElement.querySelector('app-side-panel');
+    expect(host.textContent).toContain('Proyecto no disponible en esta lectura');
+    expect(host.querySelector('pre')).toBeNull();
+    v.instance.closePanel();
+    expect(v.instance.panelOpen()).toBe(false);
+  });
+  it('replaces project with container in the same panel and requests focus restoration to the original page trigger', async () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const v = view(f, 'projects');
+    const root = v.location.nativeElement as HTMLElement;
+    document.body.append(root);
+    const trigger = root.querySelector<HTMLButtonElement>('app-docker-project-card footer button')!;
+    expect(trigger.disabled).toBe(false);
+    expect(trigger.isConnected).toBe(true);
+    // Simulate browser focus: jsdom does not focus this Ionic-hosted button.
+    const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(trigger);
+    const focus = vi.spyOn(trigger, 'focus').mockImplementation(() => {});
+    try {
+      trigger.click();
+      v.changeDetectorRef.detectChanges();
+      http
+        .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+        .flush(project);
+      v.changeDetectorRef.detectChanges();
+      const host = root.querySelector('app-side-panel')!;
+      const panel = getDebugNode(host)!.injector.get(SidePanel);
+      const inspect = host.querySelector<HTMLButtonElement>('button')!;
+      active.mockReturnValue(inspect);
+      inspect.click();
+      v.changeDetectorRef.detectChanges();
+      expect(root.querySelector('app-side-panel')).toBe(host);
+      expect(panel.open()).toBe(true);
+      expect(state.projectPanelOpen()).toBeNull();
+      expect(state.inspectedContainer()?.source).toBe('detail');
+      expect(host.querySelector('app-container-details')).not.toBeNull();
+      http.expectNone(() => true);
+      panel.didDismiss();
+      v.changeDetectorRef.detectChanges();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(focus).toHaveBeenCalledOnce();
+    } finally {
+      active.mockRestore();
+      focus.mockRestore();
+      root.remove();
+    }
+  });
   it('shows independent indicators for missing, zero, stale and differing readings in both tabs', () => {
     const f = enter(),
       state = f.componentInstance.state;

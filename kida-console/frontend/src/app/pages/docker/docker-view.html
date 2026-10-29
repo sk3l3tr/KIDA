@@ -69,40 +69,6 @@
             <pre>{{ data | json }}</pre>
           </details>
         }
-        @if (state.selected() !== null) {
-          <h3>Inspección: {{ state.selected() }}</h3>
-          @if (state.detail.loading()) {
-            <p role="status">Inspeccionando proyecto…</p>
-          }
-          @if (state.detail.error()) {
-            <p class="error" role="alert">Error de inspección: {{ state.detail.error() }}</p>
-          }
-          @if (state.detail.stale()) {
-            <p>Inspección anterior, desactualizada.</p>
-          }
-          @if (state.detail.data(); as project) {
-            @for (service of project.services; track $index) {
-              <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
-              @for (container of service.containers; track container.id) {
-                <button
-                  type="button"
-                  [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
-                  (click)="state.openContainer(container.id, 'detail', project.name)"
-                >
-                  Inspeccionar {{ container.name }}
-                </button>
-              } @empty {
-                <p>Sin contenedores.</p>
-              }
-            } @empty {
-              <p>Sin servicios.</p>
-            }
-            <details>
-              <summary>Datos de inspección (JSON interpretado)</summary>
-              <pre>{{ project | json }}</pre>
-            </details>
-          }
-        }
       </section>
     } @else {
       <section
@@ -278,8 +244,16 @@
     }
     <app-side-panel
       [open]="panelOpen()"
-      [title]="state.inspectedContainer() ? 'Inspeccionar contenedor' : 'Docker Compose'"
-      [subtitle]="state.inspectedContainer()?.id ?? 'Lectura de versión'"
+      [title]="
+        state.inspectedContainer()
+          ? 'Inspeccionar contenedor'
+          : state.projectPanelOpen() !== null
+            ? 'Inspeccionar proyecto'
+            : 'Docker Compose'
+      "
+      [subtitle]="
+        state.inspectedContainer()?.id ?? state.projectPanelOpen() ?? 'Lectura de versión'
+      "
       [fallbackFocus]="heading"
       (closed)="closePanel()"
     >
@@ -320,6 +294,66 @@
           </app-container-details>
         } @else {
           <p role="status">Contenedor no disponible en esta lectura</p>
+        }
+      } @else if (state.projectPanelOpen() !== null) {
+        @let name = state.projectPanelOpen();
+        <h3>Inspección: {{ name }}</h3>
+        @if (state.selected() !== name) {
+          <p role="status">Proyecto no disponible en esta lectura</p>
+        } @else {
+          @if (state.detail.loading()) {
+            <p role="status">Inspeccionando proyecto…</p>
+          }
+          @if (state.detail.error()) {
+            <p role="alert">Error de inspección: {{ state.detail.error() }}</p>
+          }
+          @if (state.detail.stale()) {
+            <p>Inspección anterior, desactualizada.</p>
+          }
+          @if (state.detail.data(); as project) {
+            <p>Nombre: {{ project.name }}</p>
+            <p>Proyecto observado. La detección no acredita propiedad ni administración KIDA.</p>
+            <p>
+              {{ state.inspectedProjectTotals().services }} servicios ·
+              {{ state.inspectedProjectTotals().containers }} contenedores ·
+              {{ state.inspectedProjectTotals().online }} en ejecución
+            </p>
+            <h3>Servicios</h3>
+            @for (service of project.services; track $index) {
+              <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
+              @for (container of service.containers; track container.id) {
+                <p>
+                  {{ container.name }} · {{ container.image }} ·
+                  {{ container.online ? 'En ejecución' : 'Fuera de línea' }} ·
+                  {{ container.status }}
+                </p>
+                <button
+                  type="button"
+                  [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
+                  (click)="state.openContainer(container.id, 'detail', project.name)"
+                >
+                  Inspeccionar {{ container.name }}
+                </button>
+              } @empty {
+                <p>Sin contenedores.</p>
+              }
+            } @empty {
+              <p>Sin servicios.</p>
+            }
+            <details>
+              <summary>Datos de inspección (JSON interpretado)</summary>
+              <p>
+                Los datos JSON se interpretan con JavaScript; no representan el JSON original
+                exacto.
+              </p>
+              @if (state.limitedPrecision(project)) {
+                <p role="status">
+                  Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
+                </p>
+              }
+              <pre>{{ project | json }}</pre>
+            </details>
+          }
         }
       } @else {
         @if (state.version.data(); as data) {

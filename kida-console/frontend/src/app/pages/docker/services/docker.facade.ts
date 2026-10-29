@@ -53,6 +53,7 @@ export class DockerFacade implements OnDestroy {
   readonly inventory = reading<DockerContainers>();
   readonly version = reading<ComposeVersion>();
   readonly versionPanelOpen = signal<'projects' | 'containers' | null>(null);
+  readonly projectPanelOpen = signal<string | null>(null);
   readonly projects = reading<ComposeProject[]>();
   readonly associations = computed(() => {
     const projects = this.projects.data();
@@ -114,14 +115,25 @@ export class DockerFacade implements OnDestroy {
   openContainer(id: string, source: 'inventory' | 'projects' | 'detail', project?: string): void {
     if (!this.active || this.pending() !== null) return;
     this.versionPanelOpen.set(null);
+    this.projectPanelOpen.set(null);
     this.inspectedContainer.set({ id, source, project });
   }
   openVersion(tab: 'projects' | 'containers'): void {
     this.inspectedContainer.set(null);
+    this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(tab);
   }
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
+  readonly inspectedProjectTotals = computed(() => {
+    const project = this.detail.data();
+    const containers = project?.services.flatMap((service) => service.containers) ?? [];
+    return {
+      services: project?.services.length ?? 0,
+      containers: containers.length,
+      online: containers.filter((container) => container.online).length,
+    };
+  });
   readonly busy = signal(false);
   readonly pending = signal<PendingContainer | null>(null);
   readonly uncertain = signal(false);
@@ -166,6 +178,7 @@ export class DockerFacade implements OnDestroy {
     this.sessionChanges.unsubscribe();
   }
   leaveTab(): void {
+    this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(null);
     this.inspectedContainer.set(null);
     ++this.selectionRevision;
@@ -177,6 +190,7 @@ export class DockerFacade implements OnDestroy {
     this.trigger = null;
   }
   private reset(): void {
+    this.projectPanelOpen.set(null);
     this.versionPanelOpen.set(null);
     this.active = false;
     ++this.generation;
@@ -290,6 +304,11 @@ export class DockerFacade implements OnDestroy {
       this.detail.stale.set(false);
     }
     this.selected.set(project);
+    if (!afterWrite) {
+      this.versionPanelOpen.set(null);
+      this.inspectedContainer.set(null);
+      this.projectPanelOpen.set(project);
+    }
     const generation = this.generation,
       revision = this.identity.snapshot();
     this.detail.loading.set(true);

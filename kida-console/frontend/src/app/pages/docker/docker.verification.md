@@ -123,3 +123,26 @@ despliegue.
 - Sin Playwright por instrucción expresa. Foco real, overlays, temas y responsive
   en navegador pendientes; las pruebas de página proyectan contenido del panel
   mediante un host simulado. No se verifica Docker real.
+
+## Historia #11: inspector de proyecto (29 de octubre de 2026)
+
+- La inspección existente abre el panel compartido con nombre completo, totales
+  de servicios/contenedores/actividad, aviso de observado, servicios, contenedores
+  y JSON interpretado. El JSON de la lista completa sigue en la vista Proyectos.
+- La lectura anterior solo se muestra para el mismo proyecto; se conservan
+  carga, error y desactualización. Una lista correcta que elimina el proyecto
+  limpia la selección de lectura y deja el aviso de indisponibilidad en el panel.
+- Proyecto → contenedor sustituye contenido sin cerrar el panel ni añadir
+  historial; conserva el origen de página para restaurar foco. El canal ocupado
+  impide otra inspección y las respuestas tardías no reabren ni sustituyen el
+  contenido visible. El refresco posterior a escritura tampoco abre el panel.
+- Node 24.15.0: 57/57 pruebas Docker aprobadas. Suite global: 501/503, con los
+  mismos dos fallos preexistentes de Auth/System documentados en #9. Producción
+  sigue bloqueada por presupuesto inicial de 1 MB (exceso 22.28 kB), sin cambios
+  de presupuestos, dependencias ni contratos. `git diff --check` correcto.
+- Revisión independiente sin defectos pendientes. Se aplicó su recomendación
+  de restaurar los spies de foco en finally. La prueba de sustitución simula
+  activeElement y comprueba la petición de foco al disparador original: jsdom
+  no enfocaba el botón dentro del fixture Ionic ni antes de abrir el panel.
+- Sin Playwright por instrucción expresa. Validación real de foco, Escape/fondo,
+  overlays, temas y responsive pendiente en navegador. Sin backend/Docker real.
