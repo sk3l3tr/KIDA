@@ -5,10 +5,19 @@ import { SystemRtcCard } from '../../components/system-rtc-card/system-rtc-card'
 import { SystemPowerCard } from '../../components/system-power-card/system-power-card';
 import { SystemCycleCard } from '../../components/system-cycle-card/system-cycle-card';
 import { SystemFacade } from '../../services/system.facade';
+import { Masonry, MasonryItem } from '../../../../components/masonry/masonry';
 
 @Component({
   selector: 'app-system-energy',
-  imports: [IonContent, SystemData, SystemRtcCard, SystemPowerCard, SystemCycleCard],
+  imports: [
+    IonContent,
+    SystemData,
+    SystemRtcCard,
+    SystemPowerCard,
+    SystemCycleCard,
+    Masonry,
+    MasonryItem,
+  ],
   templateUrl: './system-energy.html',
   styleUrl: '../../system.scss',
 })

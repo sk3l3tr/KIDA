@@ -255,7 +255,7 @@ describe('System page', () => {
     expect(masonry.querySelectorAll(':scope > [appMasonryItem]')).toHaveLength(4);
     expect(masonry.querySelector('.indicators')).toBeNull();
     expect(masonry.querySelector('app-system-section')).toBeNull();
-    expect(fixture.nativeElement.querySelectorAll('app-masonry')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelectorAll('app-masonry')).toHaveLength(2);
     expect(fixture.nativeElement.querySelector('app-system-equipment')).toBeNull();
     const text = fixture.nativeElement.textContent;
     for (const expected of [
@@ -268,6 +268,23 @@ describe('System page', () => {
       expect(text).toContain(expected);
     const inspector = fixture.nativeElement.querySelector('app-system-inspector');
     expect(inspector.textContent).toContain('0 sensores');
+  });
+  it('places energy panels and the conditional operation result in masonry', () => {
+    const fixture = enter();
+    const masonry = fixture.nativeElement.querySelector('app-system-energy app-masonry');
+    const items = () => masonry.querySelectorAll(':scope > [appMasonryItem]');
+    expect([...items()].map((item: Element) => item.getAttribute('aria-label'))).toEqual([
+      'Capacidades RTC',
+      'Apagado y reinicio',
+      'Ciclo de energía',
+    ]);
+    fixture.componentInstance.state.error.set('Error de prueba');
+    fixture.detectChanges();
+    expect(items()).toHaveLength(4);
+    expect(items()[3].getAttribute('aria-label')).toBe('Estado de la operación');
+    fixture.componentInstance.state.error.set('');
+    fixture.detectChanges();
+    expect(items()).toHaveLength(3);
   });
   it('retains partial/stale data with independent errors and update timestamps', () => {
     const fixture = enter(),
