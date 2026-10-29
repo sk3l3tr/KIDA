@@ -101,3 +101,25 @@ despliegue.
 - Revisión independiente sin hallazgos; `git diff --check` correcto.
 - Sin Playwright por instrucción expresa. Pendientes comprobaciones visuales,
   temas, responsive y accesibilidad real en navegador. Sin backend/Docker real.
+
+## Historia #10: inspector de contenedor (29 de octubre de 2026)
+
+- Inventario, servicios y la inspección existente de proyecto abren el mismo panel
+  lateral que versión, sin peticiones nuevas. Selección por ID completo y origen;
+  el contenido se resuelve desde la lectura actual, con carga/error/desactualización
+  y aviso de desaparición. Cambiar tab, salir o cambiar sesión limpia la selección.
+- Identificación/estado, ejecución, puertos, redes, operaciones y JSON interpretado;
+  fechas UTC, null no disponible y fechas inválidas conservadas, incluyendo fechas
+  imposibles que JavaScript normalizaría. Sin perder campos ni datos adicionales.
+- Las cuatro operaciones siguen en inventario; el inspector informa disponibilidad
+  según el mismo ID en inventario y bloqueos actuales. Su incorporación al panel
+  corresponde a #13–#16. No se amplían contratos ni se inspecciona por HTTP.
+- Node 24.15.0: 48/48 pruebas Docker aprobadas tras las correcciones. Suite global:
+  492/494; persisten los mismos dos fallos preexistentes de Auth/System descritos
+  en #9. Build de producción bloqueado por el mismo presupuesto inicial de 1 MB
+  (exceso 22.28 kB); no se modifican presupuestos.
+- Revisión independiente detectó normalización de fechas imposibles y orden
+  JSON/operaciones: corregidos, con pruebas de regresión y suite Docker repetida.
+- Sin Playwright por instrucción expresa. Foco real, overlays, temas y responsive
+  en navegador pendientes; las pruebas de página proyectan contenido del panel
+  mediante un host simulado. No se verifica Docker real.

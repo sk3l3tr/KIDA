@@ -1,36 +1,39 @@
+<h3>Identificación y estado</h3>
 <p>Nombre: {{ container().name }} · ID: {{ container().id }}</p>
 <p>Imagen: {{ container().image }}</p>
 <p>
-  Actividad: {{ container().online ? 'En línea' : 'Fuera de línea' }} · Estado:
+  Actividad: {{ container().online ? 'En ejecución' : 'Fuera de línea' }} · Estado:
   {{ container().status }} · Salud: {{ display(container().health) }}
 </p>
-<details>
-  <summary>Detalles del contenedor {{ container().name }}</summary>
-  <p>Inicio: {{ display(container().started_at) }} · Fin: {{ display(container().finished_at) }}</p>
+<h3>Ejecución</h3>
+<p>Inicio: {{ date(container().started_at) }} · Fin: {{ date(container().finished_at) }}</p>
+<p>
+  Salida: {{ counter(container().exit_code) }} · Reinicios:
+  {{ counter(container().restart_count) }} · Política:
+  {{ display(container().restart_policy) }}
+</p>
+<h3>Puertos</h3>
+@for (port of container().ports; track $index) {
   <p>
-    Salida: {{ counter(container().exit_code) }} · Reinicios:
-    {{ counter(container().restart_count) }} · Política:
-    {{ display(container().restart_policy) }}
+    {{ display(port.container_port) }} / {{ port.protocol }} → {{ display(port.host_ip) }}:{{
+      display(port.host_port)
+    }}
   </p>
-  <h4>Puertos</h4>
-  @for (port of container().ports; track $index) {
-    <p>
-      {{ display(port.container_port) }} / {{ port.protocol }} → {{ display(port.host_ip) }}:{{
-        display(port.host_port)
-      }}
-    </p>
-  } @empty {
-    <p>Sin puertos.</p>
-  }
-  <h4>Redes</h4>
-  @for (network of container().networks; track $index) {
-    <p>
-      {{ network.name }} · IP: {{ display(network.ip_address) }} · Puerta de enlace:
-      {{ display(network.gateway) }} · MAC: {{ display(network.mac_address) }}
-    </p>
-  } @empty {
-    <p>Sin redes.</p>
-  }
+} @empty {
+  <p>Sin puertos.</p>
+}
+<h3>Redes</h3>
+@for (network of container().networks; track $index) {
+  <p>
+    {{ network.name }} · IP: {{ display(network.ip_address) }} · Puerta de enlace:
+    {{ display(network.gateway) }} · MAC: {{ display(network.mac_address) }}
+  </p>
+} @empty {
+  <p>Sin redes.</p>
+}
+<ng-content select="[container-operations]" />
+<details>
+  <summary>JSON interpretado</summary>
   <p>Datos recibidos, interpretados por JavaScript (JSON).</p>
   @if (limitedPrecision(container())) {
     <p>Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.</p>

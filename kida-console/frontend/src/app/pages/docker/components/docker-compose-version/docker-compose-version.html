@@ -26,11 +26,7 @@
     </div>
   </div>
   <div class="compose-actions">
-    <button
-      type="button"
-      [disabled]="!state.version.data()"
-      (click)="state.versionPanelOpen.set(tab())"
-    >
+    <button type="button" [disabled]="!state.version.data()" (click)="state.openVersion(tab())">
       Datos de versión
     </button>
     <button
@@ -42,28 +38,3 @@
     </button>
   </div>
 </section>
-<app-side-panel
-  [open]="state.versionPanelOpen() === tab()"
-  title="Docker Compose"
-  subtitle="Lectura de versión"
-  [fallbackFocus]="fallbackFocus()"
-  (closed)="close()"
->
-  @if (state.version.data(); as data) {
-    <h3>Versión detectada</h3>
-    <p>{{ data.version }}</p>
-    @if (state.version.stale()) {
-      <p>Versión anterior, desactualizada.</p>
-    }
-    <details>
-      <summary>JSON interpretado</summary>
-      <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>
-      @if (state.limitedPrecision(data)) {
-        <p role="status">
-          Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
-        </p>
-      }
-      <pre>{{ data | json }}</pre>
-    </details>
-  }
-</app-side-panel>

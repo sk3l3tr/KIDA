@@ -1,12 +1,11 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
-import { ContainerDetails } from '../container-details/container-details';
 import { DockerFacade, serviceKeys } from '../../services/docker.facade';
 import { ComposeProject, ComposeService } from '../../utils/docker.models';
 
 @Component({
   selector: 'app-docker-project-card',
-  imports: [IonicModule, ContainerDetails],
+  imports: [IonicModule],
   templateUrl: './docker-project-card.html',
   styleUrl: './docker-project-card.scss',
 })
@@ -18,19 +17,6 @@ export class DockerProjectCard {
   readonly keys = computed(() => serviceKeys(this.project()));
   activeCount(service: ComposeService): number {
     return service.containers.filter((container) => container.online).length;
-  }
-  isInspected(service: string, id: string): boolean {
-    const selected = this.state.inspectedContainer();
-    return (
-      selected?.project === this.project().name &&
-      selected.service === service &&
-      selected.id === id
-    );
-  }
-  toggleContainer(service: string, id: string): void {
-    this.state.inspectedContainer.set(
-      this.isInspected(service, id) ? null : { project: this.project().name, service, id },
-    );
   }
   changeServices(event: CustomEvent): void {
     if (event.target !== event.currentTarget) return;

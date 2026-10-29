@@ -53,8 +53,7 @@
                   type="button"
                   class="inspect-container"
                   [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
-                  [attr.aria-expanded]="isInspected(keys()[serviceIndex], container.id)"
-                  (click)="toggleContainer(keys()[serviceIndex], container.id)"
+                  (click)="state.openContainer(container.id, 'projects', project().name)"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24">
                     <path
@@ -66,9 +65,6 @@
                   </svg>
                 </button>
               </div>
-              @if (isInspected(keys()[serviceIndex], container.id)) {
-                <app-container-details [container]="container" />
-              }
             } @empty {
               <p>Sin contenedores.</p>
             }

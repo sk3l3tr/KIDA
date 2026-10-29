@@ -228,6 +228,151 @@ describe('Docker page', () => {
     state.ionViewWillLeave();
     expect(state.versionPanelOpen()).toBeNull();
   });
+  it('opens the inventory panel locally and follows refreshed readings, failures and disappearance', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const v = view(f, 'containers');
+    const root = v.location.nativeElement as HTMLElement;
+    expect(root.querySelectorAll('app-side-panel')).toHaveLength(1);
+    root.querySelector<HTMLButtonElement>('tbody button')!.click();
+    v.changeDetectorRef.detectChanges();
+    const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(SidePanel);
+    expect(panel.open()).toBe(true);
+    expect(panel.fallbackFocus()).toBe(root.querySelector('h1'));
+    expect(state.currentContainer()).toEqual(container);
+    expect(root.querySelectorAll('.action-buttons button')).toHaveLength(4);
+    http.expectNone(() => true);
+    state.refreshContainers();
+    const changed = { ...container, name: 'updated', online: true };
+    http.expectOne(`${base}/containers`).flush({ ...inventory, containers: [changed] });
+    expect(state.currentContainer()).toEqual(changed);
+    state.refreshContainers();
+    http.expectOne(`${base}/containers`).flush({ detail: { code: 'core_unavailable' } }, fail);
+    v.changeDetectorRef.detectChanges();
+    expect(state.currentContainer()).toEqual(changed);
+    expect(root.querySelector('app-side-panel')!.textContent).toContain('desactualizados');
+    state.refreshContainers();
+    http.expectOne(`${base}/containers`).flush({ total: 0, running: 0, containers: [] });
+    v.changeDetectorRef.detectChanges();
+    expect(panel.open()).toBe(true);
+    expect(root.querySelector('app-side-panel')!.textContent).toContain(
+      'Contenedor no disponible en esta lectura',
+    );
+    panel.closed.emit();
+    expect(state.inspectedContainer()).toBeNull();
+    state.refreshContainers();
+    http.expectOne(`${base}/containers`).flush(inventory);
+    expect(state.inspectedContainer()).toBeNull();
+  });
+  it('keeps Compose data separate from current inventory and replaces panel contents without requests', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const v = view(f, 'projects');
+    const observed = { ...container, name: 'Compose old copy', online: true };
+    state.projects.data.set([{ ...project, services: [{ name: null, containers: [observed] }] }]);
+    state.openVersion('projects');
+    v.changeDetectorRef.detectChanges();
+    v.location.nativeElement.querySelector('.inspect-container').click();
+    v.changeDetectorRef.detectChanges();
+    expect(state.versionPanelOpen()).toBeNull();
+    expect(state.currentContainer()).toEqual(observed);
+    expect(state.containerInInventory()).toEqual(container);
+    expect(v.location.nativeElement.querySelectorAll('app-side-panel')).toHaveLength(1);
+    state.inventory.data.set({ ...inventory, containers: [] });
+    v.changeDetectorRef.detectChanges();
+    expect(v.location.nativeElement.querySelector('app-side-panel').textContent).toContain(
+      'Sin el mismo ID',
+    );
+    expect(state.currentContainer()).toEqual(observed);
+    state.openVersion('projects');
+    expect(state.inspectedContainer()).toBeNull();
+    http.expectNone(() => true);
+  });
+  it('opens from project inspection without fetching and prevents late responses from reopening or replacing selection', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.inspect(project.name);
+    http
+      .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
+      .flush(project);
+    const v = view(f, 'projects');
+    const button = Array.from(
+      v.location.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.textContent?.includes('Inspeccionar ' + container.name))!;
+    button.click();
+    v.changeDetectorRef.detectChanges();
+    expect(state.inspectedContainer()?.source).toBe('detail');
+    expect(state.currentContainer()).toEqual(container);
+    http.expectNone(() => true);
+    state.inspect(project.name);
+    const late = http.expectOne(
+      `${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`,
+    );
+    state.openContainer(container.id, 'projects', project.name);
+    late.flush({ ...project, services: [] });
+    expect(state.currentContainer()).toEqual(container);
+    state.openContainer(container.id, 'detail', project.name);
+    expect(state.currentContainer()).toBeNull();
+    state.leaveTab();
+    expect(state.inspectedContainer()).toBeNull();
+    v.changeDetectorRef.detectChanges();
+    expect(v.instance.panelOpen()).toBe(false);
+    state.openContainer(container.id, 'inventory');
+    TestBed.inject(ThemeIdentity).begin();
+    expect(state.inspectedContainer()).toBeNull();
+  });
+  it('preserves complete container details, empty collections and invalid dates while formatting valid dates in UTC', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    const value = {
+      ...container,
+      started_at: '2026-10-29T12:00:00+02:00',
+      finished_at: 'invalid-date',
+      ports: [],
+      networks: [],
+      exit_code: 137,
+    };
+    state.inventory.data.set({ ...inventory, containers: [value] });
+    state.openContainer(container.id, 'inventory');
+    const v = view(f, 'containers');
+    const details = v.location.nativeElement.querySelector('app-container-details');
+    expect(details.textContent).toContain('2026-10-29 10:00:00.000 UTC');
+    expect(details.textContent).toContain('invalid-date');
+    expect(details.textContent).toContain('Sin puertos');
+    expect(details.textContent).toContain('Sin redes');
+    expect(details.textContent).toContain('Salida: 137');
+    expect(details.textContent).toContain('future-status');
+    expect(details.textContent).toContain('JSON interpretado');
+    expect(JSON.parse(details.querySelector('pre').textContent)).toEqual(value);
+    expect(details.querySelector('img')).toBeNull();
+    state.inventory.data.set(inventory);
+    v.changeDetectorRef.detectChanges();
+    expect(details.textContent).toContain('Inicio: No disponible');
+    expect(details.textContent).toContain('Puerta de enlace:');
+    expect(details.textContent).toContain('MAC:');
+    for (const invalid of [
+      '2026-02-30T00:00:00Z',
+      '2026-13-01T00:00:00Z',
+      '2026-04-31T12:00:00+02:00',
+    ]) {
+      state.inventory.data.set({
+        ...inventory,
+        containers: [{ ...container, started_at: invalid }],
+      });
+      v.changeDetectorRef.detectChanges();
+      expect(details.textContent).toContain('Inicio: ' + invalid);
+    }
+    state.inventory.data.set({
+      ...inventory,
+      containers: [{ ...container, started_at: '2024-02-29T12:00:00Z' }],
+    });
+    v.changeDetectorRef.detectChanges();
+    expect(details.textContent).toContain('2024-02-29 12:00:00.000 UTC');
+    const sections = Array.from(details.querySelectorAll('h3, summary')).map(
+      (node: any) => node.textContent,
+    );
+    expect(sections.slice(-2)).toEqual(['Operaciones', 'JSON interpretado']);
+  });
   it('shows independent indicators for missing, zero, stale and differing readings in both tabs', () => {
     const f = enter(),
       state = f.componentInstance.state;
@@ -349,7 +494,9 @@ describe('Docker page', () => {
     const button = card.querySelector('.inspect-container');
     button.click();
     v.changeDetectorRef.detectChanges();
-    expect(card.querySelector('app-container-details')?.textContent).toContain('ID: second');
+    expect(v.location.nativeElement.querySelector('app-container-details')?.textContent).toContain(
+      'ID: second',
+    );
     http.expectNone(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
     state.refreshProjects();
     http.expectOne(`${base}/compose/projects`).flush([
@@ -363,14 +510,21 @@ describe('Docker page', () => {
       },
     ]);
     v.changeDetectorRef.detectChanges();
-    expect(card.querySelector('app-container-details')?.textContent).toContain('ID: second');
+    expect(v.location.nativeElement.querySelector('app-container-details')?.textContent).toContain(
+      'ID: second',
+    );
     state.leaveTab();
     v.changeDetectorRef.detectChanges();
-    expect(card.querySelector('app-container-details')).toBeNull();
-    state.inspectedContainer.set({ project: project.name, service: keys[1], id: 'second' });
+    expect(state.inspectedContainer()).toBeNull();
+    state.openContainer('second', 'projects', project.name);
     state.refreshProjects();
     http.expectOne(`${base}/compose/projects`).flush([{ ...project, services: [services[0]] }]);
-    expect(state.inspectedContainer()).toBeNull();
+    expect(state.inspectedContainer()?.id).toBe('second');
+    expect(state.currentContainer()).toBeNull();
+    v.changeDetectorRef.detectChanges();
+    expect(v.location.nativeElement.textContent).toContain(
+      'Contenedor no disponible en esta lectura',
+    );
     state.ionViewWillLeave();
     expect(state.expandedServices()).toEqual({});
   });
@@ -627,7 +781,7 @@ describe('Docker page', () => {
     try {
       state.search.set(project.name);
       v.changeDetectorRef.detectChanges();
-      const summary = root.querySelector<HTMLElement>('tbody summary')!;
+      const summary = root.querySelector<HTMLElement>('tbody button')!;
       const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(summary);
       const searchFocus = vi.spyOn(
         root.querySelector<HTMLInputElement>('#docker-search')!,
@@ -646,7 +800,10 @@ describe('Docker page', () => {
   });
   it('shows API totals, future states, nulls, zero, anonymous services and safe remote text', () => {
     const f = initial();
-    const rendered = view(f, 'containers').location.nativeElement;
+    const v = view(f, 'containers');
+    v.location.nativeElement.querySelector('tbody button').click();
+    v.changeDetectorRef.detectChanges();
+    const rendered = v.location.nativeElement;
     expect(rendered.textContent).toContain('Total: 99');
     expect(rendered.textContent).toContain(container.name);
     expect(rendered.querySelector('img')).toBeNull();

@@ -5,7 +5,7 @@
       <p>Consulta el inventario de contenedores y los proyectos Compose observados.</p>
     </header>
     <app-docker-indicators />
-    <app-docker-compose-version [tab]="tab" [fallbackFocus]="heading" />
+    <app-docker-compose-version [tab]="tab" />
     <div aria-live="polite">
       @if (state.busy()) {
         <p>Acción o actualización posterior pendiente…</p>
@@ -84,7 +84,13 @@
             @for (service of project.services; track $index) {
               <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
               @for (container of service.containers; track container.id) {
-                <app-container-details [container]="container" />
+                <button
+                  type="button"
+                  [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
+                  (click)="state.openContainer(container.id, 'detail', project.name)"
+                >
+                  Inspeccionar {{ container.name }}
+                </button>
               } @empty {
                 <p>Sin contenedores.</p>
               }
@@ -195,10 +201,13 @@
                       <td>
                         <span class="mobile-label">Contenedor</span
                         ><strong>{{ container.name }}</strong>
-                        <details>
-                          <summary>Ver detalles</summary>
-                          <app-container-details [container]="container" />
-                        </details>
+                        <button
+                          type="button"
+                          [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
+                          (click)="state.openContainer(container.id, 'inventory')"
+                        >
+                          Inspeccionar
+                        </button>
                       </td>
                       <td>
                         <span class="mobile-label">Estado</span
@@ -267,6 +276,73 @@
         </div>
       </section>
     }
+    <app-side-panel
+      [open]="panelOpen()"
+      [title]="state.inspectedContainer() ? 'Inspeccionar contenedor' : 'Docker Compose'"
+      [subtitle]="state.inspectedContainer()?.id ?? 'Lectura de versión'"
+      [fallbackFocus]="heading"
+      (closed)="closePanel()"
+    >
+      @if (state.inspectedContainer(); as selected) {
+        <p>
+          Origen:
+          {{
+            selected.source === 'inventory'
+              ? 'Inventario'
+              : selected.source === 'projects'
+                ? 'Lista de proyectos Compose'
+                : 'Inspección de proyecto'
+          }}{{ selected.project ? ' · ' + selected.project : '' }}
+        </p>
+        @if (state.containerReading().loading()) {
+          <p role="status">Actualizando lectura…</p>
+        }
+        @if (state.containerReading().error()) {
+          <p role="alert">Error de lectura: {{ state.containerReading().error() }}</p>
+        }
+        @if (state.containerReading().stale()) {
+          <p>Datos anteriores, desactualizados.</p>
+        }
+        @if (state.currentContainer(); as container) {
+          <app-container-details [container]="container">
+            <section container-operations>
+              <h3>Operaciones</h3>
+              @if (!state.containerInInventory()) {
+                <p>
+                  Sin el mismo ID en el inventario principal, las operaciones no están disponibles.
+                </p>
+              } @else if (state.locked()) {
+                <p>Operaciones temporalmente bloqueadas. Los controles están en el inventario.</p>
+              } @else {
+                <p>Operaciones disponibles desde el inventario de contenedores.</p>
+              }
+            </section>
+          </app-container-details>
+        } @else {
+          <p role="status">Contenedor no disponible en esta lectura</p>
+        }
+      } @else {
+        @if (state.version.data(); as data) {
+          <h3>Versión detectada</h3>
+          <p>{{ data.version }}</p>
+          @if (state.version.stale()) {
+            <p>Versión anterior, desactualizada.</p>
+          }
+          <details>
+            <summary>JSON interpretado</summary>
+            <p>
+              Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.
+            </p>
+            @if (state.limitedPrecision(data)) {
+              <p role="status">
+                Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
+              </p>
+            }
+            <pre>{{ data | json }}</pre>
+          </details>
+        }
+      }
+    </app-side-panel>
     <p>Los datos JSON se interpretan con JavaScript; no representan el JSON original exacto.</p>
     @if (
       state.limitedPrecision(state.inventory.data()) ||

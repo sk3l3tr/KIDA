@@ -2,6 +2,7 @@ import { Component, ElementRef, effect, inject, viewChild } from '@angular/core'
 import { DOCUMENT, JsonPipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
+import { SidePanel } from '../../components/side-panel/side-panel';
 import { ContainerDetails } from './components/container-details/container-details';
 import { DockerFacade } from './services/docker.facade';
 import { DockerIndicators } from './components/docker-indicators/docker-indicators';
@@ -12,6 +13,7 @@ import { DockerProjectCard } from './components/docker-project-card/docker-proje
   selector: 'app-docker-view',
   imports: [
     IonContent,
+    SidePanel,
     JsonPipe,
     ContainerDetails,
     DockerIndicators,
@@ -38,6 +40,18 @@ export class DockerView {
     });
   }
 
+  panelOpen(): boolean {
+    const selected = this.state.inspectedContainer();
+    return (
+      this.state.versionPanelOpen() === this.tab ||
+      (!!selected && (selected.source === 'inventory' ? 'containers' : 'projects') === this.tab)
+    );
+  }
+  closePanel(): void {
+    if (!this.panelOpen()) return;
+    this.state.versionPanelOpen.set(null);
+    this.state.inspectedContainer.set(null);
+  }
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();
     this.state.heading = () => this.heading()?.nativeElement;

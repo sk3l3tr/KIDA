@@ -82,9 +82,44 @@ export class DockerFacade implements OnDestroy {
     () => new Set(this.visibleContainers().map((container) => container.id)),
   );
   readonly expandedServices = signal<Record<string, string[]>>({});
-  readonly inspectedContainer = signal<{ project: string; service: string; id: string } | null>(
-    null,
-  );
+  readonly inspectedContainer = signal<{
+    id: string;
+    source: 'inventory' | 'projects' | 'detail';
+    project?: string;
+  } | null>(null);
+  readonly containerReading = computed(() => {
+    const selected = this.inspectedContainer();
+    if (selected?.source === 'projects') return this.projects;
+    if (selected?.source === 'detail') return this.detail;
+    return this.inventory;
+  });
+  readonly currentContainer = computed(() => {
+    const selected = this.inspectedContainer();
+    if (!selected) return null;
+    if (selected.source === 'inventory') {
+      return this.inventory.data()?.containers.find((c) => c.id === selected.id) ?? null;
+    }
+    const project =
+      selected.source === 'projects'
+        ? this.projects.data()?.find((p) => p.name === selected.project)
+        : this.selected() === selected.project
+          ? this.detail.data()
+          : null;
+    return project?.services.flatMap((s) => s.containers).find((c) => c.id === selected.id) ?? null;
+  });
+  readonly containerInInventory = computed(() => {
+    const selected = this.inspectedContainer();
+    return this.inventory.data()?.containers.find((c) => c.id === selected?.id) ?? null;
+  });
+  openContainer(id: string, source: 'inventory' | 'projects' | 'detail', project?: string): void {
+    if (!this.active || this.pending() !== null) return;
+    this.versionPanelOpen.set(null);
+    this.inspectedContainer.set({ id, source, project });
+  }
+  openVersion(tab: 'projects' | 'containers'): void {
+    this.inspectedContainer.set(null);
+    this.versionPanelOpen.set(tab);
+  }
   readonly detail = reading<ComposeProject>();
   readonly selected = signal<string | null>(null);
   readonly busy = signal(false);
@@ -228,20 +263,6 @@ export class DockerFacade implements OnDestroy {
           : keys.slice(0, 1);
       }
       this.expandedServices.set(next);
-      const inspected = this.inspectedContainer();
-      if (
-        inspected &&
-        !projects.some(
-          (project) =>
-            project.name === inspected.project &&
-            project.services.some(
-              (service, index) =>
-                serviceKeys(project)[index] === inspected.service &&
-                service.containers.some((container) => container.id === inspected.id),
-            ),
-        )
-      )
-        this.inspectedContainer.set(null);
       if (
         this.selected() !== null &&
         !projects.some((project) => project.name === this.selected())
