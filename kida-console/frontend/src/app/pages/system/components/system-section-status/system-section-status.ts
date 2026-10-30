@@ -7,8 +7,8 @@ import { SystemSection } from '../../services/system.facade';
   imports: [DatePipe, NgTemplateOutlet],
   templateUrl: './system-section-status.html',
 })
-export class SystemSectionStatus {
-  readonly state = input.required<SystemSection>();
+export class SystemSectionStatus<T> {
+  readonly state = input.required<SystemSection<T>>();
   readonly timestampOnly = input(false);
   readonly hideTimestamp = input(false);
 }

@@ -20,7 +20,7 @@ import { SystemSection } from '../../services/system.facade';
     }
   `,
 })
-export class SystemSectionView {
-  readonly state = input.required<SystemSection>();
+export class SystemSectionView<T> {
+  readonly state = input.required<SystemSection<T>>();
   readonly refresh = output<void>();
 }

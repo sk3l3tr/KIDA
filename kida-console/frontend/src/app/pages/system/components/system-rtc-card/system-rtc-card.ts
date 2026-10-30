@@ -1,5 +1,6 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { SystemSection } from '../../services/system.facade';
+import { WakeCapabilities } from '../../utils/system.models';
 import { displaySystemValue } from '../../utils/system-format';
 import { fields } from '../system-sensor-card/system-sensors';
 import { SystemData } from '../system-data/system-data';
@@ -12,7 +13,7 @@ import { SystemSectionStatus } from '../system-section-status/system-section-sta
   styleUrl: './system-rtc-card.scss',
 })
 export class SystemRtcCard {
-  readonly state = input.required<SystemSection>();
+  readonly state = input.required<SystemSection<WakeCapabilities>>();
   readonly fields = fields;
   readonly display = displaySystemValue;
 

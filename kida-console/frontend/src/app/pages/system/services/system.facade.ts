@@ -11,6 +11,8 @@ import {
 import {
   PendingAction,
   PowerAction,
+  SystemHealth,
+  WakeCapabilities,
   actionLabels,
   cycleRequest,
   systemFailure,
@@ -18,20 +20,19 @@ import {
 } from '../utils/system.models';
 
 interface ConfirmationContext {
-  readonly generation: number;
   readonly confirmationRevision: number;
 }
 
-function section(title: string) {
+function section<T>(title: string) {
   return {
     title,
-    data: signal<unknown>(null),
+    data: signal<T | null>(null),
     loading: signal(false),
     error: signal(''),
     updated: signal<Date | null>(null),
   };
 }
-export type SystemSection = ReturnType<typeof section>;
+export type SystemSection<T> = ReturnType<typeof section<T>>;
 
 @Injectable()
 export class SystemFacade implements OnDestroy {
@@ -39,8 +40,8 @@ export class SystemFacade implements OnDestroy {
   private readonly confirmations = inject(SystemConfirmationService);
   private readonly identity = inject(ThemeIdentity);
 
-  readonly health = section('Salud y sensores');
-  readonly wake = section('Capacidades RTC');
+  readonly health = section<SystemHealth>('Salud y sensores');
+  readonly wake = section<WakeCapabilities>('Capacidades RTC');
   readonly sections = [this.health, this.wake];
   readonly sensorsAvailable = computed(() => Array.isArray(fields(this.health.data())['sensors']));
   readonly sensors = computed(() => sensorReadings(this.health.data()));
@@ -61,7 +62,6 @@ export class SystemFacade implements OnDestroy {
   private energyActive = false;
   private confirming = false;
   private confirmationRevision = 0;
-  private generation = 0;
   private subscriptions = new Subscription();
   private confirmation?: SystemConfirmation;
   private readonly sessionChanges = this.identity.changes.subscribe(() => this.ionViewWillLeave());
@@ -70,8 +70,8 @@ export class SystemFacade implements OnDestroy {
     if (this.active) return;
     this.reset();
     this.active = true;
-    this.refresh(this.health);
-    this.refresh(this.wake);
+    this.refreshHealth();
+    this.refreshWake();
   }
   ionViewWillLeave(): void {
     this.active = false;
@@ -96,7 +96,6 @@ export class SystemFacade implements OnDestroy {
   }
   private reset(): void {
     this.leaveEnergy();
-    ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
     this.busy.set(false);
@@ -115,12 +114,18 @@ export class SystemFacade implements OnDestroy {
       state.updated.set(null);
     }
   }
-  refresh(state: SystemSection): void {
+  refreshHealth(): void {
+    this.load(this.health, this.service.health());
+  }
+
+  refreshWake(): void {
+    this.load(this.wake, this.service.wakeCapabilities());
+  }
+
+  private load<T>(state: SystemSection<T>, request: Observable<T>): void {
     if (!this.active || state.loading()) return;
     state.loading.set(true);
     state.error.set('');
-    const request: Observable<unknown> =
-      state === this.health ? this.service.health() : this.service.wakeCapabilities();
     this.subscriptions.add(
       request.pipe(finalize(() => state.loading.set(false))).subscribe({
         next: (data) => {
@@ -141,7 +146,6 @@ export class SystemFacade implements OnDestroy {
     if (!pending) return;
 
     const context: ConfirmationContext = {
-      generation: this.generation,
       confirmationRevision: this.confirmationRevision,
     };
     let confirmation: SystemConfirmation;
@@ -175,10 +179,7 @@ export class SystemFacade implements OnDestroy {
   }
 
   private isCurrentConfirmation(context: ConfirmationContext): boolean {
-    return (
-      context.generation === this.generation &&
-      context.confirmationRevision === this.confirmationRevision
-    );
+    return context.confirmationRevision === this.confirmationRevision;
   }
 
   private canExecute(context: ConfirmationContext): boolean {

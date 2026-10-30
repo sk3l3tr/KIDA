@@ -434,6 +434,34 @@ describe('System page', () => {
     expect(view.busy()).toBe(false);
   });
 
+  it.each(['tab', 'view', 'session', 'destroy'] as const)(
+    'invalidates the confirmation before cancelling it on %s',
+    async (leaving) => {
+      const view = enter().componentInstance.state;
+      const prepare = vi.spyOn(TestBed.inject(SystemConfirmationService), 'prepare');
+      const operation = view.confirm('shutdown');
+      await ready();
+      const isCurrent = prepare.mock.calls[0][1];
+      const confirmation = prepare.mock.results[0].value;
+      const cancel = confirmation.cancel.bind(confirmation);
+      const cancellation = vi.spyOn(confirmation, 'cancel').mockImplementation(() => {
+        expect(isCurrent()).toBe(false);
+        cancel();
+      });
+      expect(isCurrent()).toBe(true);
+
+      if (leaving === 'tab') view.leaveEnergy();
+      else if (leaving === 'view') view.ionViewWillLeave();
+      else if (leaving === 'session') TestBed.inject(ThemeIdentity).clear();
+      else view.ngOnDestroy();
+
+      expect(cancellation).toHaveBeenCalledOnce();
+      await operation;
+      expect(view.busy()).toBe(false);
+      http.expectNone((request) => request.method === 'POST');
+    },
+  );
+
   it.each(['tab', 'view', 'session'] as const)(
     'releases a pending creation on %s invalidation without unlocking a newer dialog',
     async (leaving) => {
@@ -475,70 +503,100 @@ describe('System page', () => {
     },
   );
 
-  it('does not let an old dismissal unlock or execute over a new confirmation', async () => {
-    const view = enter().componentInstance.state;
-    const old = view.confirm('shutdown');
-    await ready();
-    const dismissOld = dismiss;
-    view.leaveEnergy();
-    view.enterEnergy();
-    const current = view.confirm('reboot');
-    await ready();
-    dismissOld({ role: 'confirm' });
-    await old;
-    expect(view.busy()).toBe(true);
-    expect(view.error()).toBe('');
-    await view.confirm('shutdown');
-    expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
-    http.expectNone(`${base}/shutdown`);
-    dismiss({ role: 'confirm' });
-    await current;
-    http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
-    expect(view.busy()).toBe(false);
-  });
-
-  it('releases the confirmation lock when leaving between dismissal and execution', async () => {
-    const view = enter().componentInstance.state;
-    const operation = view.confirm('shutdown');
-    await ready();
-    dismiss({ role: 'confirm' });
-    queueMicrotask(() => {
-      view.leaveEnergy();
+  it.each(['tab', 'view', 'session'] as const)(
+    'does not let an old dismissal unlock or execute over a new confirmation after %s invalidation',
+    async (leaving) => {
+      const view = enter().componentInstance.state;
+      const old = view.confirm('shutdown');
+      await ready();
+      const dismissOld = dismiss;
+      if (leaving === 'tab') view.leaveEnergy();
+      else if (leaving === 'view') view.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).clear();
+      if (leaving !== 'tab') {
+        view.ionViewWillEnter();
+        http.expectOne(`${base}/health`).flush(health);
+        http.expectOne(`${base}/wake-capabilities`).flush(wake);
+      }
       view.enterEnergy();
-    });
-    await operation;
-    expect(view.busy()).toBe(false);
-    http.expectNone(`${base}/shutdown`);
-    const retry = view.confirm('reboot');
-    await ready();
-    dismiss({ role: 'cancel' });
-    await retry;
-    expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
-  });
+      const current = view.confirm('reboot');
+      await ready();
+      dismissOld({ role: 'confirm' });
+      await old;
+      expect(view.busy()).toBe(true);
+      expect(view.error()).toBe('');
+      await view.confirm('shutdown');
+      expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+      http.expectNone(`${base}/shutdown`);
+      dismiss({ role: 'confirm' });
+      await current;
+      http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
+      expect(view.busy()).toBe(false);
+    },
+  );
 
-  it('does not let an old dialog creation failure affect a new confirmation', async () => {
-    const view = enter().componentInstance.state;
-    let rejectOld!: (reason: Error) => void;
-    vi.mocked(TestBed.inject(AlertController).create).mockImplementationOnce(
-      () =>
-        new Promise((_, reject) => {
-          rejectOld = reject;
-        }),
-    );
-    const old = view.confirm('shutdown');
-    view.leaveEnergy();
-    view.enterEnergy();
-    const current = view.confirm('reboot');
-    await ready();
-    rejectOld(new Error('late failure'));
-    await old;
-    expect(view.busy()).toBe(true);
-    expect(view.error()).toBe('');
-    dismiss({ role: 'cancel' });
-    await current;
-    expect(view.busy()).toBe(false);
-    http.expectNone((request) => request.method === 'POST');
-  });
+  it.each(['tab', 'view', 'session'] as const)(
+    'releases the confirmation lock when leaving between dismissal and execution after %s invalidation',
+    async (leaving) => {
+      const view = enter().componentInstance.state;
+      const operation = view.confirm('shutdown');
+      await ready();
+      dismiss({ role: 'confirm' });
+      queueMicrotask(() => {
+        if (leaving === 'tab') view.leaveEnergy();
+        else if (leaving === 'view') view.ionViewWillLeave();
+        else TestBed.inject(ThemeIdentity).clear();
+        if (leaving !== 'tab') {
+          view.ionViewWillEnter();
+          http.expectOne(`${base}/health`).flush(health);
+          http.expectOne(`${base}/wake-capabilities`).flush(wake);
+        }
+        view.enterEnergy();
+      });
+      await operation;
+      expect(view.busy()).toBe(false);
+      http.expectNone(`${base}/shutdown`);
+      const retry = view.confirm('reboot');
+      await ready();
+      dismiss({ role: 'cancel' });
+      await retry;
+      expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each(['tab', 'view', 'session'] as const)(
+    'does not let an old dialog creation failure affect a new confirmation after %s invalidation',
+    async (leaving) => {
+      const view = enter().componentInstance.state;
+      let rejectOld!: (reason: Error) => void;
+      vi.mocked(TestBed.inject(AlertController).create).mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectOld = reject;
+          }),
+      );
+      const old = view.confirm('shutdown');
+      if (leaving === 'tab') view.leaveEnergy();
+      else if (leaving === 'view') view.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).clear();
+      if (leaving !== 'tab') {
+        view.ionViewWillEnter();
+        http.expectOne(`${base}/health`).flush(health);
+        http.expectOne(`${base}/wake-capabilities`).flush(wake);
+      }
+      view.enterEnergy();
+      const current = view.confirm('reboot');
+      await ready();
+      rejectOld(new Error('late failure'));
+      await old;
+      expect(view.busy()).toBe(true);
+      expect(view.error()).toBe('');
+      dismiss({ role: 'cancel' });
+      await current;
+      expect(view.busy()).toBe(false);
+      http.expectNone((request) => request.method === 'POST');
+    },
+  );
 
   it.each(['cancel', 'success', 'failure', 'start-failure'] as const)(
     'restores focus after %s',
@@ -719,6 +777,71 @@ describe('System shared tab state', () => {
   });
   afterEach(() => http.verify());
 
+  it.each(['health', 'wake'] as const)(
+    'guards inactive and duplicate %s loads and preserves its snapshot on failure',
+    (key) => {
+      const state = TestBed.inject(SystemFacade);
+      const section = state[key];
+      const path = key === 'health' ? 'health' : 'wake-capabilities';
+      const refresh = () => (key === 'health' ? state.refreshHealth() : state.refreshWake());
+      const snapshot = key === 'health' ? health : wake;
+
+      refresh();
+      http.expectNone(`${base}/${path}`);
+      state.ionViewWillEnter();
+      refresh();
+      http.expectOne(`${base}/health`).flush(health);
+      http.expectOne(`${base}/wake-capabilities`).flush(wake);
+      const updated = section.updated();
+      expect(updated).toBeInstanceOf(Date);
+
+      refresh();
+      expect(section.loading()).toBe(true);
+      expect(section.data()).toEqual(snapshot);
+      expect(section.error()).toBe('');
+      refresh();
+      http.expectOne(`${base}/${path}`).error(new ProgressEvent('error'));
+      expect(section.loading()).toBe(false);
+      expect(section.error()).not.toBe('');
+      expect(section.data()).toEqual(snapshot);
+      expect(section.updated()).toBe(updated);
+      http.expectNone(`${base}/${path}`);
+
+      refresh();
+      expect(section.error()).toBe('');
+      http.expectOne(`${base}/${path}`).flush(null);
+      expect(section.data()).toBeNull();
+      expect(section.loading()).toBe(false);
+      expect(section.updated()).not.toBe(updated);
+    },
+  );
+
+  it.each(['leave', 'session', 'destroy'] as const)(
+    'clears pending section loads on %s and discards both late responses',
+    (transition) => {
+      const state = TestBed.inject(SystemFacade);
+      state.ionViewWillEnter();
+      const pendingHealth = http.expectOne(`${base}/health`);
+      const pendingWake = http.expectOne(`${base}/wake-capabilities`);
+      if (transition === 'leave') state.ionViewWillLeave();
+      else if (transition === 'session') TestBed.inject(ThemeIdentity).clear();
+      else state.ngOnDestroy();
+
+      pendingHealth.flush(health);
+      pendingWake.flush(wake);
+      for (const section of state.sections) {
+        expect(section.data()).toBeNull();
+        expect(section.loading()).toBe(false);
+        expect(section.error()).toBe('');
+        expect(section.updated()).toBeNull();
+      }
+      state.refreshHealth();
+      state.refreshWake();
+      http.expectNone(`${base}/health`);
+      http.expectNone(`${base}/wake-capabilities`);
+    },
+  );
+
   it('shares the same snapshots across tabs, loads once and refreshes only the requested section', () => {
     const overview = TestBed.createComponent(SystemOverview).componentInstance;
     const energy = TestBed.createComponent(SystemEnergy).componentInstance;
@@ -738,7 +861,7 @@ describe('System shared tab state', () => {
     expect(state.wake.data()).toEqual(wake);
     http.expectNone(`${base}/health`);
     http.expectNone(`${base}/wake-capabilities`);
-    state.refresh(state.wake);
+    state.refreshWake();
     http.expectNone(`${base}/health`);
     http.expectOne(`${base}/wake-capabilities`).flush(null);
     expect(state.wake.data()).toBeNull();
