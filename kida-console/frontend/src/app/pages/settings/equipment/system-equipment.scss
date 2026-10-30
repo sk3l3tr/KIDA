@@ -2,20 +2,6 @@
   display: block;
   min-width: 0;
 }
-.equipment-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  h2 {
-    margin: 0.25rem 0 0;
-  }
-}
-.equipment-status {
-  margin-bottom: 1rem;
-}
 .equipment-list {
   background: transparent;
   border: var(--kida-border-width) solid var(--ion-border-color);
@@ -23,7 +9,6 @@
   overflow: hidden;
   padding: 0;
 }
-.equipment-extras,
 .equipment-details ion-accordion-group {
   background: transparent;
   border: 0;
@@ -79,9 +64,6 @@ ion-label.value-row {
     max-width: 100%;
     text-align: end;
   }
-}
-.equipment-extras {
-  margin-top: 1rem;
 }
 .equipment-modal {
   --width: min(760px, calc(100vw - 3rem));

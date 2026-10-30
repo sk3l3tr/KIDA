@@ -1,20 +1,10 @@
 <section class="equipment-panel" aria-label="Equipo" [attr.aria-busy]="loading()">
-  <div class="equipment-header">
-    <div>
-      <span class="eyebrow">INFORMACIÓN DEL SERVIDOR</span>
-      <h2>Equipo</h2>
-    </div>
-    <button class="secondary" (click)="refresh.emit()" [disabled]="loading()">
-      Actualizar Equipo
-    </button>
-  </div>
-  <ng-container [ngTemplateOutlet]="status" />
   @if (value() !== null) {
     <ion-list class="equipment-list" lines="none">
       <ion-item class="hostname-row">
         <ion-label class="value-row">
           <span>Nombre del equipo</span>
-          <app-system-data [value]="fields()['hostname']" />
+          <span>{{ fields()['hostname'] }}</span>
         </ion-label>
       </ion-item>
       <ion-item button detail (click)="open('system')" aria-haspopup="dialog">
@@ -24,14 +14,6 @@
         <ion-label>Hardware</ion-label>
       </ion-item>
     </ion-list>
-    @if (extras(); as extra) {
-      <ion-accordion-group class="equipment-extras">
-        <ion-accordion value="extra">
-          <ion-item slot="header"><ion-label>Otros datos</ion-label></ion-item>
-          <div slot="content" class="detail-content"><app-system-data [value]="extra.value" /></div>
-        </ion-accordion>
-      </ion-accordion-group>
-    }
   }
 </section>
 
@@ -56,7 +38,6 @@
     </ion-header>
     <ion-content>
       <div class="equipment-details">
-        <ng-container [ngTemplateOutlet]="status" />
         <ion-accordion-group multiple>
           @for (group of groups(); track group.key) {
             @if (group.expandable) {
@@ -93,25 +74,3 @@
     </ion-content>
   </ng-template>
 </ion-modal>
-
-<ng-template #status>
-  <div class="equipment-status" aria-live="polite">
-    @if (loading()) {
-      <p>Cargando…</p>
-    }
-    @if (updated()) {
-      <small
-        >Última actualización: {{ updated() | date: 'medium' }}. Instantánea; puede estar
-        desactualizada.</small
-      >
-    } @else {
-      <small>Sin actualización disponible.</small>
-    }
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
-    @if (value() !== null && (error() || loading())) {
-      <p>Datos anteriores; pendientes de actualizar.</p>
-    }
-  </div>
-</ng-template>

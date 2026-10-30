@@ -214,7 +214,7 @@ describe('System page', () => {
     await Promise.resolve();
     await Promise.resolve();
   }
-  it('places energy panels and the conditional operation result in masonry', () => {
+  it('places the three energy panels in masonry', () => {
     const fixture = enter();
     const masonry = fixture.nativeElement.querySelector('app-system-energy app-masonry');
     const items = () => masonry.querySelectorAll(':scope > [appMasonryItem]');
@@ -223,13 +223,6 @@ describe('System page', () => {
       'Apagado y reinicio',
       'Ciclo de energía',
     ]);
-    fixture.componentInstance.state.error.set('Error de prueba');
-    fixture.detectChanges();
-    expect(items()).toHaveLength(4);
-    expect(items()[3].getAttribute('aria-label')).toBe('Estado de la operación');
-    fixture.componentInstance.state.error.set('');
-    fixture.detectChanges();
-    expect(items()).toHaveLength(3);
   });
   it('updates quick choices and manual input without sending an operation', async () => {
     const fixture = enter();
@@ -345,11 +338,9 @@ describe('System page', () => {
       else dialog.present.mockRejectedValueOnce(failure);
       await view.confirm('shutdown');
       expect(view.busy()).toBe(false);
-      expect(view.error()).toBe('No se pudo abrir la confirmación.');
       http.expectNone(`${base}/shutdown`);
       const retry = view.confirm('shutdown');
       await ready();
-      expect(view.error()).toBe('');
       expect(view.busy()).toBe(true);
       dismiss({ role: 'cancel' });
       await retry;
@@ -364,7 +355,6 @@ describe('System page', () => {
     });
     await expect(view.confirm('shutdown')).resolves.toBeUndefined();
     expect(view.busy()).toBe(false);
-    expect(view.error()).toBe('No se pudo abrir la confirmación.');
     expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
     http.expectNone(`${base}/shutdown`);
     const retry = view.confirm('reboot');
@@ -372,11 +362,10 @@ describe('System page', () => {
     dismiss({ role: 'confirm' });
     await retry;
     http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
-    expect(view.error()).toBe('');
     expect(view.busy()).toBe(false);
   });
 
-  it('reports a synchronous execution failure as an operation error and allows retry', async () => {
+  it('releases the lock after a synchronous execution failure and allows retry', async () => {
     const view = enter().componentInstance.state;
     vi.spyOn(TestBed.inject(SystemService), 'execute').mockImplementationOnce(() => {
       throw new Error('execution failed');
@@ -386,11 +375,9 @@ describe('System page', () => {
     dismiss({ role: 'confirm' });
     await operation;
     expect(view.busy()).toBe(false);
-    expect(view.error()).toBe('No se pudo completar la operación.');
     http.expectNone(`${base}/shutdown`);
     const retry = view.confirm('reboot');
     await ready();
-    expect(view.error()).toBe('');
     dismiss({ role: 'confirm' });
     await retry;
     http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
@@ -456,7 +443,6 @@ describe('System page', () => {
       await old;
       expect(oldDialog.remove).toHaveBeenCalledOnce();
       expect(view.busy()).toBe(true);
-      expect(view.error()).toBe('');
       await view.confirm('shutdown');
       expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
       dismiss({ role: 'cancel' });
@@ -487,7 +473,6 @@ describe('System page', () => {
       dismissOld({ role: 'confirm' });
       await old;
       expect(view.busy()).toBe(true);
-      expect(view.error()).toBe('');
       await view.confirm('shutdown');
       expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
       http.expectNone(`${base}/shutdown`);
@@ -553,7 +538,6 @@ describe('System page', () => {
       rejectOld(new Error('late failure'));
       await old;
       expect(view.busy()).toBe(true);
-      expect(view.error()).toBe('');
       dismiss({ role: 'cancel' });
       await current;
       expect(view.busy()).toBe(false);
@@ -646,7 +630,6 @@ describe('System page', () => {
     http.expectNone(`${base}/shutdown`);
     request.flush({ scheduled: true, when: '+1' });
     expect(view.busy()).toBe(false);
-    expect(view.result()).toEqual({ scheduled: true, when: '+1' });
     expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
   });
   it('invalidates confirmation on leave and session transitions, including async creation', async () => {
@@ -669,7 +652,6 @@ describe('System page', () => {
     expect(dialog.remove).toHaveBeenCalled();
     http.expectNone(`${base}/reboot`);
     expect(view.health.data()).toBeNull();
-    expect(view.result()).toBeNull();
   });
   it('invalidates pending confirmation on tab leave, even after returning to Energy', async () => {
     const view = enter().componentInstance.state;
@@ -704,10 +686,9 @@ describe('System page', () => {
     http.expectNone(`${base}/shutdown`);
     action.error(new ProgressEvent('error'));
     expect(view.busy()).toBe(false);
-    expect(view.error()).toContain('incierta');
     expect(view.health.data()).toEqual(health);
   });
-  it('discards late results on leave, reloads on entry and shows uncertain execution', async () => {
+  it('discards late responses on leave, reloads on entry and unlocks after a failed execution', async () => {
     const view = enter().componentInstance.state;
     const operation = view.confirm('reboot');
     await ready();
@@ -716,7 +697,8 @@ describe('System page', () => {
     const action = http.expectOne(`${base}/reboot`);
     view.ionViewWillLeave();
     action.flush({ scheduled: true, when: '+1' });
-    expect(view.result()).toBeNull();
+    expect(view.busy()).toBe(false);
+    expect(view.health.data()).toBeNull();
     view.ionViewWillEnter();
     view.enterEnergy();
     http.expectNone(`${base}/info`);
@@ -727,7 +709,6 @@ describe('System page', () => {
     dismiss({ role: 'confirm' });
     await uncertain;
     http.expectOne(`${base}/reboot`).error(new ProgressEvent('error'));
-    expect(view.error()).toContain('incierta');
     expect(view.busy()).toBe(false);
     http.expectNone(`${base}/reboot`);
   });

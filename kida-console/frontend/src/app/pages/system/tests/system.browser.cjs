@@ -409,11 +409,15 @@ const wake = {
         await page.waitForFunction(
           () => [...document.querySelectorAll('app-system-energy')].length === 1,
         );
-        // Exercise confirmation and uncertainty only against the intercepted API.
+        // Exercise confirmation and unlock after failure against the intercepted API.
         await energy.getByRole('button', { name: 'Reiniciar', exact: true }).click();
         await alert.waitFor();
         await alert.getByRole('button', { name: 'Confirmar', exact: true }).click();
-        await energy.getByText('Ejecución incierta', { exact: false }).waitFor();
+        await alert.waitFor({ state: 'detached' });
+        await page.waitForFunction(() => {
+          const buttons = document.querySelectorAll('app-system-energy .power-buttons button');
+          return buttons.length === 2 && [...buttons].every((button) => !button.disabled);
+        });
         assert.deepEqual(writes, [{ path: '/api/system/reboot', body: { when: '+1' } }]);
         await page.locator('ion-tab-button[tab="overview"]').click();
         await page.waitForURL('**/system/overview');

@@ -21,7 +21,7 @@ const info = {
   hardware: { model: 'Server', vendor: null },
   cpu: { brand: 'CPU de prueba', logical_cores: 8, physical_cores: 4 },
   memory: { total_bytes: 17179869184, available_bytes: 0, used_bytes: 17179869184 },
-  graphics: ['GPU única'],
+  graphics: ['GPU única — ' + 'Intel Corporation Arrow Lake-P Arc Pro 130T/140T '.repeat(4)],
   disks: [
     {
       name: '<img src=x onerror="window.equipmentInjected=true">',
@@ -101,7 +101,6 @@ async function assertClosedDetails(modal) {
           { theme, mode },
         );
         let current = structuredClone(info),
-          fail = false,
           expire = false,
           reads = 0;
         const errors = [],
@@ -121,8 +120,6 @@ async function assertClosedDetails(modal) {
           if (path === '/api/system/info') {
             reads++;
             if (expire) return route.fulfill({ status: 401, json: { detail: 'expired' } });
-            if (fail)
-              return route.fulfill({ status: 503, json: { detail: { code: 'core_unavailable' } } });
             return route.fulfill({ json: current });
           }
           if (path === '/api/system/health')
@@ -171,7 +168,7 @@ async function assertClosedDetails(modal) {
         );
         const hostnameLayout = await card.locator('.hostname-row .value-row').evaluate((el) => {
           const title = el.querySelector('span').getBoundingClientRect();
-          const value = el.querySelector('app-system-data').getBoundingClientRect();
+          const value = el.querySelector('span:last-child').getBoundingClientRect();
           return {
             sameLine: Math.abs(title.top - value.top) < 3,
             stacked: value.top >= title.bottom,
@@ -230,7 +227,7 @@ async function assertClosedDetails(modal) {
         await page.waitForFunction(() =>
           document.activeElement?.classList.contains('equipment-close'),
         );
-        await modal.getByText('GPU única', { exact: true }).waitFor();
+        await modal.getByText(current.graphics[0], { exact: true }).waitFor();
         await assertClosedDetails(modal);
         assert.equal(
           await modal.locator('ion-accordion-group').evaluate((el) => {
@@ -262,11 +259,6 @@ async function assertClosedDetails(modal) {
           'Scalar and expandable rows differ visually',
         );
         await page.screenshot({ path: `${output}/${name}-hardware-initial.png` });
-        current.graphics = [
-          'GPU única — ' + 'Intel Corporation Arrow Lake-P Arc Pro 130T/140T '.repeat(4),
-        ];
-        await card.locator('.equipment-header button').evaluate((el) => el.click());
-        await modal.getByText(current.graphics[0], { exact: true }).waitFor();
         assert.equal(
           await modal.locator('.detail-value .value-row').evaluate((el) => {
             const title = el.querySelector('span').getBoundingClientRect();
@@ -304,22 +296,6 @@ async function assertClosedDetails(modal) {
           'Horizontal overflow',
         );
         await page.screenshot({ path: `${output}/${name}-hardware.png` });
-        // Refresh while details remain open, without bypassing the page's real request/state path.
-        current.cpu.brand = 'CPU actualizada';
-        await card.locator('.equipment-header button').evaluate((el) => el.click());
-        await modal.getByText('CPU actualizada', { exact: true }).waitFor();
-        const expanded = await modal.locator('ion-accordion-group').evaluate((el) => el.value);
-        assert.ok(
-          ['hardware', 'cpu', 'memory', 'disks'].every((key) => expanded.includes(key)),
-          'Refresh collapsed groups',
-        );
-        fail = true;
-        await card.locator('.equipment-header button').evaluate((el) => el.click());
-        await modal
-          .getByText('Datos anteriores; pendientes de actualizar.', { exact: true })
-          .waitFor();
-        await modal.getByText('CPU actualizada', { exact: true }).waitFor();
-        fail = false;
         await modal.locator('.equipment-close').click();
         await page.waitForFunction(
           () => !document.querySelector('ion-modal')?.classList.contains('show-modal'),
@@ -327,7 +303,8 @@ async function assertClosedDetails(modal) {
         // A scalar missing value and an empty collection keep distinct representations.
         current.graphics = [];
         current.hardware = null;
-        await card.locator('.equipment-header button').click();
+        await page.reload();
+        await card.locator('.hostname-row').waitFor();
         await page.waitForFunction(
           () =>
             !document
@@ -380,7 +357,7 @@ async function assertClosedDetails(modal) {
         await page.waitForFunction(
           () => !document.querySelector('ion-modal')?.classList.contains('show-modal'),
         );
-        // Re-enter through Angular routing, then force session expiry while detail is open.
+        // Re-enter through Angular routing and leave during modal presentation.
         await page.goBack();
         await page.waitForURL('**/settings');
         await page.locator('app-system-equipment .hostname-row').waitFor();
@@ -408,15 +385,9 @@ async function assertClosedDetails(modal) {
           'System must not request equipment information',
         );
         await page.waitForFunction(() => !document.querySelector('.equipment-modal.show-modal'));
-        await page.goBack();
-        await page.waitForURL('**/settings');
-        await page.locator('app-system-equipment .hostname-row').waitFor();
-        await page.locator('app-system-equipment .equipment-list ion-item[button]').last().click();
-        await page.getByRole('dialog', { name: 'Hardware', exact: true }).waitFor();
+        // A fresh entry is the only equipment read trigger; expire that request.
         expire = true;
-        await page
-          .locator('app-system-equipment .equipment-header button')
-          .evaluate((el) => el.click());
+        await page.goBack();
         await page.waitForURL('**/login**');
         await page.waitForFunction(
           () => !document.querySelector('ion-modal')?.classList.contains('show-modal'),

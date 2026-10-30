@@ -10,23 +10,6 @@
       <section appMasonryItem class="panel power-panel" aria-label="Ciclo de energía">
         <app-system-cycle-card />
       </section>
-
-      @if (state.busy() || state.error() || state.result() !== null) {
-        <section appMasonryItem class="panel action-result" aria-label="Estado de la operación">
-          <div aria-live="polite">
-            @if (state.busy()) {
-              <p>Confirmación o acción pendiente…</p>
-            }
-            @if (state.error()) {
-              <p class="error" role="alert">{{ state.error() }}</p>
-            }
-            @if (state.result() !== null) {
-              <h3>Resultado: {{ state.resultLabel() }}</h3>
-              <app-system-data [value]="state.result()" />
-            }
-          </div>
-        </section>
-      }
     </app-masonry>
   </main>
 </ion-content>

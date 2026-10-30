@@ -54,14 +54,5 @@
         <dd>{{ display(reading().fields['fault']) }}</dd>
       </div>
     </dl>
-  } @else {
-    <!-- <small
-      >Alarma: {{ display(reading().fields['alarm']) }} · Fallo:
-      {{ display(reading().fields['fault']) }}</small
-    > -->
   }
-  <!-- <details>
-    <summary>Lectura original · todos los campos</summary>
-    <app-system-data [value]="reading().raw" />
-  </details> -->
 </article>

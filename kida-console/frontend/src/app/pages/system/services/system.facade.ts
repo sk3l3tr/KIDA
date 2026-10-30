@@ -13,7 +13,6 @@ import {
   PowerAction,
   SystemHealth,
   WakeCapabilities,
-  actionLabels,
   cycleRequest,
   systemFailure,
   validWhen,
@@ -47,9 +46,6 @@ export class SystemFacade implements OnDestroy {
   readonly sensors = computed(() => sensorReadings(this.health.data()));
   readonly groups = computed(() => sensorGroups(this.sensors()));
   readonly busy = signal(false);
-  readonly error = signal('');
-  readonly result = signal<unknown>(null);
-  readonly resultLabel = signal('');
   readonly validWhen = validWhen;
 
   when = '+1';
@@ -99,9 +95,6 @@ export class SystemFacade implements OnDestroy {
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
     this.busy.set(false);
-    this.error.set('');
-    this.result.set(null);
-    this.resultLabel.set('');
     this.when = '+1';
     this.wakeMode = 'time';
     this.wakeTime = '';
@@ -196,7 +189,6 @@ export class SystemFacade implements OnDestroy {
     this.confirmation = confirmation;
     this.confirming = true;
     this.busy.set(true);
-    this.error.set('');
     try {
       const confirmed = await confirmation.present();
       if (!this.canExecute(context)) return false;
@@ -222,8 +214,6 @@ export class SystemFacade implements OnDestroy {
   ): void {
     this.confirming = false;
     try {
-      this.result.set(null);
-      this.resultLabel.set(actionLabels[pending.action]);
       this.subscriptions.add(
         this.service
           .execute(pending)
@@ -234,14 +224,12 @@ export class SystemFacade implements OnDestroy {
             }),
           )
           .subscribe({
-            next: (result) => this.result.set(result),
-            error: (failure) => this.error.set(systemFailure(failure, true)),
+            error: () => {},
           }),
       );
-    } catch (failure) {
+    } catch {
       if (!this.isCurrentConfirmation(context)) return;
       this.busy.set(false);
-      this.error.set(systemFailure(failure, true));
       confirmation.restoreFocus();
     }
   }
@@ -252,6 +240,5 @@ export class SystemFacade implements OnDestroy {
     this.busy.set(false);
     this.confirmation?.cancel();
     this.confirmation = undefined;
-    this.error.set('No se pudo abrir la confirmación.');
   }
 }

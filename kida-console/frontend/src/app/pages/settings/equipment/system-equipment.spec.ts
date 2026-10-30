@@ -16,7 +16,7 @@ import {
   IonToolbar,
   provideIonicAngular,
 } from '@ionic/angular/standalone';
-import { equipmentGroup, equipmentGroups, extraEquipmentFields } from './equipment-data';
+import { equipmentGroup, equipmentGroups } from './equipment-data';
 import { displaySystemValue } from '../../system/utils/system-format';
 import { SystemEquipment } from './system-equipment';
 
@@ -78,7 +78,6 @@ describe('Equipment presentation', () => {
     ).toEqual(['hardware', 'cpu', 'graphics', 'memory', 'disks']);
     expect(hardware.find((g) => g.key === 'cpu')?.value).toBe(info.cpu);
     expect(hardware.find((g) => g.key === 'disks')?.expandable).toBe(true);
-    expect(extraEquipmentFields(info)).toEqual({ future: { extra: 'visible' } });
   });
 
   it('uses direct values for scalars and one GPU, retaining structured groups with one field', () => {
@@ -140,16 +139,12 @@ describe('Equipment presentation', () => {
     return fixture.nativeElement.querySelector('ion-modal') as HTMLElement;
   }
 
-  it('renders a noninteractive hostname and emits refresh independently of opening details', () => {
+  it('renders a noninteractive hostname and two detail links', () => {
     const fixture = setup(),
       root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('.hostname-row')?.textContent).toContain('core-server');
     expect(root.querySelector('.hostname-row')?.hasAttribute('button')).toBe(false);
     expect(root.querySelectorAll('.equipment-list ion-item[button]')).toHaveLength(2);
-    const refresh = vi.fn();
-    fixture.componentInstance.refresh.subscribe(refresh);
-    root.querySelector<HTMLButtonElement>('.equipment-header button')!.click();
-    expect(refresh).toHaveBeenCalledOnce();
     expect(fixture.componentInstance.isOpen()).toBe(false);
   });
 
@@ -166,17 +161,10 @@ describe('Equipment presentation', () => {
     expect(modal.querySelector('ion-accordion-group')?.multiple).toBe(true);
   });
 
-  it('keeps an open detail current through refresh errors and subsequent successful updates', () => {
+  it('keeps an open detail current when its input changes', () => {
     const fixture = setup(),
       modal = mountDetails(fixture, 'system');
-    fixture.componentRef.setInput('loading', true);
-    fixture.componentRef.setInput('error', 'Sin conexión');
-    fixture.detectChanges();
-    expect(modal.textContent).toContain('Datos anteriores');
-    expect(modal.textContent).toContain('Sin conexión');
     fixture.componentRef.setInput('value', { ...info, os: { name: 'Nuevo sistema' } });
-    fixture.componentRef.setInput('loading', false);
-    fixture.componentRef.setInput('error', '');
     fixture.detectChanges();
     expect(modal.textContent).toContain('Nuevo sistema');
     expect(fixture.componentInstance.isOpen()).toBe(true);
