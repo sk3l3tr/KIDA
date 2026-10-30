@@ -4,11 +4,13 @@ import { Observable, Subscription, finalize } from 'rxjs';
 import { Account, AuthService } from '../../auth/auth.service';
 import { errorMessage } from '../../utils/messages';
 import { IonContent } from '@ionic/angular/standalone';
+import { Masonry, MasonryItem } from '../../components/masonry/masonry';
 
 @Component({
   selector: 'app-administrators',
-  imports: [FormsModule, IonContent],
+  imports: [FormsModule, IonContent, Masonry, MasonryItem],
   templateUrl: './administrators.html',
+  styleUrl: './administrators.scss',
 })
 export class Administrators implements OnDestroy {
   readonly auth = inject(AuthService);

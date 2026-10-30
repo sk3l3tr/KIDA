@@ -1,0 +1,11 @@
+app-masonry {
+  grid-column: 1 / -1;
+  --masonry-columns: 2;
+  --masonry-gap: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  app-masonry {
+    --masonry-columns: 1;
+  }
+}

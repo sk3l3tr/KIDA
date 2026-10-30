@@ -11,157 +11,159 @@
     @if (message()) {
       <p class="success" role="status">{{ message() }}</p>
     }
-    <section class="panel" aria-labelledby="profile-title">
-      <h2 id="profile-title">Mi cuenta</h2>
-      <form #renameForm="ngForm" (ngSubmit)="rename()">
-        <label for="own-username">Username</label>
-        <input
-          id="own-username"
-          name="ownUsername"
-          [(ngModel)]="ownUsername"
-          required
-          pattern="[a-zA-Z0-9_.-]{3,64}"
-          minlength="3"
-          maxlength="64"
-          autocomplete="username"
-        />
-        <small>3–64 caracteres: letras, números, punto, guion o guion bajo.</small>
-        <button [disabled]="renameForm.invalid || busy()">Guardar username</button>
-      </form>
-      <form #passwordForm="ngForm" (ngSubmit)="changePassword()">
-        <h3>Cambiar contraseña</h3>
-        <label for="current-password">Contraseña actual</label>
-        <input
-          id="current-password"
-          name="currentPassword"
-          type="password"
-          [(ngModel)]="currentPassword"
-          required
-          maxlength="128"
-          autocomplete="current-password"
-        />
-        <label for="new-password">Nueva contraseña</label>
-        <input
-          id="new-password"
-          name="newPassword"
-          type="password"
-          [(ngModel)]="newPassword"
-          required
-          minlength="12"
-          maxlength="128"
-          autocomplete="new-password"
-        />
-        <label for="confirm-password">Repetir nueva contraseña</label>
-        <input
-          id="confirm-password"
-          name="confirmPassword"
-          type="password"
-          [(ngModel)]="confirmPassword"
-          required
-          autocomplete="new-password"
-        />
-        <small>12–128 caracteres. Se cerrarán todas tus sesiones.</small>
-        <button [disabled]="passwordForm.invalid || newPassword !== confirmPassword || busy()">
-          Cambiar contraseña
-        </button>
-      </form>
-    </section>
-    <section class="panel" aria-labelledby="accounts-title">
-      <h2 id="accounts-title">Administradores</h2>
-      <ul class="accounts-list">
-        @for (account of accounts(); track account.id) {
-          <li>
-            <span
-              >{{ account.username }}
-              @if (account.id === auth.user()?.id) {
-                <small>(tú)</small>
-              }
-            </span>
-            <button
-              type="button"
-              class="danger"
-              [disabled]="busy() || accounts().length <= 1"
-              (click)="pendingDelete.set(account)"
-            >
-              Eliminar
-            </button>
-          </li>
-        }
-      </ul>
-      @if (accounts().length === 1) {
-        <p>Debe quedar al menos un administrador.</p>
-      }
-      @if (pendingDelete(); as target) {
-        <div class="confirmation" role="group" aria-label="Confirmar eliminación">
-          <p>
-            ¿Eliminar la cuenta {{ target.username }}? Se cerrarán todas sus sesiones.
-            @if (target.id === auth.user()?.id) {
-              Tu sesión también se cerrará.
-            }
-          </p>
-          <button type="button" class="danger" [disabled]="busy()" (click)="remove(target)">
-            Confirmar eliminación
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            [disabled]="busy()"
-            (click)="pendingDelete.set(null)"
-          >
-            Cancelar
-          </button>
-        </div>
-      }
-    </section>
-    <section class="panel" aria-labelledby="create-title">
-      <h2 id="create-title">Crear administrador</h2>
-      <form #createForm="ngForm" (ngSubmit)="create()">
-        <label for="create-username">Username nuevo</label>
-        <input
-          id="create-username"
-          name="createUsername"
-          [(ngModel)]="createUsername"
-          required
-          pattern="[a-zA-Z0-9_.-]{3,64}"
-          minlength="3"
-          maxlength="64"
-          autocomplete="off"
-        />
-        <label for="create-password">Contraseña nueva (12–128 caracteres)</label>
-        <input
-          id="create-password"
-          name="createPassword"
-          type="password"
-          [(ngModel)]="createPassword"
-          required
-          minlength="12"
-          maxlength="128"
-          autocomplete="new-password"
-        />
-        <fieldset>
-          <legend>Confirma tu identidad</legend>
-          <label for="admin-username">Tu username</label>
+    <app-masonry>
+      <section appMasonryItem class="panel" aria-labelledby="profile-title">
+        <h2 id="profile-title">Mi cuenta</h2>
+        <form #renameForm="ngForm" (ngSubmit)="rename()">
+          <label for="own-username">Username</label>
           <input
-            id="admin-username"
-            name="adminUsername"
-            [(ngModel)]="adminUsername"
+            id="own-username"
+            name="ownUsername"
+            [(ngModel)]="ownUsername"
             required
+            pattern="[a-zA-Z0-9_.-]{3,64}"
+            minlength="3"
             maxlength="64"
             autocomplete="username"
           />
-          <label for="admin-password">Tu contraseña</label>
+          <small>3–64 caracteres: letras, números, punto, guion o guion bajo.</small>
+          <button [disabled]="renameForm.invalid || busy()">Guardar username</button>
+        </form>
+        <form #passwordForm="ngForm" (ngSubmit)="changePassword()">
+          <h3>Cambiar contraseña</h3>
+          <label for="current-password">Contraseña actual</label>
           <input
-            id="admin-password"
-            name="adminPassword"
+            id="current-password"
+            name="currentPassword"
             type="password"
-            [(ngModel)]="adminPassword"
+            [(ngModel)]="currentPassword"
             required
             maxlength="128"
             autocomplete="current-password"
           />
-        </fieldset>
-        <button [disabled]="createForm.invalid || busy()">Crear administrador</button>
-      </form>
-    </section>
+          <label for="new-password">Nueva contraseña</label>
+          <input
+            id="new-password"
+            name="newPassword"
+            type="password"
+            [(ngModel)]="newPassword"
+            required
+            minlength="12"
+            maxlength="128"
+            autocomplete="new-password"
+          />
+          <label for="confirm-password">Repetir nueva contraseña</label>
+          <input
+            id="confirm-password"
+            name="confirmPassword"
+            type="password"
+            [(ngModel)]="confirmPassword"
+            required
+            autocomplete="new-password"
+          />
+          <small>12–128 caracteres. Se cerrarán todas tus sesiones.</small>
+          <button [disabled]="passwordForm.invalid || newPassword !== confirmPassword || busy()">
+            Cambiar contraseña
+          </button>
+        </form>
+      </section>
+      <section appMasonryItem class="panel" aria-labelledby="accounts-title">
+        <h2 id="accounts-title">Administradores</h2>
+        <ul class="accounts-list">
+          @for (account of accounts(); track account.id) {
+            <li>
+              <span
+                >{{ account.username }}
+                @if (account.id === auth.user()?.id) {
+                  <small>(tú)</small>
+                }
+              </span>
+              <button
+                type="button"
+                class="danger"
+                [disabled]="busy() || accounts().length <= 1"
+                (click)="pendingDelete.set(account)"
+              >
+                Eliminar
+              </button>
+            </li>
+          }
+        </ul>
+        @if (accounts().length === 1) {
+          <p>Debe quedar al menos un administrador.</p>
+        }
+        @if (pendingDelete(); as target) {
+          <div class="confirmation" role="group" aria-label="Confirmar eliminación">
+            <p>
+              ¿Eliminar la cuenta {{ target.username }}? Se cerrarán todas sus sesiones.
+              @if (target.id === auth.user()?.id) {
+                Tu sesión también se cerrará.
+              }
+            </p>
+            <button type="button" class="danger" [disabled]="busy()" (click)="remove(target)">
+              Confirmar eliminación
+            </button>
+            <button
+              type="button"
+              class="secondary"
+              [disabled]="busy()"
+              (click)="pendingDelete.set(null)"
+            >
+              Cancelar
+            </button>
+          </div>
+        }
+      </section>
+      <section appMasonryItem class="panel" aria-labelledby="create-title">
+        <h2 id="create-title">Crear administrador</h2>
+        <form #createForm="ngForm" (ngSubmit)="create()">
+          <label for="create-username">Username nuevo</label>
+          <input
+            id="create-username"
+            name="createUsername"
+            [(ngModel)]="createUsername"
+            required
+            pattern="[a-zA-Z0-9_.-]{3,64}"
+            minlength="3"
+            maxlength="64"
+            autocomplete="off"
+          />
+          <label for="create-password">Contraseña nueva (12–128 caracteres)</label>
+          <input
+            id="create-password"
+            name="createPassword"
+            type="password"
+            [(ngModel)]="createPassword"
+            required
+            minlength="12"
+            maxlength="128"
+            autocomplete="new-password"
+          />
+          <fieldset>
+            <legend>Confirma tu identidad</legend>
+            <label for="admin-username">Tu username</label>
+            <input
+              id="admin-username"
+              name="adminUsername"
+              [(ngModel)]="adminUsername"
+              required
+              maxlength="64"
+              autocomplete="username"
+            />
+            <label for="admin-password">Tu contraseña</label>
+            <input
+              id="admin-password"
+              name="adminPassword"
+              type="password"
+              [(ngModel)]="adminPassword"
+              required
+              maxlength="128"
+              autocomplete="current-password"
+            />
+          </fieldset>
+          <button [disabled]="createForm.invalid || busy()">Crear administrador</button>
+        </form>
+      </section>
+    </app-masonry>
   </div>
 </ion-content>
