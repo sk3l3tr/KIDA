@@ -5,7 +5,6 @@ import { themeCatalog } from '../../../theme/catalog';
 import { ThemeIdentity } from '../../../theme/integration';
 import { Subscription, finalize } from 'rxjs';
 import { SystemService } from '../system/services/system.service';
-import { systemFailure } from '../system/utils/system.models';
 import { SystemEquipment } from './equipment/system-equipment';
 
 @Component({
@@ -72,13 +71,7 @@ import { SystemEquipment } from './equipment/system-equipment';
           </p>
         }
       </section>
-      <app-system-equipment
-        [value]="info()"
-        [loading]="loading()"
-        [error]="error()"
-        [updated]="updated()"
-        (refresh)="refresh()"
-      />
+      <app-system-equipment [value]="info()" [loading]="loading()" />
     </main>
   </ion-content>`,
 })
@@ -88,9 +81,6 @@ export class Settings implements OnDestroy {
   private readonly equipment = viewChild(SystemEquipment);
   readonly info = signal<unknown>(null);
   readonly loading = signal(false);
-  readonly error = signal('');
-  readonly updated = signal<Date | null>(null);
-  private active = false;
   private subscriptions = new Subscription();
   private readonly sessionChanges = this.identity.changes.subscribe(() => this.reset());
   readonly themes = inject(ThemeService);
@@ -101,11 +91,9 @@ export class Settings implements OnDestroy {
   ] as const;
   ionViewWillEnter(): void {
     this.reset();
-    this.active = true;
-    this.refresh();
+    this.loadEquipment();
   }
   ionViewWillLeave(): void {
-    this.active = false;
     this.reset();
   }
   ngOnDestroy(): void {
@@ -118,23 +106,16 @@ export class Settings implements OnDestroy {
     this.subscriptions = new Subscription();
     this.info.set(null);
     this.loading.set(false);
-    this.error.set('');
-    this.updated.set(null);
   }
-  refresh(): void {
-    if (!this.active || this.loading()) return;
+  private loadEquipment(): void {
     this.loading.set(true);
-    this.error.set('');
     this.subscriptions.add(
       this.service
         .info()
         .pipe(finalize(() => this.loading.set(false)))
         .subscribe({
-          next: (data) => {
-            this.info.set(data);
-            this.updated.set(new Date());
-          },
-          error: (failure) => this.error.set(systemFailure(failure)),
+          next: (data) => this.info.set(data),
+          error: () => {},
         }),
     );
   }

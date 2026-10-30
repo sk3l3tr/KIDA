@@ -41,18 +41,3 @@ export function equipmentGroups(value: unknown, detail: 'system' | 'hardware'): 
     )
     .sort((a, b) => Number(a.expandable) - Number(b.expandable));
 }
-
-export function extraEquipmentFields(value: unknown): Record<string, unknown> {
-  const known = new Set([
-    'hostname',
-    'os',
-    'kernel',
-    'architecture',
-    'hardware',
-    'cpu',
-    'memory',
-    'graphics',
-    'disks',
-  ]);
-  return Object.fromEntries(Object.entries(systemFields(value)).filter(([key]) => !known.has(key)));
-}

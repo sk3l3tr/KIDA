@@ -5,40 +5,26 @@ import {
   computed,
   effect,
   input,
-  output,
   signal,
   viewChild,
 } from '@angular/core';
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { IonicModule, IonModal } from '@ionic/angular';
 import { enterThemeModal, leaveThemeModal } from '../../../../theme/modal-motion';
-import {
-  equipmentGroup,
-  equipmentGroups,
-  extraEquipmentFields,
-  systemFields,
-} from './equipment-data';
+import { equipmentGroups, systemFields } from './equipment-data';
 import { SystemData } from '../../system/components/system-data/system-data';
 
 @Component({
   selector: 'app-system-equipment',
-  imports: [DatePipe, NgTemplateOutlet, SystemData, IonicModule],
+  imports: [SystemData, IonicModule],
   templateUrl: './system-equipment.html',
   styleUrl: './system-equipment.scss',
 })
 export class SystemEquipment implements OnDestroy {
   readonly value = input<unknown>(null);
   readonly loading = input(false);
-  readonly error = input('');
-  readonly updated = input<Date | null>(null);
-  readonly refresh = output<void>();
   readonly detail = signal<'system' | 'hardware' | null>(null);
   readonly isOpen = signal(false);
   readonly fields = computed(() => systemFields(this.value()));
-  readonly extras = computed(() => {
-    const value = extraEquipmentFields(this.value());
-    return Object.keys(value).length ? equipmentGroup('extra', value, 'Otros datos') : null;
-  });
   readonly groups = computed(() => equipmentGroups(this.value(), this.detail() ?? 'system'));
   readonly title = computed(() =>
     this.detail() === 'hardware' ? 'Hardware' : 'Sistema operativo',

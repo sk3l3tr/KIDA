@@ -47,38 +47,30 @@ describe('Settings equipment lifecycle', () => {
     return fixture;
   }
 
-  it('loads only equipment on entry and blocks overlapping manual refreshes', () => {
-    const fixture = enter(),
-      view = fixture.componentInstance;
+  it('loads only equipment on entry', () => {
+    const view = enter().componentInstance;
     expect(view.loading()).toBe(true);
     const request = http.expectOne(url);
     expect(request.request.method).toBe('GET');
     expect(request.request.withCredentials).toBe(true);
-    view.refresh();
-    http.expectNone(url);
     http.expectNone(`${environment.apiBaseUrl}/system/health`);
     http.expectNone(`${environment.apiBaseUrl}/system/wake-capabilities`);
     request.flush(info);
     expect(view.info()).toEqual(info);
-    expect(view.updated()).toBeInstanceOf(Date);
     expect(view.loading()).toBe(false);
-    expect(view.error()).toBe('');
   });
 
-  it('preserves prior data and timestamp on failure and replaces them on successful refresh', () => {
+  it('handles a failed load and retries on the next entry', () => {
     const view = enter().componentInstance;
-    http.expectOne(url).flush(info);
-    const timestamp = view.updated();
-    view.refresh();
     http.expectOne(url).error(new ProgressEvent('error'));
-    expect(view.info()).toEqual(info);
-    expect(view.updated()).toBe(timestamp);
-    expect(view.error()).toContain('Sin conexión');
-    view.refresh();
+    expect(view.info()).toBeNull();
+    expect(view.loading()).toBe(false);
+    http.expectNone(url);
+    view.ionViewWillLeave();
+    view.ionViewWillEnter();
     const fresh = { ...info, hostname: 'fresh-server' };
     http.expectOne(url).flush(fresh);
     expect(view.info()).toEqual(fresh);
-    expect(view.error()).toBe('');
     expect(view.loading()).toBe(false);
   });
 
@@ -88,26 +80,28 @@ describe('Settings equipment lifecycle', () => {
     view.ionViewWillLeave();
     pending.flush(info);
     expect(view.info()).toBeNull();
-    expect(view.updated()).toBeNull();
     expect(view.loading()).toBe(false);
-    view.refresh();
     http.expectNone(url);
     view.ionViewWillEnter();
     http.expectOne(url).flush(info);
     expect(view.info()).toEqual(info);
   });
 
-  it('clears equipment and ignores old-session responses on identity changes', () => {
+  it('clears loaded equipment on identity changes', () => {
     const view = enter().componentInstance;
     http.expectOne(url).flush(info);
-    view.refresh();
+    TestBed.inject(ThemeIdentity).clear();
+    expect(view.info()).toBeNull();
+    expect(view.loading()).toBe(false);
+  });
+
+  it('ignores old-session responses on identity changes', () => {
+    const view = enter().componentInstance;
     const pending = http.expectOne(url);
     TestBed.inject(ThemeIdentity).clear();
     pending.flush({ ...info, hostname: 'old-session' });
     expect(view.info()).toBeNull();
-    expect(view.updated()).toBeNull();
     expect(view.loading()).toBe(false);
-    expect(view.error()).toBe('');
   });
 
   it('keeps appearance selection available independently of equipment loading', () => {

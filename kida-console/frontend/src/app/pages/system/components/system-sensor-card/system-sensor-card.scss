@@ -32,9 +32,6 @@
   font-size: 1rem;
   margin: 0.5rem 0;
 }
-.compact summary {
-  font-size: 0.8rem;
-}
 .sensor-heading {
   display: flex;
   flex-wrap: wrap;
@@ -93,18 +90,4 @@ dt {
 }
 dd {
   margin: 0.25rem 0 0;
-}
-details {
-  margin-top: 0.75rem;
-}
-summary {
-  cursor: pointer;
-  min-height: 44px;
-  padding-block: 0.6rem;
-  color: var(--ion-color-primary);
-  font-weight: 600;
-}
-summary:focus-visible {
-  outline: 3px solid var(--ion-color-primary);
-  outline-offset: 3px;
 }

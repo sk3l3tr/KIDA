@@ -44,7 +44,7 @@
         <strong>Avisos</strong>
         <ul>
           @for (notice of notices; track $index) {
-            <li><app-system-data [value]="notice" /></li>
+            <li>{{ notice }}</li>
           }
         </ul>
       </div>
