@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { AlertController } from '@ionic/angular';
 import { PendingAction } from '../utils/system.models';
-import { SystemConfirmationService } from './system-confirmation.service';
+import { SystemConfirmationService } from '../services/system-confirmation.service';
 
 @Component({ template: '' })
 class ConfirmationHost {}
@@ -67,6 +67,90 @@ describe('SystemConfirmationService', () => {
     expect(await cancelled.present()).toBe(false);
     expect(await service.prepare(pending, () => false).present()).toBe(false);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('reuses the same promise when cancelled before the first presentation', async () => {
+    const confirmation = service.prepare(pending, () => true);
+    confirmation.cancel();
+    const result = confirmation.present();
+    expect(confirmation.present()).toBe(result);
+    confirmation.cancel();
+    expect(confirmation.present()).toBe(result);
+    expect(await result).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it.each(['create', 'present', 'onDidDismiss'] as const)(
+    'reuses the same promise before and after cancellation during %s',
+    async (stage) => {
+      const operation = stage === 'create' ? create : alert[stage];
+      operation.mockImplementationOnce(() => new Promise(() => {}));
+      const confirmation = service.prepare(pending, () => true);
+      const result = confirmation.present();
+      expect(confirmation.present()).toBe(result);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(operation).toHaveBeenCalledOnce();
+      confirmation.cancel();
+      expect(confirmation.present()).toBe(result);
+      expect(await result).toBe(false);
+      confirmation.cancel();
+      expect(confirmation.present()).toBe(result);
+      expect(create).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('preserves the promise and its accepted result when cancelled after completion', async () => {
+    const confirmation = service.prepare(pending, () => true);
+    const result = confirmation.present();
+    expect(await result).toBe(true);
+    expect(confirmation.present()).toBe(result);
+    confirmation.cancel();
+    expect(confirmation.present()).toBe(result);
+    expect(await result).toBe(true);
+    expect(create).toHaveBeenCalledOnce();
+    expect(alert.dismiss).not.toHaveBeenCalled();
+  });
+
+  it.each<{ action: PendingAction; header: string; summary: string }>([
+    {
+      action: { action: 'shutdown', body: { when: 'now' } },
+      header: 'Apagar',
+      summary: 'Cuándo: now.',
+    },
+    {
+      action: { action: 'reboot', body: { when: '23:00' } },
+      header: 'Reiniciar',
+      summary: 'Cuándo: 23:00.',
+    },
+    {
+      action: { action: 'powerCycle', body: { wake_time: '06:00' } },
+      header: 'Ciclo de energía',
+      summary: 'Encendido a las 06:00; apagado: +1.',
+    },
+    {
+      action: { action: 'powerCycle', body: { wake_time: '06:00', shutdown_time: '23:00' } },
+      header: 'Ciclo de energía',
+      summary: 'Encendido a las 06:00; apagado: 23:00.',
+    },
+    {
+      action: { action: 'powerCycle', body: { wake_after_seconds: 120 } },
+      header: 'Ciclo de energía',
+      summary: 'Encendido en 120 segundos; apagado: +1.',
+    },
+    {
+      action: { action: 'powerCycle', body: { wake_after_seconds: 3600, shutdown_time: '23:00' } },
+      header: 'Ciclo de energía',
+      summary: 'Encendido en 3600 segundos; apagado: 23:00.',
+    },
+  ])('preserves the confirmation message: $summary', async ({ action, header, summary }) => {
+    await service.prepare(action, () => true).present();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        header: `Confirmar: ${header}`,
+        message: `${summary} Horas locales del servidor CORE. La operación puede desconectar el equipo.`,
+      }),
+    );
   });
 
   it('removes a late-created cancelled dialog without changing a newer session', async () => {
@@ -134,6 +218,64 @@ describe('SystemConfirmationService', () => {
       expect(alert.remove).toHaveBeenCalledTimes(stage === 'create' ? 0 : 1);
     },
   );
+
+  it.each(['create', 'present'] as const)(
+    'handles a late %s rejection after cancellation',
+    async (stage) => {
+      let reject!: (failure: Error) => void;
+      const operation = stage === 'create' ? create : alert.present;
+      operation.mockImplementationOnce(
+        () =>
+          new Promise((_, fail) => {
+            reject = fail;
+          }),
+      );
+      const confirmation = service.prepare(pending, () => true);
+      const result = confirmation.present();
+      await Promise.resolve();
+      expect(operation).toHaveBeenCalledOnce();
+      confirmation.cancel();
+      expect(await result).toBe(false);
+      reject(new Error('late failure'));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(confirmation.present()).toBe(result);
+      expect(await result).toBe(false);
+      expect(alert.remove).toHaveBeenCalledTimes(stage === 'create' ? 0 : 1);
+      expect(alert.dismiss).toHaveBeenCalledTimes(stage === 'create' ? 0 : 1);
+      expect(alert.onDidDismiss).not.toHaveBeenCalled();
+    },
+  );
+
+  it('waits for Ionic teardown when presentation rejects after cancellation', async () => {
+    let rejectPresent!: (failure: Error) => void;
+    let finishDismiss!: (dismissed: boolean) => void;
+    alert.present.mockImplementationOnce(
+      () =>
+        new Promise<void>((_, reject) => {
+          rejectPresent = reject;
+        }),
+    );
+    alert.dismiss.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishDismiss = resolve;
+        }),
+    );
+    const confirmation = service.prepare(pending, () => true);
+    const result = confirmation.present();
+    await Promise.resolve();
+    confirmation.cancel();
+    expect(await result).toBe(false);
+    rejectPresent(new Error('late presentation failure'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(alert.remove).not.toHaveBeenCalled();
+    finishDismiss(true);
+    await Promise.resolve();
+    expect(alert.remove).toHaveBeenCalledOnce();
+    expect(alert.dismiss).toHaveBeenCalledOnce();
+  });
 
   it.each(['reject', 'false', 'true', 'pending', 'throw'] as const)(
     'settles cancellation without onDidDismiss when dismiss is %s',
@@ -279,6 +421,31 @@ describe('SystemConfirmationService', () => {
       trigger.remove();
     }
   });
+
+  it.each(['confirm', 'cancel'])(
+    'cancels deferred focus after a completed dialog with role %s',
+    async (role) => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      try {
+        trigger.focus();
+        const focus = vi.spyOn(trigger, 'focus');
+        alert.onDidDismiss.mockResolvedValueOnce({ role });
+        const confirmation = service.prepare(pending, () => true);
+        await confirmation.present();
+        confirmation.restoreFocus();
+        TestBed.tick();
+        expect(focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+        confirmation.restoreFocus();
+        confirmation.cancel();
+        TestBed.tick();
+        expect(focus).toHaveBeenCalledOnce();
+        expect(alert.dismiss).not.toHaveBeenCalled();
+      } finally {
+        trigger.remove();
+      }
+    },
+  );
 
   it.each(['valid', 'obsolete', 'cancelled', 'disconnected'] as const)(
     'restores focus only to a current connected trigger: %s',

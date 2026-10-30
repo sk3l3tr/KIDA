@@ -16,121 +16,162 @@ export class SystemConfirmationService {
   private readonly injector = inject(Injector);
 
   prepare(pending: PendingAction, isCurrent: () => boolean): SystemConfirmation {
-    let trigger = this.document.activeElement;
-    let cancelled = false;
-    let alert: HTMLIonAlertElement | undefined;
-    let focusRef: AfterRenderRef | undefined;
-    let result: Promise<boolean> | undefined;
-    let resolveResult: ((confirmed: boolean) => void) | undefined;
-    let rejectResult: ((failure: unknown) => void) | undefined;
-    let removed = false;
-    const valid = () => !cancelled && isCurrent();
-    const removeDialog = (dialog: HTMLIonAlertElement) => {
-      if (removed) return;
-      removed = true;
-      dialog.remove();
-    };
-    const finish = (confirmed: boolean) => {
-      resolveResult?.(confirmed);
-      resolveResult = undefined;
-      rejectResult = undefined;
-    };
-    const clearFocus = () => {
-      focusRef?.destroy();
-      focusRef = undefined;
-    };
-
-    const show = async (): Promise<boolean> => {
-      if (!valid()) return false;
-      // The summary uses the same frozen parameters that will be executed.
-      const summary =
-        pending.action === 'powerCycle'
-          ? `${'wake_time' in pending.body ? 'Encendido a las ' + pending.body.wake_time : 'Encendido en ' + pending.body.wake_after_seconds + ' segundos'}; apagado: ${pending.body.shutdown_time ?? '+1'}.`
-          : `Cuándo: ${pending.body.when}.`;
-      try {
-        const dialog = await this.alerts.create({
-          header: `Confirmar: ${actionLabels[pending.action]}`,
-          message: `${summary} Horas locales del servidor CORE. La operación puede desconectar el equipo.`,
-          cssClass: 'system-confirmation',
-          backdropDismiss: false,
-          buttons: [
-            { text: 'Cancelar', role: 'cancel' },
-            { text: 'Confirmar', role: 'confirm' },
-          ],
-        });
-        if (!valid()) {
-          removeDialog(dialog);
-          return false;
-        }
-        alert = dialog;
-        await dialog.present();
-        if (!valid()) {
-          // cancel() owns an in-flight Ionic dismissal; do not detach ahead of its teardown.
-          if (!cancelled) removeDialog(dialog);
-          alert = undefined;
-          return false;
-        }
-        dialog.querySelector<HTMLButtonElement>('.alert-button-role-cancel')?.focus();
-        const { role } = await dialog.onDidDismiss();
-        alert = undefined;
-        return valid() && role === 'confirm';
-      } catch (failure) {
-        if (alert) removeDialog(alert);
-        alert = undefined;
-        throw failure;
-      }
-    };
-
-    return {
-      present: () => {
-        if (cancelled) return Promise.resolve(false);
-        if (!result) {
-          result = new Promise<boolean>((resolve, reject) => {
-            resolveResult = resolve;
-            rejectResult = reject;
-          });
-          void show().then(finish, (failure) => {
-            rejectResult?.(failure);
-            resolveResult = undefined;
-            rejectResult = undefined;
-          });
-        }
-        return result;
-      },
-      cancel: () => {
-        if (cancelled) return;
-        cancelled = true;
-        clearFocus();
-        trigger = null;
-        finish(false);
-        const dialog = alert;
-        alert = undefined;
-        if (dialog) {
-          try {
-            // Let Ionic restore accessibility and scrolling before detaching the overlay.
-            // The confirmation result has already settled, even if teardown stays pending.
-            void dialog.dismiss(undefined, 'cancel').then(
-              () => removeDialog(dialog),
-              () => removeDialog(dialog),
-            );
-          } catch {
-            removeDialog(dialog);
-          }
-        }
-      },
-      restoreFocus: () => {
-        clearFocus();
-        if (!valid()) return;
-        focusRef = afterNextRender(
-          () => {
-            focusRef = undefined;
-            if (valid() && trigger instanceof HTMLElement && trigger.isConnected) {
-              trigger.focus({ preventScroll: true });
-            }
-          },
-          { injector: this.injector },
-        );
-      },
-    };
+    return new ConfirmationSession(
+      this.alerts,
+      this.injector,
+      this.document.activeElement,
+      pending,
+      isCurrent,
+    );
   }
+}
+
+class ConfirmationSession implements SystemConfirmation {
+  private cancelled = false;
+  private dialog: HTMLIonAlertElement | undefined;
+  private focusRef: AfterRenderRef | undefined;
+  private result: Promise<boolean> | undefined;
+  private resolveResult: ((confirmed: boolean) => void) | undefined;
+  private rejectResult: ((failure: unknown) => void) | undefined;
+  private removed = false;
+
+  constructor(
+    private readonly alerts: AlertController,
+    private readonly injector: Injector,
+    private trigger: Element | null,
+    private readonly pending: PendingAction,
+    private readonly isCurrent: () => boolean,
+  ) {}
+
+  present(): Promise<boolean> {
+    if (!this.result) {
+      this.result = new Promise<boolean>((resolve, reject) => {
+        this.resolveResult = resolve;
+        this.rejectResult = reject;
+      });
+      void this.showDialog().then(
+        (confirmed) => this.finish(confirmed),
+        (failure) => {
+          this.rejectResult?.(failure);
+          this.clearResultHandlers();
+        },
+      );
+    }
+    return this.result;
+  }
+
+  cancel(): void {
+    if (this.cancelled) return;
+    this.cancelled = true;
+    this.clearFocus();
+    this.trigger = null;
+    this.result ??= Promise.resolve(false);
+    this.finish(false);
+    const dialog = this.dialog;
+    this.dialog = undefined;
+    if (dialog) this.dismissDialog(dialog);
+  }
+
+  restoreFocus(): void {
+    this.clearFocus();
+    if (!this.valid()) return;
+    this.focusRef = afterNextRender(
+      () => {
+        this.focusRef = undefined;
+        if (this.valid() && this.trigger instanceof HTMLElement && this.trigger.isConnected) {
+          this.trigger.focus({ preventScroll: true });
+        }
+      },
+      { injector: this.injector },
+    );
+  }
+
+  private valid(): boolean {
+    return !this.cancelled && this.isCurrent();
+  }
+
+  private async showDialog(): Promise<boolean> {
+    if (!this.valid()) return false;
+    try {
+      const dialog = await this.alerts.create({
+        header: `Confirmar: ${actionLabels[this.pending.action]}`,
+        message: confirmationMessage(this.pending),
+        cssClass: 'system-confirmation',
+        backdropDismiss: false,
+        buttons: [
+          { text: 'Cancelar', role: 'cancel' },
+          { text: 'Confirmar', role: 'confirm' },
+        ],
+      });
+      if (!this.valid()) {
+        this.removeDialog(dialog);
+        return false;
+      }
+      this.dialog = dialog;
+      await dialog.present();
+      if (!this.valid()) {
+        // cancel() owns an in-flight Ionic dismissal; do not detach ahead of its teardown.
+        if (!this.cancelled) this.removeDialog(dialog);
+        this.dialog = undefined;
+        return false;
+      }
+      dialog.querySelector<HTMLButtonElement>('.alert-button-role-cancel')?.focus();
+      const { role } = await dialog.onDidDismiss();
+      this.dialog = undefined;
+      return this.valid() && role === 'confirm';
+    } catch (failure) {
+      if (this.dialog) this.removeDialog(this.dialog);
+      this.dialog = undefined;
+      throw failure;
+    }
+  }
+
+  private finish(confirmed: boolean): void {
+    this.resolveResult?.(confirmed);
+    this.clearResultHandlers();
+  }
+
+  private clearResultHandlers(): void {
+    this.resolveResult = undefined;
+    this.rejectResult = undefined;
+  }
+
+  private dismissDialog(dialog: HTMLIonAlertElement): void {
+    try {
+      // Let Ionic restore accessibility and scrolling before detaching the overlay.
+      // The confirmation result has already settled, even if teardown stays pending.
+      void dialog.dismiss(undefined, 'cancel').then(
+        () => this.removeDialog(dialog),
+        () => this.removeDialog(dialog),
+      );
+    } catch {
+      this.removeDialog(dialog);
+    }
+  }
+
+  private removeDialog(dialog: HTMLIonAlertElement): void {
+    if (this.removed) return;
+    this.removed = true;
+    dialog.remove();
+  }
+
+  private clearFocus(): void {
+    this.focusRef?.destroy();
+    this.focusRef = undefined;
+  }
+}
+
+function confirmationMessage(pending: PendingAction): string {
+  // The summary uses the same frozen parameters that will be executed.
+  let summary: string;
+  if (pending.action === 'powerCycle') {
+    const wake =
+      'wake_time' in pending.body
+        ? `Encendido a las ${pending.body.wake_time}`
+        : `Encendido en ${pending.body.wake_after_seconds} segundos`;
+    summary = `${wake}; apagado: ${pending.body.shutdown_time ?? '+1'}.`;
+  } else {
+    summary = `Cuándo: ${pending.body.when}.`;
+  }
+  return `${summary} Horas locales del servidor. La operación puede desconectar el equipo.`;
 }
