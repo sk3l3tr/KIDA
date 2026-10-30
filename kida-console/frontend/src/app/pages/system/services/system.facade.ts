@@ -1,17 +1,8 @@
-import {
-  Injectable,
-  Injector,
-  OnDestroy,
-  afterNextRender,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
-import { DOCUMENT } from '@angular/common';
-import { AlertController } from '@ionic/angular';
+import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Observable, Subscription, finalize } from 'rxjs';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { SystemService } from './system.service';
+import { SystemConfirmation, SystemConfirmationService } from './system-confirmation.service';
 import {
   fields,
   sensorGroups,
@@ -25,6 +16,11 @@ import {
   systemFailure,
   validWhen,
 } from '../utils/system.models';
+
+interface ConfirmationContext {
+  readonly generation: number;
+  readonly confirmationRevision: number;
+}
 
 function section(title: string) {
   return {
@@ -40,10 +36,9 @@ export type SystemSection = ReturnType<typeof section>;
 @Injectable()
 export class SystemFacade implements OnDestroy {
   private readonly service = inject(SystemService);
-  private readonly alerts = inject(AlertController);
+  private readonly confirmations = inject(SystemConfirmationService);
   private readonly identity = inject(ThemeIdentity);
-  private readonly document = inject(DOCUMENT);
-  private readonly injector = inject(Injector);
+
   readonly health = section('Salud y sensores');
   readonly wake = section('Capacidades RTC');
   readonly sections = [this.health, this.wake];
@@ -55,18 +50,20 @@ export class SystemFacade implements OnDestroy {
   readonly result = signal<unknown>(null);
   readonly resultLabel = signal('');
   readonly validWhen = validWhen;
+
   when = '+1';
   wakeMode = 'time';
   wakeTime = '';
   wakeSeconds = '120';
   shutdownTime = '';
+
   private active = false;
   private energyActive = false;
   private confirming = false;
   private confirmationRevision = 0;
   private generation = 0;
   private subscriptions = new Subscription();
-  private alert?: HTMLIonAlertElement;
+  private confirmation?: SystemConfirmation;
   private readonly sessionChanges = this.identity.changes.subscribe(() => this.ionViewWillLeave());
 
   ionViewWillEnter(): void {
@@ -90,8 +87,10 @@ export class SystemFacade implements OnDestroy {
   leaveEnergy(): void {
     this.energyActive = false;
     ++this.confirmationRevision;
-    void this.alert?.dismiss(undefined, 'cancel');
-    this.alert = undefined;
+    this.confirmation?.cancel();
+    this.confirmation = undefined;
+    // Invalidation owns the pending confirmation's lock; stale continuations must not
+    // clear it later, as a new confirmation may already be using it.
     if (this.confirming) this.busy.set(false);
     this.confirming = false;
   }
@@ -137,91 +136,100 @@ export class SystemFacade implements OnDestroy {
   }
 
   async confirm(action: PowerAction): Promise<void> {
-    if (!this.active || !this.energyActive || this.busy()) return;
+    if (!this.canConfirm()) return;
+    const pending = this.buildAction(action);
+    if (!pending) return;
+
+    const context: ConfirmationContext = {
+      generation: this.generation,
+      confirmationRevision: this.confirmationRevision,
+    };
+    let confirmation: SystemConfirmation;
+    try {
+      confirmation = this.confirmations.prepare(pending, () => this.canExecute(context));
+    } catch {
+      this.confirmationFailed(context);
+      return;
+    }
+    const confirmed = await this.askConfirmation(confirmation, context);
+    if (!confirmed || !this.canExecute(context)) return;
+
+    this.execute(pending, context, confirmation);
+  }
+
+  private canConfirm(): boolean {
+    return this.active && this.energyActive && !this.busy();
+  }
+
+  private buildAction(action: PowerAction): PendingAction | null {
     let pending: PendingAction;
     if (action === 'powerCycle') {
       const body = this.cycleBody();
-      if (!body) return;
+      if (!body) return null;
       pending = { action, body: Object.freeze(body) };
     } else {
-      if (!validWhen(this.when)) return;
+      if (!validWhen(this.when)) return null;
       pending = { action, body: Object.freeze({ when: this.when }) };
     }
-    Object.freeze(pending);
-    const trigger = this.document.activeElement;
-    const generation = this.generation;
-    const confirmationRevision = this.confirmationRevision;
-    const restoreFocus = () =>
-      afterNextRender(
-        () => {
-          if (
-            this.active &&
-            this.energyActive &&
-            confirmationRevision === this.confirmationRevision &&
-            generation === this.generation &&
-            trigger instanceof HTMLElement &&
-            trigger.isConnected
-          ) {
-            trigger.focus({ preventScroll: true });
-          }
-        },
-        { injector: this.injector },
-      );
+    return Object.freeze(pending);
+  }
+
+  private isCurrentConfirmation(context: ConfirmationContext): boolean {
+    return (
+      context.generation === this.generation &&
+      context.confirmationRevision === this.confirmationRevision
+    );
+  }
+
+  private canExecute(context: ConfirmationContext): boolean {
+    return this.active && this.energyActive && this.isCurrentConfirmation(context);
+  }
+
+  private async askConfirmation(
+    confirmation: SystemConfirmation,
+    context: ConfirmationContext,
+  ): Promise<boolean> {
+    // leaveEnergy() (also called by reset()) releases this lock on invalidation.
+    // Stale continuations must not change state owned by a newer confirmation.
+    this.confirmation?.cancel();
+    this.confirmation = confirmation;
     this.confirming = true;
     this.busy.set(true);
     this.error.set('');
-    // Only frozen, validated parameters enter the summary, never the live form.
-    const summary =
-      pending.action === 'powerCycle'
-        ? `${'wake_time' in pending.body ? 'Encendido a las ' + pending.body.wake_time : 'Encendido en ' + pending.body.wake_after_seconds + ' segundos'}; apagado: ${pending.body.shutdown_time ?? '+1'}.`
-        : `Cuándo: ${pending.body.when}.`;
     try {
-      const alert = await this.alerts.create({
-        header: `Confirmar: ${actionLabels[action]}`,
-        message: `${summary} Horas locales del servidor CORE. La operación puede desconectar el equipo.`,
-        cssClass: 'system-confirmation',
-        backdropDismiss: false,
-        buttons: [
-          { text: 'Cancelar', role: 'cancel' },
-          { text: 'Confirmar', role: 'confirm' },
-        ],
-      });
-      if (
-        !this.active ||
-        !this.energyActive ||
-        generation !== this.generation ||
-        confirmationRevision !== this.confirmationRevision
-      ) {
-        alert.remove();
-        return;
-      }
-      this.alert = alert;
-      await alert.present();
-      alert.querySelector<HTMLButtonElement>('.alert-button-role-cancel')?.focus();
-      const { role } = await alert.onDidDismiss();
-      if (
-        !this.active ||
-        !this.energyActive ||
-        generation !== this.generation ||
-        confirmationRevision !== this.confirmationRevision
-      )
-        return;
-      this.alert = undefined;
-      this.confirming = false;
-      if (role !== 'confirm') {
+      const confirmed = await confirmation.present();
+      if (!this.canExecute(context)) return false;
+      // Retain the session so leaving Energy can cancel deferred focus too.
+      if (!confirmed) {
+        this.confirming = false;
         this.busy.set(false);
-        restoreFocus();
-        return;
+        confirmation.restoreFocus();
+        return false;
       }
+      // Keep the lock until execute() takes over, including the intervening microtask.
+      return true;
+    } catch {
+      this.confirmationFailed(context);
+      return false;
+    }
+  }
+
+  private execute(
+    pending: PendingAction,
+    context: ConfirmationContext,
+    confirmation: SystemConfirmation,
+  ): void {
+    this.confirming = false;
+    try {
       this.result.set(null);
-      this.resultLabel.set(actionLabels[action]);
+      this.resultLabel.set(actionLabels[pending.action]);
       this.subscriptions.add(
         this.service
           .execute(pending)
           .pipe(
             finalize(() => {
               this.busy.set(false);
-              restoreFocus();
+              confirmation.restoreFocus();
             }),
           )
           .subscribe({
@@ -229,12 +237,20 @@ export class SystemFacade implements OnDestroy {
             error: (failure) => this.error.set(systemFailure(failure, true)),
           }),
       );
-    } catch {
-      if (generation === this.generation && confirmationRevision === this.confirmationRevision) {
-        this.confirming = false;
-        this.busy.set(false);
-        this.error.set('No se pudo abrir la confirmación.');
-      }
+    } catch (failure) {
+      if (!this.isCurrentConfirmation(context)) return;
+      this.busy.set(false);
+      this.error.set(systemFailure(failure, true));
+      confirmation.restoreFocus();
     }
+  }
+
+  private confirmationFailed(context: ConfirmationContext): void {
+    if (!this.isCurrentConfirmation(context)) return;
+    this.confirming = false;
+    this.busy.set(false);
+    this.confirmation?.cancel();
+    this.confirmation = undefined;
+    this.error.set('No se pudo abrir la confirmación.');
   }
 }

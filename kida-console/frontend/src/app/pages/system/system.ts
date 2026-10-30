@@ -1,11 +1,12 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { SystemFacade } from './services/system.facade';
+import { SystemConfirmationService } from './services/system-confirmation.service';
 
 @Component({
   selector: 'app-system',
   imports: [IonicModule],
-  providers: [SystemFacade],
+  providers: [SystemFacade, SystemConfirmationService],
   templateUrl: './system.html',
   styleUrl: './system-tabs.scss',
 })

@@ -11,6 +11,7 @@ import { ThemeIdentity } from '../../../../theme/integration';
 import { ArcaRequestService, ChannelBusyError } from '../../../services/arca-request.service';
 import { SystemService } from '../services/system.service';
 import { SystemFacade } from '../services/system.facade';
+import { SystemConfirmationService } from '../services/system-confirmation.service';
 import { SystemOverview } from '../tabs/system-overview/system-overview';
 import { SystemEnergy } from '../tabs/system-energy/system-energy';
 import { SystemInspector } from '../tabs/system-inspector/system-inspector';
@@ -49,6 +50,7 @@ function setup() {
     providers: [
       ...appConfig.providers,
       SystemFacade,
+      SystemConfirmationService,
       provideHttpClientTesting(),
       {
         provide: ArcaService,
@@ -304,6 +306,7 @@ describe('System page', () => {
     'confirms %s from the card with frozen parameters',
     async (action) => {
       const fixture = enter();
+      const confirmation = vi.spyOn(fixture.componentInstance.state, 'confirm');
       const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
       const buttons = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
       const form = card.querySelector<HTMLFormElement>('form')!;
@@ -315,12 +318,293 @@ describe('System page', () => {
       expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
       card.querySelector<HTMLButtonElement>('.quick-action')!.click();
       dismiss({ role: 'confirm' });
-      await ready();
+      await confirmation.mock.results[0].value;
       const request = http.expectOne(`${base}/${action}`);
       expect(request.request.body).toEqual({ when: '+1' });
       request.flush({ scheduled: true, when: '+1' });
     },
   );
+  it('rejects invalid parameters and confirmations outside Energy without a dialog', async () => {
+    const view = enter().componentInstance.state;
+    view.when = 'invalid';
+    await view.confirm('shutdown');
+    view.wakeTime = 'invalid';
+    await view.confirm('powerCycle');
+    view.when = '+1';
+    view.leaveEnergy();
+    await view.confirm('reboot');
+    view.ionViewWillLeave();
+    view.enterEnergy();
+    await view.confirm('shutdown');
+    expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
+    expect(view.busy()).toBe(false);
+    http.expectNone((request) => request.method === 'POST');
+  });
+
+  it.each(['time', 'seconds'])('freezes the %s power-cycle payload and summary', async (mode) => {
+    const view = enter().componentInstance.state;
+    const execute = vi.spyOn(TestBed.inject(SystemService), 'execute');
+    view.wakeMode = mode;
+    view.wakeTime = '08:30';
+    view.wakeSeconds = '240';
+    view.shutdownTime = '23:00';
+    const operation = view.confirm('powerCycle');
+    await ready();
+    view.wakeTime = '09:00';
+    view.wakeSeconds = '360';
+    view.shutdownTime = '';
+    expect(TestBed.inject(AlertController).create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(mode === 'time' ? '08:30' : '240 segundos'),
+      }),
+    );
+    dismiss({ role: 'confirm' });
+    await operation;
+    const pending = execute.mock.calls[0][0];
+    expect(Object.isFrozen(pending)).toBe(true);
+    expect(Object.isFrozen(pending.body)).toBe(true);
+    const request = http.expectOne(`${base}/power-cycle`);
+    expect(request.request.body).toEqual({
+      ...(mode === 'time' ? { wake_time: '08:30' } : { wake_after_seconds: 240 }),
+      shutdown_time: '23:00',
+    });
+    request.flush({ shutdown_scheduled: true });
+    expect(view.busy()).toBe(false);
+  });
+
+  it.each(['create', 'present'] as const)(
+    'releases the lock after a dialog %s failure and allows retry',
+    async (stage) => {
+      const view = enter().componentInstance.state;
+      const failure = new Error('dialog failed');
+      if (stage === 'create')
+        vi.mocked(TestBed.inject(AlertController).create).mockRejectedValueOnce(failure);
+      else dialog.present.mockRejectedValueOnce(failure);
+      await view.confirm('shutdown');
+      expect(view.busy()).toBe(false);
+      expect(view.error()).toBe('No se pudo abrir la confirmación.');
+      http.expectNone(`${base}/shutdown`);
+      const retry = view.confirm('shutdown');
+      await ready();
+      expect(view.error()).toBe('');
+      expect(view.busy()).toBe(true);
+      dismiss({ role: 'cancel' });
+      await retry;
+      expect(view.busy()).toBe(false);
+    },
+  );
+
+  it('handles synchronous preparation failures and allows retry', async () => {
+    const view = enter().componentInstance.state;
+    vi.spyOn(TestBed.inject(SystemConfirmationService), 'prepare').mockImplementationOnce(() => {
+      throw new Error('prepare failed');
+    });
+    await expect(view.confirm('shutdown')).resolves.toBeUndefined();
+    expect(view.busy()).toBe(false);
+    expect(view.error()).toBe('No se pudo abrir la confirmación.');
+    expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
+    http.expectNone(`${base}/shutdown`);
+    const retry = view.confirm('reboot');
+    await ready();
+    dismiss({ role: 'confirm' });
+    await retry;
+    http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
+    expect(view.error()).toBe('');
+    expect(view.busy()).toBe(false);
+  });
+
+  it('reports a synchronous execution failure as an operation error and allows retry', async () => {
+    const view = enter().componentInstance.state;
+    vi.spyOn(TestBed.inject(SystemService), 'execute').mockImplementationOnce(() => {
+      throw new Error('execution failed');
+    });
+    const operation = view.confirm('shutdown');
+    await ready();
+    dismiss({ role: 'confirm' });
+    await operation;
+    expect(view.busy()).toBe(false);
+    expect(view.error()).toBe('No se pudo completar la operación.');
+    http.expectNone(`${base}/shutdown`);
+    const retry = view.confirm('reboot');
+    await ready();
+    expect(view.error()).toBe('');
+    dismiss({ role: 'confirm' });
+    await retry;
+    http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
+    expect(view.busy()).toBe(false);
+  });
+
+  it.each(['tab', 'view', 'session'] as const)(
+    'releases a pending creation on %s invalidation without unlocking a newer dialog',
+    async (leaving) => {
+      const view = enter().componentInstance.state;
+      let resolveOld!: (alert: HTMLIonAlertElement) => void;
+      const oldDialog = { ...dialog, remove: vi.fn() };
+      vi.mocked(TestBed.inject(AlertController).create).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve;
+          }),
+      );
+      const old = view.confirm('shutdown');
+      expect(view.busy()).toBe(true);
+      if (leaving === 'tab') view.leaveEnergy();
+      else if (leaving === 'view') view.ionViewWillLeave();
+      else TestBed.inject(ThemeIdentity).clear();
+      // Cleanup is immediate, even though the old create() is still unresolved.
+      expect(view.busy()).toBe(false);
+      if (leaving !== 'tab') {
+        view.ionViewWillEnter();
+        http.expectOne(`${base}/health`).flush(health);
+        http.expectOne(`${base}/wake-capabilities`).flush(wake);
+      }
+      view.enterEnergy();
+      const current = view.confirm('reboot');
+      await ready();
+      resolveOld(oldDialog as unknown as HTMLIonAlertElement);
+      await old;
+      expect(oldDialog.remove).toHaveBeenCalledOnce();
+      expect(view.busy()).toBe(true);
+      expect(view.error()).toBe('');
+      await view.confirm('shutdown');
+      expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+      dismiss({ role: 'cancel' });
+      await current;
+      expect(view.busy()).toBe(false);
+      http.expectNone((request) => request.method === 'POST');
+    },
+  );
+
+  it('does not let an old dismissal unlock or execute over a new confirmation', async () => {
+    const view = enter().componentInstance.state;
+    const old = view.confirm('shutdown');
+    await ready();
+    const dismissOld = dismiss;
+    view.leaveEnergy();
+    view.enterEnergy();
+    const current = view.confirm('reboot');
+    await ready();
+    dismissOld({ role: 'confirm' });
+    await old;
+    expect(view.busy()).toBe(true);
+    expect(view.error()).toBe('');
+    await view.confirm('shutdown');
+    expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+    http.expectNone(`${base}/shutdown`);
+    dismiss({ role: 'confirm' });
+    await current;
+    http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
+    expect(view.busy()).toBe(false);
+  });
+
+  it('releases the confirmation lock when leaving between dismissal and execution', async () => {
+    const view = enter().componentInstance.state;
+    const operation = view.confirm('shutdown');
+    await ready();
+    dismiss({ role: 'confirm' });
+    queueMicrotask(() => {
+      view.leaveEnergy();
+      view.enterEnergy();
+    });
+    await operation;
+    expect(view.busy()).toBe(false);
+    http.expectNone(`${base}/shutdown`);
+    const retry = view.confirm('reboot');
+    await ready();
+    dismiss({ role: 'cancel' });
+    await retry;
+    expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let an old dialog creation failure affect a new confirmation', async () => {
+    const view = enter().componentInstance.state;
+    let rejectOld!: (reason: Error) => void;
+    vi.mocked(TestBed.inject(AlertController).create).mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectOld = reject;
+        }),
+    );
+    const old = view.confirm('shutdown');
+    view.leaveEnergy();
+    view.enterEnergy();
+    const current = view.confirm('reboot');
+    await ready();
+    rejectOld(new Error('late failure'));
+    await old;
+    expect(view.busy()).toBe(true);
+    expect(view.error()).toBe('');
+    dismiss({ role: 'cancel' });
+    await current;
+    expect(view.busy()).toBe(false);
+    http.expectNone((request) => request.method === 'POST');
+  });
+
+  it.each(['cancel', 'success', 'failure', 'start-failure'] as const)(
+    'restores focus after %s',
+    async (outcome) => {
+      const fixture = enter();
+      const view = fixture.componentInstance.state;
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      const cancelButton = document.createElement('button');
+      const cancelFocus = vi.spyOn(cancelButton, 'focus');
+      dialog.querySelector.mockReturnValue(cancelButton);
+      try {
+        trigger.focus();
+        const focus = vi.spyOn(trigger, 'focus');
+        if (outcome === 'start-failure') {
+          vi.spyOn(TestBed.inject(SystemService), 'execute').mockImplementationOnce(() => {
+            throw new Error('execution failed');
+          });
+        }
+        const operation = view.confirm('shutdown');
+        await ready();
+        expect(cancelFocus).toHaveBeenCalled();
+        dismiss({ role: outcome === 'cancel' ? 'cancel' : 'confirm' });
+        await operation;
+        if (outcome !== 'cancel' && outcome !== 'start-failure') {
+          const request = http.expectOne(`${base}/shutdown`);
+          if (outcome === 'success') request.flush({ scheduled: true, when: '+1' });
+          else request.error(new ProgressEvent('error'));
+        }
+        TestBed.tick();
+        expect(view.busy()).toBe(false);
+        expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+      } finally {
+        trigger.remove();
+      }
+    },
+  );
+
+  it('does not restore focus after leaving and returning to Energy', async () => {
+    const fixture = enter();
+    const view = fixture.componentInstance.state;
+    const prepare = vi.spyOn(TestBed.inject(SystemConfirmationService), 'prepare');
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    try {
+      trigger.focus();
+      const focus = vi.spyOn(trigger, 'focus');
+      const operation = view.confirm('shutdown');
+      await ready();
+      const confirmation = prepare.mock.results[0].value;
+      const restoreFocus = confirmation.restoreFocus.bind(confirmation);
+      vi.spyOn(confirmation, 'restoreFocus').mockImplementationOnce(() => {
+        restoreFocus();
+        // Invalidate after registration, before Angular can run the deferred focus.
+        view.leaveEnergy();
+        view.enterEnergy();
+      });
+      dismiss({ role: 'cancel' });
+      await operation;
+      TestBed.tick();
+      expect(focus).not.toHaveBeenCalled();
+    } finally {
+      trigger.remove();
+    }
+  });
+
   it('cancels without sending an action and freezes confirmed parameters, blocking duplicates', async () => {
     const view = enter().componentInstance.state;
     const cancel = view.confirm('shutdown');
