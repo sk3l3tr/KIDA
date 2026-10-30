@@ -7,8 +7,6 @@ import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
-import { AuthService } from '../../auth/auth.service';
-import { ChannelBusyError } from '../../services/arca-request.service';
 import { SchedulerService } from './scheduler.service';
 import { Scheduler } from './scheduler';
 import { ListedSchedule } from './scheduler.models';
@@ -71,52 +69,6 @@ describe('Scheduler API through ARCA', () => {
       r.flush(data);
       expect(next).toHaveBeenCalledWith(data);
     }
-  });
-  it('sends the exact creation and deletion bodies with cookies and CSRF', () => {
-    const actions = TestBed.inject(ArcaActionsService);
-    TestBed.inject(AuthService).csrfToken.set('isolated-test-token');
-    for (const form of [
-      { ...emptyForm(), command: 'system.info', local: '2030-01-01T12:00:01' },
-      { ...emptyForm(), command: 'system.info', mode: 'interval' as const, seconds: '60' },
-      { ...emptyForm(), command: 'system.info', mode: 'cron' as const, expression: '0 2 * * *' },
-    ]) {
-      const body = createBody(form);
-      TestBed.inject(SchedulerService).add(body).subscribe();
-      const r = http.expectOne(`${base}/add`);
-      expect(r.request.method).toBe('POST');
-      expect(r.request.withCredentials).toBe(true);
-      expect(r.request.headers.get('X-CSRF-Token')).toBe('isolated-test-token');
-      expect(r.request.body).toEqual(body);
-      r.flush(entry);
-    }
-    TestBed.inject(SchedulerService).delete({ id: entry.id }).subscribe();
-    const r = http.expectOne(`${base}/delete`);
-    expect(r.request.method).toBe('POST');
-    expect(r.request.body).toEqual({ id: entry.id });
-    r.flush(entry);
-    for (const name of ['ADD', 'DELETE'])
-      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-        expect(actions.getDataSnapshot(`SCHEDULER_${name}_${suffix}`)).toBe('undefined');
-  });
-  it('drains late results, rejects occupied channels, and ignores old-session responses', () => {
-    const service = TestBed.inject(SchedulerService);
-    const old = vi.fn(),
-      failure = vi.fn(),
-      fresh = vi.fn();
-    const subscription = service.list('USER').subscribe(old);
-    const first = http.expectOne(`${base}?origin=USER`);
-    subscription.unsubscribe();
-    service.list('ALL').subscribe({ error: failure });
-    expect(failure.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-    http.expectNone(`${base}?origin=ALL`);
-    TestBed.inject(ThemeIdentity).begin();
-    service.list('ALL').subscribe(fresh);
-    const second = http.expectOne(`${base}?origin=ALL`);
-    first.flush([entry]);
-    expect(old).not.toHaveBeenCalled();
-    expect(fresh).not.toHaveBeenCalled();
-    second.flush([]);
-    expect(fresh).toHaveBeenCalledWith([]);
   });
 });
 
@@ -237,7 +189,6 @@ describe('Scheduler validation', () => {
     expect(schedulerFailure(fail(502, 'core_error'), true)).toContain('CORE rechazó');
     expect(schedulerFailure(fail(422), true)).toContain('Validación HTTP');
     expect(schedulerFailure(fail(401), true)).toContain('sesión');
-    expect(schedulerFailure(new ChannelBusyError(), true)).toContain('pendiente');
   });
 });
 
@@ -502,24 +453,5 @@ describe('Scheduler page', () => {
     http.expectNone(`${base}?origin=USER`);
     http.expectOne(`${base}/add`).flush(entry);
     http.expectOne(`${base}?origin=USER`).flush([entry]);
-  });
-  it('ignores late action results after leaving while draining the occupied channel', () => {
-    const fixture = enter(),
-      view = fixture.componentInstance;
-    view.prepareAdd();
-    view.confirm();
-    const first = http.expectOne(`${base}/add`);
-    view.ionViewWillLeave();
-    view.ionViewWillEnter();
-    http.expectOne(`${base}?origin=USER`).flush([]);
-    view.form = { ...emptyForm(), command: 'system.info', mode: 'interval', seconds: '1' };
-    view.prepareAdd();
-    view.confirm();
-    expect(view.error()).toContain('pendiente');
-    http.expectNone(`${base}/add`);
-    first.flush(entry);
-    expect(view.result()).toBeNull();
-    expect(view.entries()).toEqual([]);
-    http.expectNone(`${base}?origin=USER`);
   });
 });

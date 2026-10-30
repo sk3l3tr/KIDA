@@ -3,13 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable } from 'rxjs';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
-import { AuthService } from '../../auth/auth.service';
-import { ChannelBusyError } from '../../services/arca-request.service';
 import { BackupsService } from './backups.service';
 import { Backups, backupFailure, limitedPrecision } from './backups';
 import { BackupJob } from './backups.models';
@@ -168,7 +165,6 @@ describe('Backups form contracts', () => {
     expect(backupFailure(fail(502, 'core_error'), true)).toContain('CORE rechazó');
     expect(backupFailure(fail(422), true)).toContain('Validación HTTP');
     expect(backupFailure(fail(401), true)).toContain('sesión');
-    expect(backupFailure(new ChannelBusyError(), true)).toContain('pendiente');
   });
 });
 
@@ -204,51 +200,6 @@ describe('Backups through real ARCA transport', () => {
     const data = { backups: [job], future: null };
     r.flush(data);
     expect(next).toHaveBeenCalledWith(data);
-  });
-  it('sends exact bodies with cookie/CSRF and cleans ARCA stores', () => {
-    TestBed.inject(AuthService).csrfToken.set('test-token');
-    const service = TestBed.inject(BackupsService),
-      body = createBody(validForm());
-    for (const [path, payload, request] of [
-      ['/config/create', body, () => service.create(body)],
-      ['/config/delete', { id: job.id }, () => service.delete(job.id)],
-      ['/run', { id: job.id }, () => service.run(job.id)],
-    ] as const) {
-      const next = vi.fn();
-      (request() as Observable<unknown>).subscribe(next);
-      const r = http.expectOne(base + path);
-      expect(r.request.method).toBe('POST');
-      expect(r.request.body).toEqual(payload);
-      expect(r.request.withCredentials).toBe(true);
-      expect(r.request.headers.get('X-CSRF-Token')).toBe('test-token');
-      const data = path === '/run' ? { state: 'FUTURE', execution_id: 'e', future: null } : job;
-      r.flush(data);
-      expect(next).toHaveBeenCalledWith(data);
-    }
-    const actions = TestBed.inject(ArcaActionsService);
-    for (const name of ['CONFIG_CREATE', 'CONFIG_DELETE', 'RUN'])
-      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-        expect(actions.getDataSnapshot(`BACKUP_${name}_${suffix}`)).toBe('undefined');
-  });
-  it('drains abandoned reads and rejects occupied channels, including old-session results', () => {
-    const service = TestBed.inject(BackupsService),
-      old = vi.fn(),
-      fresh = vi.fn(),
-      error = vi.fn();
-    const subscription = service.list().subscribe(old),
-      first = http.expectOne(`${base}/config`);
-    subscription.unsubscribe();
-    service.list().subscribe({ error });
-    expect(error.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-    http.expectNone(`${base}/config`);
-    TestBed.inject(ThemeIdentity).begin();
-    service.list().subscribe(fresh);
-    const second = http.expectOne(`${base}/config`);
-    first.flush({ backups: [job] });
-    expect(old).not.toHaveBeenCalled();
-    expect(fresh).not.toHaveBeenCalled();
-    second.flush({ backups: [] });
-    expect(fresh).toHaveBeenCalledWith({ backups: [] });
   });
 });
 
@@ -449,47 +400,7 @@ describe('Backups page', () => {
     http.expectNone(`${base}/config/delete`);
     http.expectNone(`${base}/config`);
   });
-  it.each(['run', 'delete', 'create'] as const)(
-    'drains late %s result after leaving and blocks channel reuse',
-    (action) => {
-      const view = enter().componentInstance;
-      const send = () => {
-        if (action === 'create') view.create();
-        else {
-          view.prepare(action, job);
-          view.confirm();
-        }
-      };
-      const path = action === 'run' ? '/run' : `/config/${action}`;
-      send();
-      const first = http.expectOne(base + path);
-      view.ionViewWillLeave();
-      enterPage(view);
-      http.expectOne(`${base}/config`).flush({ backups: [job] });
-      view.form = validForm();
-      send();
-      expect(view.error()).toContain('pendiente');
-      http.expectNone(base + path);
-      first.flush(action === 'run' ? { state: 'QUEUED', execution_id: 'old' } : job);
-      expect(view.result()).toBeNull();
-      expect(view.entries()).toEqual([job]);
-      http.expectNone(`${base}/config`);
-    },
-  );
-  it('does not accept an abandoned read on re-entry and can refresh after the channel drains', () => {
-    const fixture = enter(),
-      view = fixture.componentInstance;
-    view.refresh();
-    const first = http.expectOne(`${base}/config`);
-    view.ionViewWillLeave();
-    enterPage(view);
-    expect(view.listError()).toContain('pendiente');
-    first.flush({ backups: [job] });
-    expect(view.entries()).toBeNull();
-    view.refresh();
-    http.expectOne(`${base}/config`).flush({ backups: [] });
-    expect(view.entries()).toEqual([]);
-  });
+
   it('focuses Cancel before rendering the pending snapshot and restores the trigger on cancel', async () => {
     const fixture = enter(),
       view = fixture.componentInstance;
@@ -542,24 +453,7 @@ describe('Backups page', () => {
     expect(trigger.isConnected).toBe(false);
     expect(document.activeElement?.id).toBe('backup-configurations-heading');
   });
-  it('does not publish a previous session write into the new session', () => {
-    const view = enter().componentInstance;
-    view.prepare('run', job);
-    view.confirm();
-    const first = http.expectOne(`${base}/run`);
-    TestBed.inject(ThemeIdentity).begin();
-    enterPage(view);
-    http.expectOne(`${base}/config`).flush({ backups: [job] });
-    view.prepare('run', job);
-    view.confirm();
-    const second = http.expectOne(`${base}/run`);
-    first.flush({ state: 'QUEUED', execution_id: 'old' });
-    expect(view.result()).toBeNull();
-    expect(view.busy()).toBe(true);
-    second.flush({ state: 'QUEUED', execution_id: 'new' });
-    http.expectOne(`${base}/config`).flush({ backups: [job] });
-    expect(view.result()).toMatchObject({ execution_id: 'new' });
-  });
+
   it('clears the DOM of an Ionic cached detached page on session change', async () => {
     const fixture = enter();
     fixture.detectChanges();

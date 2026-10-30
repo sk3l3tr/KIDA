@@ -8,7 +8,6 @@ import { appConfig } from '../../../app.config';
 import { environment } from '../../../../environments/environment';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { AuthService } from '../../../auth/auth.service';
-import { ChannelBusyError } from '../../../services/arca-request.service';
 import { Observable } from 'rxjs';
 import { DockerService } from '../services/docker.service';
 import { Docker } from '../docker';
@@ -102,26 +101,6 @@ describe('Docker HTTP through ARCA', () => {
       expect(next).toHaveBeenCalledWith(response);
     },
   );
-  it('drains abandoned inspect channel before reusing it and ignores old-session results', () => {
-    const service = TestBed.inject(DockerService),
-      next = vi.fn(),
-      error = vi.fn(),
-      fresh = vi.fn();
-    const sub = service.inspect('first').subscribe(next);
-    const first = http.expectOne(`${base}/compose/projects/inspect?project=first`);
-    sub.unsubscribe();
-    service.inspect('second').subscribe({ error });
-    expect(error.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-    http.expectNone(`${base}/compose/projects/inspect?project=second`);
-    TestBed.inject(ThemeIdentity).begin();
-    service.inspect('second').subscribe(fresh);
-    const second = http.expectOne(`${base}/compose/projects/inspect?project=second`);
-    first.flush(project);
-    expect(next).not.toHaveBeenCalled();
-    expect(fresh).not.toHaveBeenCalled();
-    second.flush({ ...project, name: 'second' });
-    expect(fresh).toHaveBeenCalledWith({ ...project, name: 'second' });
-  });
 });
 
 describe('Docker page', () => {

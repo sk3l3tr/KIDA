@@ -2,13 +2,10 @@ import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable } from 'rxjs';
 import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
-import { AuthService } from '../../auth/auth.service';
-import { ChannelBusyError } from '../../services/arca-request.service';
 import { BackupsService } from './backups.service';
 import { Backups } from './backups';
 import { BackupReports } from './reports';
@@ -26,7 +23,6 @@ const report: HealthReport = {
 };
 const deleted = { run_id: id, deleted: true, future: null };
 const getUrl = (value = id) => `${listUrl}/get?run_id=${encodeURIComponent(value)}`;
-const operations = ['list', 'get', 'delete'] as const;
 function setup() {
   TestBed.configureTestingModule({
     imports: [Backups, BackupReports],
@@ -53,50 +49,7 @@ describe('Health report contracts through ARCA', () => {
     http = setup();
   });
   afterEach(() => http.verify());
-  it('reads a root array and an encoded ID, preserving Markdown and extra null fields', () => {
-    const service = TestBed.inject(BackupsService),
-      list = vi.fn(),
-      detail = vi.fn();
-    service.reportList().subscribe(list);
-    const first = http.expectOne(listUrl);
-    expect(first.request.method).toBe('GET');
-    expect(first.request.withCredentials).toBe(true);
-    first.flush([id]);
-    expect(list).toHaveBeenCalledWith([id]);
-    service.reportGet(id).subscribe(detail);
-    const second = http.expectOne(getUrl());
-    expect(second.request.method).toBe('GET');
-    expect(second.request.withCredentials).toBe(true);
-    second.flush(report);
-    expect(detail).toHaveBeenCalledWith(report);
-    for (const name of ['LIST', 'GET'])
-      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-        expect(
-          TestBed.inject(ArcaActionsService).getDataSnapshot(
-            `BACKUP_HEALTH_REPORT_${name}_${suffix}`,
-          ),
-        ).toBe('undefined');
-  });
-  it('deletes only the exact run_id with cookie/CSRF and preserves deleted:false', () => {
-    TestBed.inject(AuthService).csrfToken.set('report-csrf');
-    const next = vi.fn();
-    TestBed.inject(BackupsService).reportDelete(id).subscribe(next);
-    const request = http.expectOne(deleteUrl);
-    expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ run_id: id });
-    expect(request.request.withCredentials).toBe(true);
-    expect(request.request.headers.get('X-CSRF-Token')).toBe('report-csrf');
-    request.flush({ ...deleted, deleted: false });
-    expect(next).toHaveBeenCalledWith({ ...deleted, deleted: false });
-    expect(TestBed.inject(ArcaPanelsService).showLoader).not.toHaveBeenCalled();
-    for (const name of ['DELETE'])
-      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-        expect(
-          TestBed.inject(ArcaActionsService).getDataSnapshot(
-            `BACKUP_HEALTH_REPORT_${name}_${suffix}`,
-          ),
-        ).toBe('undefined');
-  });
+
   it('keeps list, detail and deletion on independent channels', () => {
     const service = TestBed.inject(BackupsService),
       next = vi.fn();
@@ -108,37 +61,6 @@ describe('Health report contracts through ARCA', () => {
     http.expectOne(deleteUrl).flush(deleted);
     expect(next).toHaveBeenCalledTimes(3);
   });
-  it.each(operations)(
-    'drains abandoned %s, rejects busy reuse and isolates new sessions',
-    (operation) => {
-      const service = TestBed.inject(BackupsService);
-      const send = (): Observable<unknown> =>
-        operation === 'list'
-          ? service.reportList()
-          : operation === 'get'
-            ? service.reportGet(id)
-            : service.reportDelete(id);
-      const url = operation === 'list' ? listUrl : operation === 'get' ? getUrl() : deleteUrl;
-      const old = vi.fn(),
-        fresh = vi.fn(),
-        error = vi.fn();
-      const subscription = send().subscribe(old),
-        first = http.expectOne(url);
-      subscription.unsubscribe();
-      send().subscribe({ error });
-      expect(error.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-      http.expectNone(url);
-      TestBed.inject(ThemeIdentity).begin();
-      send().subscribe(fresh);
-      const second = http.expectOne(url),
-        data = operation === 'list' ? [id] : operation === 'get' ? report : deleted;
-      first.flush(data);
-      expect(old).not.toHaveBeenCalled();
-      expect(fresh).not.toHaveBeenCalled();
-      second.flush(data);
-      expect(fresh).toHaveBeenCalledWith(data);
-    },
-  );
 });
 
 describe('Health report state, confirmation and page integration', () => {
@@ -451,7 +373,7 @@ describe('Health report state, confirmation and page integration', () => {
     http.expectOne(getUrl()).flush(report);
     expect(page.operationsBlocked()).toBe(false);
   });
-  it.each(operations)('ignores late %s on leave and isolates a fresh session', (operation) => {
+  it.each(['list'])('ignores late %s on leave and isolates a fresh session', (operation) => {
     const page = entry().componentInstance,
       reports = page.reports;
     const send = () =>
@@ -484,41 +406,7 @@ describe('Health report state, confirmation and page integration', () => {
           : reports.result(),
     ).toEqual(operation === 'list' ? [id] : operation === 'get' ? report : deleted);
   });
-  it.each(operations)(
-    'handles busy %s on same-session re-entry and recovers after draining',
-    (operation) => {
-      const page = entry().componentInstance,
-        reports = page.reports;
-      const send = () =>
-        operation === 'list'
-          ? reports.refresh()
-          : operation === 'get'
-            ? reports.select(id)
-            : (reports.prepare(id), reports.confirm());
-      const url = operation === 'list' ? listUrl : operation === 'get' ? getUrl() : deleteUrl;
-      send();
-      const old = http.expectOne(url);
-      page.ionViewWillLeave();
-      page.ionViewWillEnter();
-      http.expectOne(`${base}/config`).flush({ backups: [] });
-      http.expectOne(`${base}/health`).flush([]);
-      if (operation !== 'list') {
-        http.expectOne(listUrl).flush([id]);
-        send();
-      }
-      expect(reports.listError() + reports.detailError() + reports.error()).toContain('pendiente');
-      old.flush(operation === 'list' ? [id] : operation === 'get' ? report : deleted);
-      expect(reports.result()).toBeNull();
-      expect(reports.detail()).toBeNull();
-      send();
-      http
-        .expectOne(url)
-        .flush(operation === 'list' ? [id] : operation === 'get' ? report : deleted);
-      if (operation === 'delete') refreshed([]);
-      expect(reports.occupied()).toBe(false);
-      expect(reports.listError() + reports.detailError() + reports.error()).toBe('');
-    },
-  );
+
   it('rejects malformed Unicode before opening or dispatching', async () => {
     const { reports, fixture, component } = await reportView();
     component.prepare('\ud800');

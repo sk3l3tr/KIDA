@@ -1,5 +1,3 @@
-import { ChannelBusyError } from './arca-request.service';
-
 export type CoreFailure =
   | { kind: 'busy'; message: string }
   | {
@@ -13,7 +11,6 @@ function fields(value: unknown): Record<string, unknown> {
 
 /** Interpret the shared HTTP/CORE envelope; each page owns its user-facing wording. */
 export function classifyCoreFailure(failure: unknown, writing = false): CoreFailure {
-  if (failure instanceof ChannelBusyError) return { kind: 'busy', message: failure.message };
   const error = fields(failure);
   const status = typeof error['status'] === 'number' ? error['status'] : undefined;
   const detail = fields(error['error'])['detail'];

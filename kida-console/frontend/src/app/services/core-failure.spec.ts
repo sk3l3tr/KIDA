@@ -1,5 +1,4 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChannelBusyError } from './arca-request.service';
 import { classifyCoreFailure } from './core-failure';
 import { systemFailure } from '../pages/system/utils/system.models';
 import { schedulerFailure } from '../pages/scheduler/scheduler-presentation';
@@ -28,8 +27,6 @@ describe('Shared CORE failure classification', () => {
     expect(classifyCoreFailure(failure(503, 'core_unavailable'), true).kind).toBe('unavailable');
     expect(classifyCoreFailure(failure(401), true).kind).toBe('expired');
     expect(classifyCoreFailure(failure(422), true).kind).toBe('validation');
-    const busy = new ChannelBusyError();
-    expect(classifyCoreFailure(busy, true)).toEqual({ kind: 'busy', message: busy.message });
   });
   it.each([undefined, null, 'unexpected', {}, { error: { detail: { message: 42 } } }])(
     'handles an unexpected error without assuming an HTTP envelope: %j',
@@ -78,8 +75,6 @@ describe('Exact page failure messages', () => {
   ] as const;
 
   it.each(pages)('preserves all messages for %s', (format, uncertain, validation, rejection) => {
-    const busy = new ChannelBusyError();
-    expect(format(busy, true)).toBe(busy.message);
     expect(format(failure(504), true)).toBe(uncertain);
     expect(format(failure(0))).toBe('Sin conexión con el servidor o CORE.');
     expect(format(failure(503, 'core_unavailable'), true)).toBe(

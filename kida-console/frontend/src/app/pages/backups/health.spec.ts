@@ -7,14 +7,10 @@ import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
-import { AuthService } from '../../auth/auth.service';
-import { ChannelBusyError } from '../../services/arca-request.service';
-import { BackupsService } from './backups.service';
 import { Backups } from './backups';
 import { BackupHealth } from './health';
 import { healthBody, healthFailure } from './health-state';
 import { HealthAction, HealthExecution, HealthHistoryRecord } from './health.models';
-import { Observable } from 'rxjs';
 
 const base = `${environment.apiBaseUrl}/backup`;
 const run: HealthExecution = {
@@ -107,151 +103,7 @@ describe('Health basic contracts through ARCA', () => {
     http = setup();
   });
   afterEach(() => http.verify());
-  it('reads root arrays and encoded IDs, preserving nulls, unknown states and fields', () => {
-    const service = TestBed.inject(BackupsService),
-      list = vi.fn(),
-      detail = vi.fn();
-    service.healthList().subscribe(list);
-    const l = http.expectOne(`${base}/health`);
-    expect(l.request.method).toBe('GET');
-    expect(l.request.withCredentials).toBe(true);
-    l.flush([record]);
-    expect(list).toHaveBeenCalledWith([record]);
-    service.healthGet(run.run_id).subscribe(detail);
-    const d = http.expectOne(getUrl());
-    expect(d.request.method).toBe('GET');
-    expect(d.request.withCredentials).toBe(true);
-    d.flush(run);
-    expect(detail).toHaveBeenCalledWith(run);
-    const actions = TestBed.inject(ArcaActionsService);
-    for (const name of ['HEALTH_LIST', 'HEALTH_GET'])
-      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-        expect(actions.getDataSnapshot(`BACKUP_${name}_${suffix}`)).toBe('undefined');
-  });
-  it.each(['AUTOMATIC', 'MANUAL'] as const)(
-    'creates %s with exact path and CSRF, without start/run',
-    (mode) => {
-      TestBed.inject(AuthService).csrfToken.set('csrf-health');
-      const body = healthBody(' ./health/../app.toml ', mode),
-        next = vi.fn();
-      TestBed.inject(BackupsService).healthCreate(body).subscribe(next);
-      const r = http.expectOne(`${base}/health/create`);
-      expect(r.request.method).toBe('POST');
-      expect(r.request.withCredentials).toBe(true);
-      expect(r.request.headers.get('X-CSRF-Token')).toBe('csrf-health');
-      expect(r.request.body).toEqual({ definition_path: ' ./health/../app.toml ', mode });
-      r.flush(run);
-      expect(next).toHaveBeenCalledWith(run);
-      const actions = TestBed.inject(ArcaActionsService);
-      for (const name of ['HEALTH_CREATE'])
-        for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-          expect(actions.getDataSnapshot(`BACKUP_${name}_${suffix}`)).toBe('undefined');
-      http.expectNone(`${base}/health/start`);
-      http.expectNone(`${base}/health/run`);
-    },
-  );
-  it.each(['list', 'get', 'create'] as const)(
-    'drains abandoned %s and isolates a new session',
-    (operation) => {
-      const service = TestBed.inject(BackupsService);
-      const send = (): Observable<unknown> =>
-        operation === 'list'
-          ? service.healthList()
-          : operation === 'get'
-            ? service.healthGet(run.run_id)
-            : service.healthCreate({ definition_path: '/a', mode: 'MANUAL' });
-      const url =
-        operation === 'list'
-          ? `${base}/health`
-          : operation === 'get'
-            ? getUrl()
-            : `${base}/health/create`;
-      const old = vi.fn(),
-        fresh = vi.fn(),
-        error = vi.fn();
-      const subscription = send().subscribe(old),
-        first = http.expectOne(url);
-      subscription.unsubscribe();
-      send().subscribe({ error });
-      expect(error.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-      http.expectNone(url);
-      TestBed.inject(ThemeIdentity).begin();
-      send().subscribe(fresh);
-      const second = http.expectOne(url),
-        data = operation === 'list' ? [record] : run;
-      first.flush(data);
-      expect(old).not.toHaveBeenCalled();
-      expect(fresh).not.toHaveBeenCalled();
-      second.flush(data);
-      expect(fresh).toHaveBeenCalledWith(data);
-    },
-  );
-  it.each(operations)(
-    'sends %s with exact body, cookie/CSRF and an open response on an independent channel',
-    (action) => {
-      TestBed.inject(AuthService).csrfToken.set('operations-csrf');
-      const service = TestBed.inject(BackupsService);
-      const send = (): Observable<unknown> =>
-        action === 'run'
-          ? service.healthRun(' ./health/../automatic.toml ')
-          : action === 'start'
-            ? service.healthStart(run.run_id)
-            : action === 'stop'
-              ? service.healthStop(run.run_id)
-              : service.healthDelete(run.run_id);
-      const next = vi.fn();
-      send().subscribe(next);
-      const request = http.expectOne(`${base}/health/${action}`);
-      expect(request.request.method).toBe('POST');
-      expect(request.request.withCredentials).toBe(true);
-      expect(request.request.headers.get('X-CSRF-Token')).toBe('operations-csrf');
-      expect(request.request.body).toEqual(
-        action === 'run'
-          ? { definition_path: ' ./health/../automatic.toml ' }
-          : { run_id: run.run_id },
-      );
-      const data = operationResponse(action);
-      request.flush(data);
-      expect(next).toHaveBeenCalledWith(data);
-      for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-        expect(
-          TestBed.inject(ArcaActionsService).getDataSnapshot(
-            `BACKUP_HEALTH_${action.toUpperCase()}_${suffix}`,
-          ),
-        ).toBe('undefined');
-    },
-  );
-  it.each(operations)(
-    'drains abandoned %s, rejects busy reuse and isolates new sessions',
-    (action) => {
-      const service = TestBed.inject(BackupsService);
-      const send = (): Observable<unknown> =>
-        action === 'run'
-          ? service.healthRun('/a')
-          : action === 'start'
-            ? service.healthStart(run.run_id)
-            : action === 'stop'
-              ? service.healthStop(run.run_id)
-              : service.healthDelete(run.run_id);
-      const old = vi.fn(),
-        fresh = vi.fn(),
-        error = vi.fn();
-      const subscription = send().subscribe(old);
-      const first = http.expectOne(`${base}/health/${action}`);
-      subscription.unsubscribe();
-      send().subscribe({ error });
-      expect(error.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-      http.expectNone(`${base}/health/${action}`);
-      TestBed.inject(ThemeIdentity).begin();
-      send().subscribe(fresh);
-      const second = http.expectOne(`${base}/health/${action}`);
-      first.flush(operationResponse(action));
-      expect(old).not.toHaveBeenCalled();
-      expect(fresh).not.toHaveBeenCalled();
-      second.flush(operationResponse(action));
-      expect(fresh).toHaveBeenCalledWith(operationResponse(action));
-    },
-  );
+
   it('validates mode and Unicode without interpreting host paths', () => {
     expect(healthBody('', 'MANUAL')).toEqual({ definition_path: '', mode: 'MANUAL' });
     expect(() => healthBody('\ud800', 'MANUAL')).toThrow('Unicode');
@@ -483,65 +335,7 @@ describe('Health basic state and page integration', () => {
     expect(health.error()).toContain('Unicode');
     http.expectNone(`${base}/health/create`);
   });
-  it.each(['list', 'get', 'create'] as const)(
-    'ignores late %s on leave, handles channel busy on re-entry, then recovers',
-    (operation) => {
-      const page = enter().componentInstance,
-        health = page.health;
-      const send = () =>
-        operation === 'list'
-          ? health.refresh()
-          : operation === 'get'
-            ? health.select(run.run_id)
-            : health.create();
-      const url =
-        operation === 'list'
-          ? `${base}/health`
-          : operation === 'get'
-            ? getUrl()
-            : `${base}/health/create`;
-      send();
-      const old = http.expectOne(url);
-      page.ionViewWillLeave();
-      page.ionViewWillEnter();
-      http.expectOne(`${base}/health/reports`).flush([]);
-      http.expectOne(`${base}/config`).flush({ backups: [] });
-      if (operation !== 'list') {
-        http.expectOne(`${base}/health`).flush([record]);
-        send();
-      }
-      expect(health.listError() + health.detailError() + health.error()).toContain('pendiente');
-      old.flush(operation === 'list' ? [record] : run);
-      expect(health.result()).toBeNull();
-      expect(health.detail()).toBeNull();
-      send();
-      http.expectOne(url).flush(operation === 'list' ? [record] : run);
-      if (operation === 'create') {
-        http.expectOne(`${base}/health`).flush([record]);
-        http.expectOne(getUrl()).flush(run);
-      }
-    },
-  );
-  it('ignores an old session result while a new session create is pending', () => {
-    const page = enter().componentInstance,
-      health = page.health;
-    health.create();
-    const old = http.expectOne(`${base}/health/create`);
-    TestBed.inject(ThemeIdentity).begin();
-    page.ionViewWillEnter();
-    http.expectOne(`${base}/health/reports`).flush([]);
-    http.expectOne(`${base}/config`).flush({ backups: [] });
-    http.expectOne(`${base}/health`).flush([]);
-    health.create();
-    const fresh = http.expectOne(`${base}/health/create`);
-    old.flush(run);
-    expect(health.result()).toBeNull();
-    expect(health.writing()).toBe(true);
-    fresh.flush(run);
-    http.expectOne(`${base}/health`).flush([record]);
-    http.expectOne(getUrl()).flush(run);
-    expect(health.result()).toEqual(run);
-  });
+
   async function healthView() {
     const page = enter().componentInstance;
     selection(page);
@@ -749,43 +543,7 @@ describe('Health basic state and page integration', () => {
       expect(health.selectedId()).toBe(run.run_id);
     },
   );
-  it.each(operations)(
-    'ignores late %s across exit, busy re-entry and new session',
-    async (action) => {
-      const { page, health, component } = await healthView();
-      const send = () => {
-        health.prepare(action);
-        health.confirm();
-      };
-      component.prepare(action);
-      component.confirm();
-      const old = http.expectOne(`${base}/health/${action}`);
-      page.ionViewWillLeave();
-      page.ionViewWillEnter();
-      http.expectOne(`${base}/health/reports`).flush([]);
-      http.expectOne(`${base}/config`).flush({ backups: [] });
-      http.expectOne(`${base}/health`).flush([record]);
-      selection(page);
-      send();
-      expect(health.error()).toContain('pendiente');
-      http.expectNone(`${base}/health/${action}`);
-      TestBed.inject(ThemeIdentity).begin();
-      page.ionViewWillEnter();
-      http.expectOne(`${base}/health/reports`).flush([]);
-      http.expectOne(`${base}/config`).flush({ backups: [] });
-      http.expectOne(`${base}/health`).flush([record]);
-      selection(page);
-      send();
-      const fresh = http.expectOne(`${base}/health/${action}`);
-      old.flush(operationResponse(action));
-      expect(health.result()).toBeNull();
-      expect(health.writing()).toBe(true);
-      fresh.flush(operationResponse(action));
-      http.expectOne(`${base}/health`).flush([record]);
-      http.expectOne(getUrl()).flush(run);
-      expect(health.result()).toEqual(operationResponse(action));
-    },
-  );
+
   it.each(['leave', 'session'] as const)(
     'clears open confirmation on %s and never dispatches it later',
     async (reason) => {

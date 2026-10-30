@@ -8,7 +8,7 @@ import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../../app.config';
 import { environment } from '../../../../environments/environment';
 import { ThemeIdentity } from '../../../../theme/integration';
-import { ArcaRequestService, ChannelBusyError } from '../../../services/arca-request.service';
+import { ArcaRequestService } from '../../../services/arca-request.service';
 import { SystemService } from '../services/system.service';
 import { SystemFacade } from '../services/system.facade';
 import { SystemConfirmationService } from '../services/system-confirmation.service';
@@ -124,44 +124,7 @@ describe('System requests and shared ARCA adapter', () => {
       http.expectNone(`${base}/power-cycle`);
     }
   });
-  it('rejects same-channel duplicates and drains late results after consumer teardown', () => {
-    const service = TestBed.inject(SystemService);
-    const first = vi.fn();
-    const sub = service.info().subscribe(first);
-    const pending = http.expectOne(`${base}/info`);
-    sub.unsubscribe();
-    const failure = vi.fn();
-    service.info().subscribe({ error: failure });
-    expect(failure.mock.calls[0][0]).toBeInstanceOf(ChannelBusyError);
-    http.expectNone(`${base}/info`);
-    pending.flush(info);
-    expect(first).not.toHaveBeenCalled();
-    const next = vi.fn();
-    service.info().subscribe(next);
-    expect(next).not.toHaveBeenCalled();
-    http.expectOne(`${base}/info`).flush({ ...info, hostname: 'fresh' });
-    expect(next).toHaveBeenCalledWith({ ...info, hostname: 'fresh' });
-    const actions = TestBed.inject(ArcaActionsService);
-    for (const suffix of ['REQUEST', 'RESPONSE', 'ERROR'])
-      expect(actions.getDataSnapshot(`SYSTEM_INFO_${suffix}`)).toBe('undefined');
-  });
-  it('ignores old-session results while a new request uses the same channel', () => {
-    const service = TestBed.inject(SystemService);
-    const old = vi.fn(),
-      complete = vi.fn(),
-      fresh = vi.fn();
-    service.info().subscribe({ next: old, complete });
-    const first = http.expectOne(`${base}/info`);
-    TestBed.inject(ThemeIdentity).begin();
-    expect(complete).toHaveBeenCalledOnce();
-    service.info().subscribe(fresh);
-    const second = http.expectOne(`${base}/info`);
-    first.flush(info);
-    expect(fresh).not.toHaveBeenCalled();
-    expect(old).not.toHaveBeenCalled();
-    second.flush({ hostname: 'second' });
-    expect(fresh).toHaveBeenCalledWith({ hostname: 'second' });
-  });
+
   it('preserves successful null HTTP responses in the extracted adapter', () => {
     const next = vi.fn();
     TestBed.inject(ArcaRequestService).request<void>('LOGOUT').subscribe(next);

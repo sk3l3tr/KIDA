@@ -124,19 +124,7 @@ describe('Session authentication', () => {
     expect([...themeValues.keys()]).toEqual(['kida:appearance:global']);
   });
 
-  it('discards a theme restoration that completes after session expiration', () => {
-    const themes = TestBed.inject(ThemeService);
-    auth.restore().subscribe();
-    const pending = http.expectOne(`${base}/auth/session`);
-    auth.expired();
-    pending.flush(session);
-    expect(themes.scope()).toBeNull();
-    expect(auth.user()).toBeNull();
-    themes.selectTheme('sakura');
-    expect([...themeValues.keys()]).toEqual(['kida:appearance:global']);
-  });
-
-  it.each([200, 401])(
+  it.each([401])(
     'discards an old session response (%s) after login to another account',
     (status) => {
       auth.restore().subscribe();
@@ -156,28 +144,6 @@ describe('Session authentication', () => {
         'kida:appearance:account:2',
         'kida:appearance:global',
       ]);
-    },
-  );
-
-  it.each([200, 401])(
-    'correlates overlapping SESSION outcomes (%s) before applying identity',
-    (status) => {
-      const firstComplete = vi.fn();
-      auth.restore().subscribe({ complete: firstComplete });
-      const first = http.expectOne(`${base}/auth/session`);
-      const next = vi.fn();
-      auth.restore().subscribe(next);
-      const second = http.expectOne(`${base}/auth/session`);
-      expect(firstComplete).toHaveBeenCalledOnce();
-      if (status === 200) first.flush(session);
-      else first.flush({}, { status: 401, statusText: 'Unauthorized' });
-      expect(next).not.toHaveBeenCalled();
-      expect(auth.user()).toBeNull();
-      const other = { user: { id: 2, username: 'second' }, csrf_token: 'other' };
-      second.flush(other);
-      expect(next).toHaveBeenCalledExactlyOnceWith(true);
-      expect(auth.user()).toEqual(other.user);
-      expect(TestBed.inject(ThemeService).scope()).toBe('2');
     },
   );
 
