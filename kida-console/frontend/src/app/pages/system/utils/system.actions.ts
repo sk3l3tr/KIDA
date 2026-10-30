@@ -10,7 +10,7 @@ export const systemActions: IactionDefinition[] = (
     ['REBOOT', 'reboot', UrlRequestType.POST],
     ['POWER_CYCLE', 'power-cycle', UrlRequestType.POST],
   ] as const
-).map(([name, path, method]) => ({
+).map(([name, path, method, useLoader = true]) => ({
   actionName: `SYSTEM_${name}_REQUEST`,
   urlRequest: {
     endpoint: `${environment.apiBaseUrl}/system/${path}`,
@@ -18,6 +18,6 @@ export const systemActions: IactionDefinition[] = (
     format: UrlRequestFormat.json,
     responseActionName: `SYSTEM_${name}_RESPONSE`,
     errorActionName: `SYSTEM_${name}_ERROR`,
-    useLoader: false,
+    useLoader,
   },
 }));

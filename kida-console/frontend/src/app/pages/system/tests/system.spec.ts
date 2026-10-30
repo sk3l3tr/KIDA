@@ -73,11 +73,11 @@ describe('System requests and shared ARCA adapter', () => {
   });
   afterEach(() => http.verify());
 
-  it('registers six distinct channels without the global loader', () => {
+  it('registers six distinct channels', () => {
     expect(systemActions).toHaveLength(6);
     expect(new Set(systemActions.map((a) => a.actionName)).size).toBe(6);
-    for (const action of systemActions) expect(action.urlRequest?.useLoader).toBe(false);
   });
+
   it('sends the three GET routes independently, preserving nulls, empty lists and new fields', () => {
     const service = TestBed.inject(SystemService);
     const first = vi.fn(),

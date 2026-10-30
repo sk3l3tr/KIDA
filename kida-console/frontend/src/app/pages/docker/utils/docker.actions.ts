@@ -11,7 +11,7 @@ export const dockerActions: IactionDefinition[] = (
     ['CONTAINER_RESTART', '/containers/restart', UrlRequestType.POST],
     ['CONTAINER_DELETE', '/containers/delete', UrlRequestType.POST],
   ] as const
-).map(([name, path, method]) => ({
+).map(([name, path, method, useLoader = true]) => ({
   actionName: `DOCKER_${name}_REQUEST`,
   urlRequest: {
     endpoint: `${environment.apiBaseUrl}/docker${path}`,
@@ -19,6 +19,6 @@ export const dockerActions: IactionDefinition[] = (
     format: UrlRequestFormat.json,
     responseActionName: `DOCKER_${name}_RESPONSE`,
     errorActionName: `DOCKER_${name}_ERROR`,
-    useLoader: false,
+    useLoader,
   },
 }));
