@@ -3,6 +3,7 @@ import { DOCUMENT, JsonPipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
 import { SidePanel } from '../../components/side-panel/side-panel';
+import { Masonry, MasonryItem } from '../../components/masonry/masonry';
 import { ContainerDetails } from './components/container-details/container-details';
 import { ContainerActions } from './components/container-actions/container-actions';
 import { DockerFacade } from './services/docker.facade';
@@ -19,6 +20,8 @@ import { DockerProjectCard } from './components/docker-project-card/docker-proje
     ContainerActions,
     DockerIndicators,
     DockerProjectCard,
+    Masonry,
+    MasonryItem,
   ],
   templateUrl: './docker-view.html',
   styleUrl: './docker.scss',

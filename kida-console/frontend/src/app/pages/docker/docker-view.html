@@ -38,9 +38,10 @@
           <p>Proyectos anteriores, desactualizados.</p>
         }
         @if (state.projects.data(); as data) {
-          <div class="project-grid">
+          <app-masonry class="project-grid">
             @for (project of data; track project.name) {
               <app-docker-project-card
+                appMasonryItem
                 [project]="project"
                 [disabled]="
                   state.detail.loading() ||
@@ -50,10 +51,11 @@
                 "
                 (inspect)="state.inspect($event)"
               />
-            } @empty {
-              <p>No hay proyectos Compose.</p>
             }
-          </div>
+          </app-masonry>
+          @if (data.length === 0) {
+            <p>No hay proyectos Compose.</p>
+          }
         }
       </section>
     } @else {
