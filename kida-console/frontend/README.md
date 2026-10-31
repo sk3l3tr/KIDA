@@ -215,6 +215,24 @@ Both paths refer to existing installations; this adds no frontend dependencies.
 `/tmp/kida-scheduler-evidence`. The script mocks every API request before navigation.
 See [recorded validation](src/app/pages/scheduler/scheduler.verification.md).
 
+## Facade conventions
+
+Use `SystemFacade` as a reference for readable coordination. A facade owns page
+state, lifecycle, operation guards and the sequence of each use case. Keep those
+sequences short and move substantial steps into named private methods. Preserve
+session and selection checks in asynchronous callbacks, frozen confirmations,
+write locks and uncertain outcomes when refactoring.
+
+Feature services own typed transport calls; presentation utilities own pure
+filtering, grouping and formatting. Reuse shared services for common interface
+mechanics: `NativeDialogService` opens and closes native dialogs and delegates
+keyboard wrapping and deferred focus restoration to the existing focus helpers.
+It holds no per-page state. Callers supply their own dialog, injector, focus
+fallback and callback validity guard; they also decide when opening must wait for
+rendering and how errors are displayed. Ionic confirmations keep their existing
+service. Extract concrete shared behavior without base facades or generic
+operation frameworks.
+
 ## Code scaffolding
 
 Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
