@@ -1,5 +1,5 @@
 import { formatCoreFailure } from '../../../services/core-failure';
-import { ComposeProject, ContainerAction } from './docker.models';
+import { ComposeProject, ContainerAction, DockerContainer } from './docker.models';
 
 export type ComposeAssociation = { project: string; service: string | null } | 'ambiguous';
 
@@ -47,4 +47,43 @@ export function dockerFailure(failure: unknown, writing = false): string {
     validation: 'Validación HTTP: datos rechazados por el servidor.',
     rejected: 'core',
   });
+}
+
+export function serviceKeys(project: ComposeProject): string[] {
+  const occurrences = new Map<string | null, number>();
+  return project.services.map((service) => {
+    const occurrence = occurrences.get(service.name) ?? 0;
+    occurrences.set(service.name, occurrence + 1);
+    return JSON.stringify([service.name, occurrence]);
+  });
+}
+
+export function filterContainers(
+  containers: DockerContainer[],
+  search: string,
+  activity: 'all' | 'online' | 'offline',
+  associations: Map<string, ComposeAssociation> | null,
+): DockerContainer[] {
+  const query = search.trim().toLowerCase();
+  return containers.filter((container) => {
+    if (activity === 'online' && !container.online) return false;
+    if (activity === 'offline' && container.online) return false;
+    if (!query) return true;
+    const association = associations?.get(container.id);
+    const fields = [container.name, container.id, container.image];
+    if (association && association !== 'ambiguous') {
+      fields.push(association.project);
+      if (association.service !== null) fields.push(association.service);
+    }
+    return fields.some((field) => field.toLowerCase().includes(query));
+  });
+}
+
+export function projectTotals(project: ComposeProject | null) {
+  const containers = project?.services.flatMap((service) => service.containers) ?? [];
+  return {
+    services: project?.services.length ?? 0,
+    containers: containers.length,
+    online: containers.filter((container) => container.online).length,
+  };
 }
