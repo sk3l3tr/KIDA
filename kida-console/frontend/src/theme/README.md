@@ -60,6 +60,14 @@ inputs and by the opt-in `.console-control` class for selects and textareas.
 `.console-dialog` surface. Components keep their layout, widths and scrolling
 rules locally. These are application styles; the portable engine is unchanged.
 
+`_buttons.scss`, loaded by `_components.scss`, styles native buttons with the
+theme's font, radius and border width and a minimum height of 44 px. The default
+(also `button.primary`) is transparent with an accent border and text; `.secondary`
+is neutral and `.danger` keeps the filled destructive presentation. `.icon-only`
+provides a 44 px icon button; keep its accessible label on the button. Interaction
+states are shared. Component-specific layout and selection styles stay local;
+Ionic's internal controls and ARCA retain their own presentation.
+
 Both classes consume the existing Ionic/KIDA colour, typography, border, spacing
 and shadow tokens. Native dialog backdrops use `--kida-overlay-backdrop`, defined
 with the other structural theme tokens. Scheduler uses these classes; adding a new

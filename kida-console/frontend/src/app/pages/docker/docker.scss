@@ -15,6 +15,28 @@
 .section-header h2 {
   margin: 0;
 }
+.projects-header {
+  margin-bottom: 1rem;
+}
+.projects-header > div {
+  min-width: 0;
+}
+.projects-eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--ion-color-primary);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.projects-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.projects-description {
+  margin: 0.5rem 0 0;
+  color: var(--kida-muted);
+  font-size: 0.8125rem;
+}
 .project-grid {
   --masonry-columns: 1;
   --masonry-gap: 1rem;

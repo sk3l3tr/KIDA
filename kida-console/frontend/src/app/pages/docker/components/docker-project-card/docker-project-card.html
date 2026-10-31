@@ -1,12 +1,25 @@
 <article class="panel project-card" [attr.aria-label]="'Proyecto ' + project().name">
   <header class="project-header">
-    <h3>{{ project().name }}</h3>
+    <span class="project-icon" aria-hidden="true"><span class="i i-layers"></span></span>
+    <div class="project-identity">
+      <p class="eyebrow">Proyecto Compose</p>
+      <h3 [title]="project().name">{{ project().name }}</h3>
+    </div>
+    <div class="project-summary">
+      <span class="observed">Observado</span>
+      <p>
+        <strong>{{ totals().active }}</strong> / {{ totals().containers }} activos
+      </p>
+    </div>
   </header>
-  <p>{{ totals().active }} / {{ totals().containers }} activos</p>
-  <p>
-    {{ totals().services }} {{ totals().services === 1 ? 'servicio' : 'servicios' }} ·
-    {{ totals().containers }} {{ totals().containers === 1 ? 'contenedor' : 'contenedores' }}
-  </p>
+  <div class="project-totals">
+    <span
+      >Servicios <strong>{{ totals().services }}</strong></span
+    >
+    <span
+      >Contenedores <strong>{{ totals().containers }}</strong></span
+    >
+  </div>
   <div class="services">
     <h4>Servicios del proyecto</h4>
     <ion-accordion-group
@@ -16,31 +29,44 @@
     >
       @for (service of project().services; track $index; let serviceIndex = $index) {
         <ion-accordion [value]="keys()[$index]">
-          <ion-item slot="header"
-            ><ion-label>
-              {{ service.name === null ? 'Sin nombre' : service.name }} ·
-              {{ service.containers.length }}
-              {{ service.containers.length === 1 ? 'contenedor' : 'contenedores' }} ·
-              {{ activeCount(service) }} / {{ service.containers.length }} activos
-            </ion-label></ion-item
-          >
+          <ion-item slot="header" lines="none">
+            <span class="i i-cube service-icon" slot="start" aria-hidden="true"></span>
+            <ion-label>
+              <span class="service-identity">
+                <strong [title]="service.name === null ? 'Sin nombre' : service.name">
+                  {{ service.name === null ? 'Sin nombre' : service.name }}
+                </strong>
+                <span class="service-count"
+                  >· {{ service.containers.length }}
+                  {{ service.containers.length === 1 ? 'contenedor' : 'contenedores' }}</span
+                >
+              </span>
+              <span class="service-active"
+                >{{ activeCount(service) }} / {{ service.containers.length }} activos</span
+              >
+            </ion-label>
+          </ion-item>
           <div slot="content" class="service-content">
             @for (container of service.containers; track $index) {
               <div class="container-row">
-                <div>
-                  <strong>{{ container.name }}</strong>
-                  <p>{{ container.image }}</p>
-                  <p>
-                    {{ container.online ? 'En ejecución' : 'Fuera de línea' }} ·
-                    {{ container.status }}
-                  </p>
+                <div class="container-identity">
+                  <strong [title]="container.name">{{ container.name }}</strong>
+                  <p [title]="container.image">{{ container.image }}</p>
                 </div>
+                <p class="container-status" [class.online]="container.online">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <span
+                    >{{ container.online ? 'En ejecución' : 'Fuera de línea' }} ·
+                    {{ container.status }}</span
+                  >
+                </p>
                 <button
                   type="button"
-                  class="inspect-container"
+                  class="inspect-container icon-only"
+                  [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
                   (click)="state.openContainer(container.id, 'projects', project().name)"
                 >
-                  <span class="i i-eye"></span>
+                  <span class="i i-eye" aria-hidden="true"></span>
                 </button>
               </div>
             } @empty {
@@ -61,7 +87,7 @@
       (click)="inspect.emit(project().name)"
       [attr.aria-label]="'Inspeccionar proyecto ' + project().name"
     >
-      <span class="i i-eye"></span>
+      <span class="i i-eye" aria-hidden="true"></span>
       Inspeccionar proyecto
     </button>
   </footer>

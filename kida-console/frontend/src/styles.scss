@@ -54,9 +54,6 @@ app-root arca-core > arca-footer.footer {
     box-shadow: inset 3px 0 var(--ion-color-primary);
   }
 }
-button {
-  font: inherit;
-}
 h1 {
   font-size: clamp(1.8rem, 4vw, 2.5rem);
   margin: 0.4rem 0 1rem;
@@ -75,34 +72,10 @@ small {
 a {
   color: var(--ion-color-primary);
 }
-button {
-  display: inline-block;
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
-  padding: 0.7rem 1rem;
-  cursor: pointer;
-  min-height: 44px;
-}
-button:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-button.secondary {
-  background: var(--ion-item-background);
-  color: var(--ion-text-color);
-  border-color: var(--ion-border-color);
-}
-button.danger {
-  background: var(--ion-color-danger);
-  color: var(--ion-color-danger-contrast);
-}
 input {
   @include controls.native-control;
 }
 input:focus-visible,
-button:focus-visible,
 a:focus-visible {
   outline: 3px solid var(--ion-color-primary);
   outline-offset: 3px;
@@ -245,7 +218,7 @@ h2,
 h3 {
   font-family: var(--kida-heading-font);
 }
-:is(button, fieldset, .panel, .login-card, .confirmation) {
+:is(fieldset, .panel, .login-card, .confirmation) {
   border-radius: var(--kida-radius);
   border-width: var(--kida-border-width);
 }
@@ -269,6 +242,7 @@ h3 {
   gap: 1.25rem;
 }
 .theme-option {
+  display: block;
   text-align: start;
   padding: 0.75rem;
   width: 100%;

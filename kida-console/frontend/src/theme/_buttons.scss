@@ -1,0 +1,81 @@
+// Ionic's Shadow DOM and overlay controls keep their own presentation.
+button:not(:where(ion-alert *, ion-action-sheet *, ion-picker *, ion-picker-legacy *)) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 0.7rem 1rem;
+  font-family: var(--kida-font);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  border: var(--kida-border-width) solid var(--ion-color-primary);
+  border-radius: var(--kida-radius);
+  background: transparent;
+  color: var(--ion-color-primary);
+  cursor: pointer;
+  transition: all 200ms ease;
+
+  > .i {
+    flex-shrink: 0;
+  }
+
+  &.secondary {
+    background: var(--ion-item-background);
+    border-color: var(--ion-border-color);
+    color: var(--ion-text-color);
+  }
+
+  &.danger {
+    background: var(--ion-color-danger);
+    border-color: transparent;
+    color: var(--ion-color-danger-contrast);
+  }
+
+  &.icon-only {
+    flex: none;
+    width: 44px;
+    padding: 0;
+    border-color: transparent;
+  }
+
+  @media (hover: hover) {
+    &:hover:enabled {
+      filter: brightness(0.95);
+      transform: translateY(-1px);
+    }
+
+    &.icon-only:hover:enabled {
+      background: var(--ion-background-color);
+    }
+  }
+
+  &:active:enabled {
+    box-shadow: none;
+    filter: brightness(0.9);
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ion-color-primary);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover:enabled {
+      transform: none;
+    }
+  }
+}

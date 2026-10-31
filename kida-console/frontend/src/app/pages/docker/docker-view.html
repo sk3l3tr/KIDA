@@ -16,15 +16,19 @@
     </div>
     @if (tab === 'projects') {
       <section aria-labelledby="docker-projects-title">
-        <div class="section-header">
+        <div class="section-header projects-header">
           <div>
+            <p class="projects-eyebrow">Inventario / Compose</p>
             <h2 id="docker-projects-title" #listHeading tabindex="-1">Proyectos observados</h2>
+            <p class="projects-description">Servicios y contenedores agrupados por proyecto</p>
           </div>
           <button
             type="button"
+            class="secondary"
             (click)="state.refreshProjects()"
             [disabled]="state.projects.loading() || state.busy() || state.pending() !== null"
           >
+            <span class="i i-refresh" aria-hidden="true"></span>
             Actualizar proyectos
           </button>
         </div>

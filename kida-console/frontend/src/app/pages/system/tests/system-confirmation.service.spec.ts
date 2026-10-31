@@ -48,7 +48,7 @@ describe('SystemConfirmationService', () => {
       expect(create).toHaveBeenCalledWith({
         header: 'Confirmar: Apagar',
         message:
-          'Cuándo: +1. Horas locales del servidor CORE. La operación puede desconectar el equipo.',
+          'Cuándo: +1. Horas locales del servidor. La operación puede desconectar el equipo.',
         cssClass: 'system-confirmation',
         backdropDismiss: false,
         buttons: [
@@ -148,7 +148,7 @@ describe('SystemConfirmationService', () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         header: `Confirmar: ${header}`,
-        message: `${summary} Horas locales del servidor CORE. La operación puede desconectar el equipo.`,
+        message: `${summary} Horas locales del servidor. La operación puede desconectar el equipo.`,
       }),
     );
   });
