@@ -9,7 +9,7 @@
     #confirmation
     aria-labelledby="docker-confirm-title"
     (cancel)="$event.preventDefault(); state.cancel()"
-    (keydown)="state.trapFocus($event)"
+    (keydown)="trapFocus($event)"
   >
     <h2 id="docker-confirm-title">Confirmar acción Docker</h2>
     @if (state.pending(); as action) {

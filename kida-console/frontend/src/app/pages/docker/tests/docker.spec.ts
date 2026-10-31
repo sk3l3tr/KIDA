@@ -971,6 +971,66 @@ describe('Docker page', () => {
     expect(v.error()).toContain('No se pudo abrir');
     http.expectNone(`${base}/containers/restart`);
   });
+  it('opens only the newest confirmation when the previous deferred opening was cancelled', () => {
+    const f = initial(),
+      state = f.componentInstance.state;
+    state.openContainer(container.id, 'inventory');
+    const v = view(f, 'containers');
+    const show = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
+    state.prepare('restart', container);
+    const previous = state.pending();
+    state.confirm();
+    http.expectNone(() => true);
+    state.cancel();
+    state.prepare('delete', container);
+    const current = state.pending();
+    expect(current).not.toBe(previous);
+    v.changeDetectorRef.detectChanges();
+    f.detectChanges();
+    TestBed.tick();
+    expect(show).toHaveBeenCalledOnce();
+    expect(state.pending()).toBe(current);
+    expect(f.nativeElement.querySelector('dialog').open).toBe(true);
+    state.confirm();
+    state.confirm();
+    const request = http.expectOne(`${base}/containers/delete`);
+    request.flush({ detail: { code: 'core_error' } }, { status: 502, statusText: 'Rejected' });
+    http.expectNone(`${base}/containers/restart`);
+  });
+  it.each(['panel', 'tab', 'leave', 'session', 'confirmation', 'destroy'] as const)(
+    'invalidates deferred focus restoration on %s without disturbing a newer confirmation',
+    (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(trigger);
+      const focus = vi.spyOn(trigger, 'focus').mockImplementation(() => {});
+      try {
+        state.prepare('restart', container);
+        state.cancel();
+        if (mode === 'panel') state.openContainer(container.id, 'inventory');
+        else if (mode === 'tab') state.leaveTab();
+        else if (mode === 'leave') state.ionViewWillLeave();
+        else if (mode === 'session') TestBed.inject(ThemeIdentity).begin();
+        else if (mode === 'destroy') f.destroy();
+        else state.prepare('delete', container);
+        if (mode !== 'destroy') f.detectChanges();
+        TestBed.tick();
+        expect(focus).not.toHaveBeenCalled();
+        if (mode === 'confirmation') {
+          expect(state.pending()?.action).toBe('delete');
+          expect(f.nativeElement.querySelector('dialog').open).toBe(true);
+        }
+        http.expectNone(() => true);
+      } finally {
+        if (mode !== 'destroy') state.cancel();
+        focus.mockRestore();
+        active.mockRestore();
+        trigger.remove();
+      }
+    },
+  );
   it('keeps uncertain warning and blocks actions until a successful inventory read', () => {
     const f = initial(),
       v = f.componentInstance.state;

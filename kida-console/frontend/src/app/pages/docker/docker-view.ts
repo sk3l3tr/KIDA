@@ -7,6 +7,7 @@ import { Masonry, MasonryItem } from '../../components/masonry/masonry';
 import { ContainerDetails } from './components/container-details/container-details';
 import { ContainerActions } from './components/container-actions/container-actions';
 import { DockerFacade } from './services/docker.facade';
+import { DockerConfirmationService } from './services/docker-confirmation.service';
 import { DockerIndicators } from './components/docker-indicators/docker-indicators';
 import { DockerProjectCard } from './components/docker-project-card/docker-project-card';
 
@@ -28,6 +29,7 @@ import { DockerProjectCard } from './components/docker-project-card/docker-proje
 })
 export class DockerView {
   readonly state = inject(DockerFacade);
+  private readonly confirmations = inject(DockerConfirmationService);
   private readonly document = inject(DOCUMENT);
   readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
 
@@ -58,6 +60,6 @@ export class DockerView {
   }
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();
-    this.state.heading = () => this.listHeading()?.nativeElement;
+    this.confirmations.heading = () => this.listHeading()?.nativeElement;
   }
 }

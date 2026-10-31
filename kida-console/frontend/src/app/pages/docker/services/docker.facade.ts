@@ -1,17 +1,9 @@
-import { NativeDialogService } from '../../../services/native-dialog.service';
-import {
-  Injectable,
-  Injector,
-  OnDestroy,
-  afterNextRender,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Observable, Subscription, catchError, finalize, forkJoin, map, of, tap } from 'rxjs';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { classifyCoreFailure } from '../../../services/core-failure';
 import { DockerService } from './docker.service';
+import { DockerConfirmationService } from './docker-confirmation.service';
 import {
   ComposeProject,
   ContainerAction,
@@ -46,11 +38,7 @@ function reading<T>() {
 export class DockerFacade implements OnDestroy {
   private readonly service = inject(DockerService);
   private readonly identity = inject(ThemeIdentity);
-  private readonly dialogs = inject(NativeDialogService);
-  private readonly injector = inject(Injector);
-
-  dialog: () => HTMLDialogElement | undefined = () => undefined;
-  heading: () => HTMLElement | undefined = () => undefined;
+  private readonly confirmations = inject(DockerConfirmationService);
 
   readonly inventory = reading<DockerContainers>();
   readonly projectPanelOpen = signal<string | null>(null);
@@ -132,7 +120,6 @@ export class DockerFacade implements OnDestroy {
   private generation = 0;
   private selectionRevision = 0;
   private subscriptions = new Subscription();
-  private trigger: Element | null = null;
   private readonly sessionChanges = this.identity.changes.subscribe(() => this.reset());
 
   ionViewWillEnter(): void {
@@ -153,12 +140,11 @@ export class DockerFacade implements OnDestroy {
     this.projectPanelOpen.set(null);
     this.inspectedContainer.set(null);
     ++this.selectionRevision;
-    this.closeConfirmation();
+    this.invalidateConfirmation();
     this.selected.set(null);
     this.detail.data.set(null);
     this.detail.error.set('');
     this.detail.stale.set(false);
-    this.trigger = null;
   }
 
   openContainer(id: string, source: 'inventory' | 'projects' | 'detail', project?: string): void {
@@ -174,7 +160,7 @@ export class DockerFacade implements OnDestroy {
     ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
-    this.closeConfirmation();
+    this.invalidateConfirmation();
     for (const state of [this.inventory, this.projects, this.detail]) {
       state.data.set(null);
       state.loading.set(false);
@@ -191,7 +177,6 @@ export class DockerFacade implements OnDestroy {
     this.error.set('');
     this.result.set(null);
     this.resultLabel.set('');
-    this.trigger = null;
   }
   private valid(generation: number, revision: number): boolean {
     return this.active && generation === this.generation && revision === this.identity.snapshot();
@@ -330,7 +315,7 @@ export class DockerFacade implements OnDestroy {
   prepare(action: ContainerAction, container: DockerContainer): void {
     const current = this.inventory.data()?.containers.find((c) => c.id === container.id);
     if (!this.active || !current || this.actionLocked(action, current.id)) return;
-    this.trigger = this.dialogs.captureFocus();
+    this.confirmations.captureFocus(this.focusContext());
     const snapshot = Object.freeze({ action, id: current.id, name: current.name });
     if (action === 'start') {
       this.execute(snapshot);
@@ -338,37 +323,32 @@ export class DockerFacade implements OnDestroy {
     }
     this.error.set('');
     this.pending.set(snapshot);
-    const show = () => this.showConfirmation(snapshot);
-    // Apply the lower modal's focusTrap binding before opening the native dialog.
-    if (this.inspectedContainer()) afterNextRender(show, { injector: this.injector });
-    else show();
-  }
-  private showConfirmation(snapshot: PendingContainer): void {
-    if (!this.active || this.pending() !== snapshot) return;
-    try {
-      this.dialogs.open(this.dialog());
-    } catch {
-      this.closeConfirmation();
-      this.error.set('No se pudo abrir la confirmación.');
-      this.restoreFocus();
-    }
+    this.confirmations.open(
+      this.inspectedContainer() !== null,
+      () => this.active && this.pending() === snapshot,
+      () => {
+        this.closeConfirmation();
+        this.error.set('No se pudo abrir la confirmación.');
+        this.confirmations.restoreFocus();
+      },
+    );
   }
   cancel(): void {
     if (!this.pending()) return;
     this.closeConfirmation();
-    this.restoreFocus();
+    this.confirmations.restoreFocus();
   }
   private closeConfirmation(): void {
     this.pending.set(null);
-    this.dialogs.close(this.dialog());
+    this.confirmations.close();
   }
   invalidateConfirmation(): void {
-    this.closeConfirmation();
-    this.trigger = null;
+    this.pending.set(null);
+    this.confirmations.invalidate();
   }
   confirm(): void {
     const pending = this.pending();
-    if (!this.active || !pending || this.busy() || !this.dialog()?.open) return;
+    if (!this.active || !pending || this.busy() || !this.confirmations.isOpen()) return;
     this.closeConfirmation();
     this.execute(pending);
   }
@@ -416,7 +396,7 @@ export class DockerFacade implements OnDestroy {
         ) {
           // Let SidePanel restore focus after Ionic has dismissed the modal.
           this.inspectedContainer.set(null);
-          this.trigger = null;
+          this.confirmations.invalidate();
         }
         const selected = this.selected();
         if (projectsOk && selected !== null) this.inspect(selected, true);
@@ -434,34 +414,18 @@ export class DockerFacade implements OnDestroy {
   }
   private finishWrite(): void {
     this.busy.set(false);
-    this.restoreFocus();
+    this.confirmations.restoreFocus();
   }
-  trapFocus(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && this.pending()) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.cancel();
-      return;
-    }
-    this.dialogs.trapFocus(event, this.dialog());
-  }
-  private restoreFocus(): void {
+  private focusContext(): () => boolean {
     const generation = this.generation;
-    const trigger = this.trigger;
-    if (!trigger) return;
+    const revision = this.identity.snapshot();
     const selectionRevision = this.selectionRevision;
     const container = this.inspectedContainer();
     const project = this.projectPanelOpen();
-    this.dialogs.restoreFocus(
-      this.injector,
-      trigger,
-      () => this.heading(),
-      () =>
-        this.active &&
-        generation === this.generation &&
-        selectionRevision === this.selectionRevision &&
-        container === this.inspectedContainer() &&
-        project === this.projectPanelOpen(),
-    );
+    return () =>
+      this.valid(generation, revision) &&
+      selectionRevision === this.selectionRevision &&
+      container === this.inspectedContainer() &&
+      project === this.projectPanelOpen();
   }
 }
