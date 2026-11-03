@@ -1,0 +1,11 @@
+<div aria-live="polite" [attr.aria-busy]="state().loading()">
+  @if (state().loading()) {
+    <p role="status">{{ loadingText() }}</p>
+  }
+  @if (state().error()) {
+    <p class="error" role="alert">{{ errorPrefix() }} {{ state().error() }}</p>
+  }
+  @if (state().stale()) {
+    <p>{{ staleText() }}</p>
+  }
+</div>

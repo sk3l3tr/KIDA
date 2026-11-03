@@ -1,0 +1,63 @@
+<ion-content>
+  <div class="console-layout docker-layout">
+    <app-docker-indicators />
+    <app-docker-operation-status [showDetails]="true" />
+    <section aria-labelledby="docker-projects-title">
+      <div class="section-header projects-header">
+        <div>
+          <p class="projects-eyebrow">Inventario / Compose</p>
+          <h2 id="docker-projects-title" #listHeading data-docker-heading tabindex="-1">
+            Proyectos observados
+          </h2>
+          <p class="projects-description">Servicios y contenedores agrupados por proyecto</p>
+        </div>
+        <button
+          type="button"
+          class="secondary"
+          (click)="state.refreshProjects()"
+          [disabled]="state.projects.loading() || state.busy() || state.pending() !== null"
+        >
+          <span class="i i-refresh" aria-hidden="true"></span>
+          Actualizar proyectos
+        </button>
+      </div>
+      <app-docker-section-status
+        [state]="state.projects"
+        loadingText="Cargando proyectos…"
+        errorPrefix="Error de proyectos:"
+        staleText="Proyectos anteriores, desactualizados."
+      />
+      @if (state.projects.data(); as data) {
+        <app-masonry class="project-grid">
+          @for (project of data; track project.name) {
+            <app-docker-project-card
+              appMasonryItem
+              [project]="project"
+              [disabled]="
+                state.detail.loading() ||
+                state.busy() ||
+                state.pending() !== null ||
+                state.projects.loading()
+              "
+              (inspect)="state.inspect($event)"
+            />
+          }
+        </app-masonry>
+        @if (data.length === 0) {
+          <p>No hay proyectos Compose.</p>
+        }
+      }
+    </section>
+    <app-docker-inspector source="projects" [fallbackFocus]="listHeading" />
+    @if (
+      state.limitedPrecision(state.inventory.data()) ||
+      state.limitedPrecision(state.projects.data()) ||
+      state.limitedPrecision(state.detail.data()) ||
+      state.limitedPrecision(state.result())
+    ) {
+      <p role="status">
+        Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
+      </p>
+    }
+  </div>
+</ion-content>

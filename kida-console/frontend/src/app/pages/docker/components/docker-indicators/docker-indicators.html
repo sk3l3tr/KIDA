@@ -1,17 +1,13 @@
-<div aria-live="polite">
-  @if (state.inventory.loading()) {
-    <p>Cargando inventario…</p>
-  }
-  @if (state.inventory.error()) {
-    <p>Inventario: {{ state.inventory.error() }}</p>
-  }
-  @if (state.projects.loading()) {
-    <p>Cargando proyectos…</p>
-  }
-  @if (state.projects.error()) {
-    <p>Proyectos: {{ state.projects.error() }}</p>
-  }
-</div>
+<app-docker-section-status
+  [state]="state.inventory"
+  loadingText="Cargando inventario…"
+  errorPrefix="Inventario:"
+/>
+<app-docker-section-status
+  [state]="state.projects"
+  loadingText="Cargando proyectos…"
+  errorPrefix="Proyectos:"
+/>
 <section class="indicators" aria-label="Indicadores de Docker">
   <div class="panel indicator">
     <h2>Contenedores</h2>

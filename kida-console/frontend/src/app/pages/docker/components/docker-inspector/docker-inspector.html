@@ -1,0 +1,81 @@
+<app-side-panel
+  [open]="panelOpen()"
+  [focusTrap]="state.pending() === null"
+  [title]="state.inspectedContainer() ? 'Inspeccionar contenedor' : 'Inspeccionar proyecto'"
+  [subtitle]="state.inspectedContainer()?.id ?? state.projectPanelOpen() ?? undefined"
+  [fallbackFocus]="fallbackFocus()"
+  (closed)="closePanel()"
+>
+  @if (state.inspectedContainer(); as selected) {
+    <p>
+      Origen:
+      {{
+        selected.source === 'inventory'
+          ? 'Inventario'
+          : selected.source === 'projects'
+            ? 'Lista de proyectos Compose'
+            : 'Inspección de proyecto'
+      }}{{ selected.project ? ' · ' + selected.project : '' }}
+    </p>
+    <app-docker-section-status [state]="state.containerReading()" />
+    @if (state.currentContainer(); as container) {
+      <app-container-details [container]="container">
+        <section container-operations>
+          <h3>Operaciones</h3>
+          @if (!state.containerInInventory()) {
+            <p>Sin el mismo ID en el inventario principal, las operaciones no están disponibles.</p>
+          } @else {
+            <app-container-actions [containerId]="container.id" />
+          }
+        </section>
+      </app-container-details>
+    } @else {
+      <p role="status">Contenedor no disponible en esta lectura</p>
+    }
+    <app-docker-operation-status />
+  } @else if (state.projectPanelOpen() !== null) {
+    @let name = state.projectPanelOpen();
+    <h3>Inspección: {{ name }}</h3>
+    @if (state.selected() !== name) {
+      <p role="status">Proyecto no disponible en esta lectura</p>
+    } @else {
+      <app-docker-section-status
+        [state]="state.detail"
+        loadingText="Inspeccionando proyecto…"
+        errorPrefix="Error de inspección:"
+        staleText="Inspección anterior, desactualizada."
+      />
+      @if (state.detail.data(); as project) {
+        <p>Nombre: {{ project.name }}</p>
+        <p>Proyecto observado. La detección no acredita propiedad ni administración KIDA.</p>
+        <p>
+          {{ state.inspectedProjectTotals().services }} servicios ·
+          {{ state.inspectedProjectTotals().containers }} contenedores ·
+          {{ state.inspectedProjectTotals().online }} en ejecución
+        </p>
+        <h3>Servicios</h3>
+        @for (service of project.services; track $index) {
+          <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
+          @for (container of service.containers; track container.id) {
+            <p>
+              {{ container.name }} · {{ container.image }} ·
+              {{ container.online ? 'En ejecución' : 'Fuera de línea' }} ·
+              {{ container.status }}
+            </p>
+            <button
+              type="button"
+              [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
+              (click)="state.openContainer(container.id, 'detail', project.name)"
+            >
+              Inspeccionar {{ container.name }}
+            </button>
+          } @empty {
+            <p>Sin contenedores.</p>
+          }
+        } @empty {
+          <p>Sin servicios.</p>
+        }
+      }
+    }
+  }
+</app-side-panel>

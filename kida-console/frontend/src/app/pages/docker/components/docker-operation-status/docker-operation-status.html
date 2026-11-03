@@ -1,0 +1,19 @@
+<div aria-live="polite">
+  @if (state.busy()) {
+    <p>Acción o actualización posterior pendiente…</p>
+  }
+  @if (state.error()) {
+    <p class="error" role="alert">{{ state.error() }}</p>
+  }
+  @if (state.result(); as response) {
+    @if (showDetails()) {
+      <h3>Acción solicitada: {{ state.resultLabel() }}</h3>
+    } @else {
+      <p>Acción solicitada: {{ state.resultLabel() }}</p>
+    }
+    <p>Respuesta de CORE: {{ response.container }} · {{ response.status }}</p>
+    @if (showDetails()) {
+      <pre>{{ response | json }}</pre>
+    }
+  }
+</div>

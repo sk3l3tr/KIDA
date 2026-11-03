@@ -1,8 +1,10 @@
 import { Component, computed, inject } from '@angular/core';
+import { DockerSectionStatus } from '../docker-section-status/docker-section-status';
 import { DockerFacade } from '../../services/docker.facade';
 
 @Component({
   selector: 'app-docker-indicators',
+  imports: [DockerSectionStatus],
   templateUrl: './docker-indicators.html',
   styleUrl: './docker-indicators.scss',
 })

@@ -1,5 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { DockerFacade } from '../../services/docker.facade';
+import { actionIcons, actionLabels } from '../../utils/docker-presentation';
 import { ContainerAction } from '../../utils/docker.models';
 
 @Component({
@@ -16,10 +17,6 @@ export class ContainerActions {
   readonly container = computed(
     () => this.state.inventory.data()?.containers.find((c) => c.id === this.containerId()) ?? null,
   );
-  readonly labels: Record<ContainerAction, string> = {
-    start: 'Arrancar',
-    stop: 'Parar',
-    restart: 'Reiniciar',
-    delete: 'Eliminar',
-  };
+  readonly labels = actionLabels;
+  readonly icons = actionIcons;
 }

@@ -11,7 +11,9 @@ import { AuthService } from '../../../auth/auth.service';
 import { Observable } from 'rxjs';
 import { DockerService } from '../services/docker.service';
 import { Docker } from '../docker';
-import { DockerView } from '../docker-view';
+import { DockerProjects } from '../tabs/docker-projects/docker-projects';
+import { DockerContainers } from '../tabs/docker-containers/docker-containers';
+import { DockerInspector } from '../components/docker-inspector/docker-inspector';
 import { SidePanel } from '../../../components/side-panel/side-panel';
 import { DockerContainer, ComposeProject } from '../utils/docker.models';
 import { composeAssociations, counter, display, dockerFailure } from '../utils/docker-presentation';
@@ -140,15 +142,48 @@ describe('Docker page', () => {
     fixture.detectChanges();
     return fixture;
   }
+  async function confirm(f: ReturnType<typeof initial>) {
+    const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement | null;
+    if (dialog?.open) dialog.querySelector<HTMLButtonElement>('button:last-child')!.click();
+    await Promise.resolve();
+  }
+  async function cancel(f: ReturnType<typeof initial>) {
+    const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement | null;
+    if (dialog?.open) dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
+    else f.componentInstance.state.invalidateConfirmation();
+    await Promise.resolve();
+  }
   function view(f: ReturnType<typeof initial>, tab: 'projects' | 'containers') {
-    const component = createComponent(DockerView, {
-      environmentInjector: TestBed.inject(EnvironmentInjector),
-      elementInjector: f.debugElement.injector,
-    });
-    component.instance.tab = tab;
+    const component = createComponent<DockerProjects | DockerContainers>(
+      tab === 'projects' ? DockerProjects : DockerContainers,
+      {
+        environmentInjector: TestBed.inject(EnvironmentInjector),
+        elementInjector: f.debugElement.injector,
+      },
+    );
     component.changeDetectorRef.detectChanges();
     return component;
   }
+  function inspector(v: ReturnType<typeof view>) {
+    return getDebugNode(
+      v.location.nativeElement.querySelector('app-docker-inspector')!,
+    )!.injector.get(DockerInspector);
+  }
+  it('renders each tab independently while sharing its facade and snapshots', () => {
+    const f = initial();
+    const projects = view(f, 'projects');
+    const containers = view(f, 'containers');
+    expect(projects.instance.state).toBe(containers.instance.state);
+    expect(projects.location.nativeElement.querySelector('#docker-projects-title')).not.toBeNull();
+    expect(projects.location.nativeElement.querySelector('#docker-containers-title')).toBeNull();
+    expect(
+      containers.location.nativeElement.querySelector('#docker-containers-title'),
+    ).not.toBeNull();
+    expect(containers.location.nativeElement.querySelector('#docker-projects-title')).toBeNull();
+    projects.instance.ionViewWillEnter();
+    containers.instance.ionViewWillEnter();
+    http.expectNone(() => true);
+  });
   const fail = { status: 503, statusText: 'Unavailable' };
   it('opens the inventory panel locally and follows refreshed readings, failures and disappearance', () => {
     const f = initial(),
@@ -215,7 +250,7 @@ describe('Docker page', () => {
     state.leaveTab();
     expect(state.inspectedContainer()).toBeNull();
     v.changeDetectorRef.detectChanges();
-    expect(v.instance.panelOpen()).toBe(false);
+    expect(inspector(v).panelOpen()).toBe(false);
     state.openContainer(container.id, 'inventory');
     TestBed.inject(ThemeIdentity).begin();
     expect(state.inspectedContainer()).toBeNull();
@@ -266,7 +301,7 @@ describe('Docker page', () => {
       const request = http.expectOne(
         `${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`,
       );
-      if (mode === 'close') v.instance.closePanel();
+      if (mode === 'close') inspector(v).closePanel();
       else if (mode === 'container') state.openContainer(container.id, 'projects', project.name);
       else if (mode === 'tab') state.leaveTab();
       else TestBed.inject(ThemeIdentity).begin();
@@ -276,7 +311,7 @@ describe('Docker page', () => {
       if (mode === 'container') {
         expect(state.currentContainer()).toEqual(container);
         expect(v.location.nativeElement.querySelector('app-container-details')).not.toBeNull();
-      } else expect(v.instance.panelOpen()).toBe(false);
+      } else expect(inspector(v).panelOpen()).toBe(false);
     },
   );
   it('replaces project with container in the same panel and requests focus restoration to the original page trigger', async () => {
@@ -443,7 +478,7 @@ describe('Docker page', () => {
       const request = http.expectOne(`${base}/containers/start`);
       expect(request.request.method).toBe('POST');
       expect(request.request.body).toEqual({ container: container.id });
-      expect(state.resultLabel()).toBe(`play: ${container.name} (${container.id})`);
+      expect(state.resultLabel()).toBe(`Arrancar: ${container.name} (${container.id})`);
       expect(state.inventory.data()?.containers[0].online).toBe(false);
       request.flush({ container: 'canonical', status: 'accepted', extra: null });
       expect(state.busy()).toBe(true);
@@ -525,34 +560,37 @@ describe('Docker page', () => {
     'detail',
     'uncertain',
     'missing',
-  ] as const)('blocks shared controls and direct preparation of every action during %s', (mode) => {
-    const f = initial(),
-      state = f.componentInstance.state;
-    state.openContainer(container.id, 'inventory');
-    const v = view(f, 'containers');
-    if (mode === 'busy') state.busy.set(true);
-    else if (mode === 'confirmation') state.prepare('restart', container);
-    else if (mode === 'uncertain') state.uncertain.set(true);
-    else if (mode === 'missing') state.inventory.data.set(null);
-    else state[mode].loading.set(true);
-    v.changeDetectorRef.detectChanges();
-    const root = v.location.nativeElement as HTMLElement;
-    if (mode !== 'missing') {
-      const buttons = root.querySelectorAll<HTMLButtonElement>(
-        'app-container-actions .action-buttons button',
-      );
-      expect(buttons).toHaveLength(8);
-      expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
-    }
-    const pending = state.pending();
-    for (const action of state.actions) {
-      expect(state.actionLocked(action, container.id)).toBe(true);
-      state.prepare(action, container);
-    }
-    expect(state.pending()).toBe(pending);
-    http.expectNone(() => true);
-    if (mode === 'confirmation') state.cancel();
-  });
+  ] as const)(
+    'blocks shared controls and direct preparation of every action during %s',
+    async (mode) => {
+      const f = initial(),
+        state = f.componentInstance.state;
+      state.openContainer(container.id, 'inventory');
+      const v = view(f, 'containers');
+      if (mode === 'busy') state.busy.set(true);
+      else if (mode === 'confirmation') state.prepare('restart', container);
+      else if (mode === 'uncertain') state.uncertain.set(true);
+      else if (mode === 'missing') state.inventory.data.set(null);
+      else state[mode].loading.set(true);
+      v.changeDetectorRef.detectChanges();
+      const root = v.location.nativeElement as HTMLElement;
+      if (mode !== 'missing') {
+        const buttons = root.querySelectorAll<HTMLButtonElement>(
+          'app-container-actions .action-buttons button',
+        );
+        expect(buttons).toHaveLength(8);
+        expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
+      }
+      const pending = state.pending();
+      for (const action of state.actions) {
+        expect(state.actionLocked(action, container.id)).toBe(true);
+        state.prepare(action, container);
+      }
+      expect(state.pending()).toBe(pending);
+      http.expectNone(() => true);
+      if (mode === 'confirmation') await cancel(f);
+    },
+  );
   it('keeps inspector start results separate from refresh failures and never retries an uncertain write', () => {
     const f = initial(),
       state = f.componentInstance.state;
@@ -602,7 +640,7 @@ describe('Docker page', () => {
       expect(host.textContent).toContain('Acción solicitada:');
       expect(host.textContent).toContain('Respuesta de CORE:');
       expect(host.textContent).toContain('accepted');
-      expect(v.instance.panelOpen()).toBe(true);
+      expect(inspector(v).panelOpen()).toBe(true);
     },
   );
   it.each(['close', 'container', 'tab'] as const)(
@@ -614,7 +652,7 @@ describe('Docker page', () => {
       const v = view(f, 'containers');
       v.location.nativeElement.querySelector('app-side-panel .action-buttons button').click();
       const request = http.expectOne(`${base}/containers/start`);
-      if (mode === 'close') v.instance.closePanel();
+      if (mode === 'close') inspector(v).closePanel();
       else if (mode === 'container') state.openContainer('another', 'inventory');
       else state.leaveTab();
       request.flush({ container: container.id, status: 'accepted' });
@@ -622,7 +660,7 @@ describe('Docker page', () => {
       http.expectOne(`${base}/compose/projects`).flush([project]);
       v.changeDetectorRef.detectChanges();
       expect(state.result()?.status).toBe('accepted');
-      if (mode === 'close' || mode === 'tab') expect(v.instance.panelOpen()).toBe(false);
+      if (mode === 'close' || mode === 'tab') expect(inspector(v).panelOpen()).toBe(false);
       else expect(state.inspectedContainer()?.id).toBe('another');
     },
   );
@@ -640,7 +678,7 @@ describe('Docker page', () => {
     ),
   )(
     'confirms $action from $source (online=$online) using current inventory without duplicate POSTs',
-    ({ source, action, online }) => {
+    async ({ source, action, online }) => {
       const label = { stop: 'Parar', restart: 'Reiniciar', delete: 'Eliminar' }[action];
       const status = { stop: 'stopped', restart: 'restarted', delete: 'deleted' }[action];
       const f = initial(),
@@ -675,6 +713,7 @@ describe('Docker page', () => {
       expect(state.pending()).toEqual({ action, name: container.name, id: container.id });
       const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
       expect(dialog.open).toBe(true);
+      expect(dialog.textContent).toContain('Acción: ' + label);
       expect(dialog.textContent).toContain(container.name);
       expect(dialog.textContent).toContain(container.id);
       expect(dialog.textContent).toContain(
@@ -691,12 +730,10 @@ describe('Docker page', () => {
         containers: [{ ...current, name: 'new inventory name' }],
       });
       f.nativeElement.querySelector('.dialog-buttons button:last-child').click();
-      state.confirm();
+      await confirm(f);
       const request = http.expectOne(`${base}/containers/${action}`);
       expect(request.request.body).toEqual({ container: container.id });
-      expect(state.resultLabel()).toBe(
-        `${action === 'delete' ? 'trash' : action}: ${container.name} (${container.id})`,
-      );
+      expect(state.resultLabel()).toBe(`${label}: ${container.name} (${container.id})`);
       expect(state.inventory.data()?.containers[0].online).toBe(online);
       request.flush({
         container: container.id,
@@ -801,6 +838,7 @@ describe('Docker page', () => {
             dialog.dispatchEvent(event);
             expect(event.defaultPrevented).toBe(true);
           }
+          await Promise.resolve();
           v.changeDetectorRef.detectChanges();
           f.detectChanges();
           TestBed.tick();
@@ -810,10 +848,10 @@ describe('Docker page', () => {
           expect(panel.focusTrap()).toBe(true);
           expect(panel.open()).toBe(true);
           expect(focus).toHaveBeenCalledOnce();
-          state.confirm();
+          await confirm(f);
           http.expectNone(() => true);
         } finally {
-          state.cancel();
+          await cancel(f);
           show.mockRestore();
           active.mockRestore();
           focus.mockRestore();
@@ -824,7 +862,7 @@ describe('Docker page', () => {
     );
     it.each(['close', 'container', 'project', 'tab', 'leave', 'session'] as const)(
       'invalidates an inspector action confirmation on %s without sending',
-      (mode) => {
+      async (mode) => {
         const f = initial(),
           state = f.componentInstance.state;
         state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
@@ -835,7 +873,7 @@ describe('Docker page', () => {
         f.detectChanges();
         TestBed.tick();
         expect(f.nativeElement.querySelector('dialog').open).toBe(true);
-        if (mode === 'close') v.instance.closePanel();
+        if (mode === 'close') inspector(v).closePanel();
         else if (mode === 'container') state.openContainer('another', 'inventory');
         else if (mode === 'project') {
           state.inspect(project.name);
@@ -855,58 +893,58 @@ describe('Docker page', () => {
             .injector.get(SidePanel)
             .focusTrap(),
         ).toBe(true);
-        state.confirm();
+        await confirm(f);
         http.expectNone(`${base}/containers/${action}`);
       },
     );
-    it('does not open a deferred confirmation after the inspector closes before rendering', () => {
+    it('does not open a deferred confirmation after the inspector closes before rendering', async () => {
       const f = initial(),
         state = f.componentInstance.state;
       state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
       state.openContainer(container.id, 'inventory');
       const v = view(f, 'containers');
       state.prepare(action, container);
-      v.instance.closePanel();
+      inspector(v).closePanel();
       v.changeDetectorRef.detectChanges();
       f.detectChanges();
       TestBed.tick();
       expect(state.pending()).toBeNull();
       expect(f.nativeElement.querySelector('dialog').open).toBe(false);
-      state.confirm();
+      await confirm(f);
       http.expectNone(() => true);
     });
-    it('retains a successful action result after failed refreshes and blocks uncertain action without retrying', () => {
+    it('retains a successful action result after failed refreshes and blocks uncertain action without retrying', async () => {
       const f = initial(),
         state = f.componentInstance.state;
       state.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
       state.openContainer(container.id, 'inventory');
       const v = view(f, 'containers');
       const host = v.location.nativeElement.querySelector('app-side-panel');
-      const prepare = () => {
+      const prepare = async () => {
         state.openContainer(container.id, 'inventory');
         v.changeDetectorRef.detectChanges();
         host.querySelector(`button[aria-label^="${label} contenedor"]`).click();
         v.changeDetectorRef.detectChanges();
         f.detectChanges();
         TestBed.tick();
-        state.confirm();
+        await confirm(f);
       };
-      prepare();
+      await prepare();
       http.expectOne(`${base}/containers/${action}`).flush({ container: container.id, status });
       http.expectOne(`${base}/containers`).flush({}, fail);
       http.expectOne(`${base}/compose/projects`).flush({}, fail);
       v.changeDetectorRef.detectChanges();
       expect(v.location.nativeElement.textContent).toContain(status);
       expect(state.inventory.stale()).toBe(true);
-      expect(v.instance.panelOpen()).toBe(action !== 'delete');
+      expect(inspector(v).panelOpen()).toBe(action !== 'delete');
       expect(state.inventory.error()).not.toBe('');
-      prepare();
+      await prepare();
       http
         .expectOne(`${base}/containers/${action}`)
         .flush({ detail: { code: 'core_timeout' } }, { status: 504, statusText: 'Timeout' });
       v.changeDetectorRef.detectChanges();
       expect(host.textContent).toContain('No se pudo confirmar el resultado');
-      expect(v.instance.panelOpen()).toBe(true);
+      expect(inspector(v).panelOpen()).toBe(true);
       expect(host.querySelector(`button[aria-label^="${label} contenedor"]`).disabled).toBe(true);
       state.prepare(action, container);
       http.expectNone(() => true);
@@ -927,11 +965,11 @@ describe('Docker page', () => {
       expect(state.uncertain()).toBe(false);
       expect(state.actionLocked(action, container.id)).toBe(false);
       expect(host.textContent).toContain('No se pudo confirmar el resultado');
-      expect(v.instance.panelOpen()).toBe(true);
+      expect(inspector(v).panelOpen()).toBe(true);
       http.expectNone(`${base}/containers/${action}`);
     });
   });
-  it('freezes confirmations, cancels without writes and consumes double confirmation once', () => {
+  it('freezes confirmations, cancels without writes and consumes double confirmation once', async () => {
     const f = initial(),
       v = f.componentInstance.state;
     const mutable = { ...container };
@@ -942,13 +980,13 @@ describe('Docker page', () => {
     expect(v.pending()?.id).toBe(container.id);
     v.refreshContainers();
     http.expectNone(`${base}/containers`);
-    v.cancel();
-    v.confirm();
+    await cancel(f);
+    await confirm(f);
     http.expectNone(`${base}/containers/delete`);
     v.inventory.data.set({ ...inventory, containers: [{ ...container, online: true }] });
     v.prepare('stop', container);
-    v.confirm();
-    v.confirm();
+    await confirm(f);
+    await confirm(f);
     v.prepare('start', container);
     const r = http.expectOne(`${base}/containers/stop`);
     expect(r.request.body).toEqual({ container: container.id });
@@ -959,19 +997,44 @@ describe('Docker page', () => {
     expect(v.error()).toContain('CORE rechazó');
     expect(v.busy()).toBe(false);
   });
-  it('recovers when opening a dialog fails', () => {
+  it('keeps a newer pending lock through obsolete cancellation and accepted microtasks', async () => {
+    const f = initial();
+    const state = f.componentInstance.state;
+    state.prepare('restart', container);
+    const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
+    dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
+    state.invalidateConfirmation();
+    state.prepare('delete', container);
+    const latest = state.pending();
+    await Promise.resolve();
+    expect(state.pending()).toBe(latest);
+    expect(latest?.action).toBe('delete');
+    dialog.querySelector<HTMLButtonElement>('button:last-child')!.click();
+    dialog.querySelector<HTMLButtonElement>('button:last-child')!.click();
+    state.prepare('restart', container);
+    expect(state.pending()).toBe(latest);
+    http.expectNone(() => true);
+    await Promise.resolve();
+    expect(state.pending()).toBeNull();
+    expect(state.busy()).toBe(true);
+    http
+      .expectOne(`${base}/containers/delete`)
+      .flush({ detail: { code: 'core_error' } }, { status: 502, statusText: 'Rejected' });
+    http.expectNone(`${base}/containers/restart`);
+  });
+  it('recovers when opening a dialog fails', async () => {
     const f = initial(),
       v = f.componentInstance.state;
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementationOnce(() => {
       throw new Error();
     });
-    v.prepare('restart', container);
+    await v.prepare('restart', container);
     expect(v.pending()).toBeNull();
     expect(v.locked()).toBe(false);
     expect(v.error()).toContain('No se pudo abrir');
     http.expectNone(`${base}/containers/restart`);
   });
-  it('opens only the newest confirmation when the previous deferred opening was cancelled', () => {
+  it('opens only the newest confirmation when the previous deferred opening was cancelled', async () => {
     const f = initial(),
       state = f.componentInstance.state;
     state.openContainer(container.id, 'inventory');
@@ -979,9 +1042,9 @@ describe('Docker page', () => {
     const show = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
     state.prepare('restart', container);
     const previous = state.pending();
-    state.confirm();
+    await confirm(f);
     http.expectNone(() => true);
-    state.cancel();
+    await cancel(f);
     state.prepare('delete', container);
     const current = state.pending();
     expect(current).not.toBe(previous);
@@ -991,15 +1054,15 @@ describe('Docker page', () => {
     expect(show).toHaveBeenCalledOnce();
     expect(state.pending()).toBe(current);
     expect(f.nativeElement.querySelector('dialog').open).toBe(true);
-    state.confirm();
-    state.confirm();
+    await confirm(f);
+    await confirm(f);
     const request = http.expectOne(`${base}/containers/delete`);
     request.flush({ detail: { code: 'core_error' } }, { status: 502, statusText: 'Rejected' });
     http.expectNone(`${base}/containers/restart`);
   });
   it.each(['panel', 'tab', 'leave', 'session', 'confirmation', 'destroy'] as const)(
     'invalidates deferred focus restoration on %s without disturbing a newer confirmation',
-    (mode) => {
+    async (mode) => {
       const f = initial(),
         state = f.componentInstance.state;
       const trigger = document.createElement('button');
@@ -1008,7 +1071,7 @@ describe('Docker page', () => {
       const focus = vi.spyOn(trigger, 'focus').mockImplementation(() => {});
       try {
         state.prepare('restart', container);
-        state.cancel();
+        await cancel(f);
         if (mode === 'panel') state.openContainer(container.id, 'inventory');
         else if (mode === 'tab') state.leaveTab();
         else if (mode === 'leave') state.ionViewWillLeave();
@@ -1024,7 +1087,7 @@ describe('Docker page', () => {
         }
         http.expectNone(() => true);
       } finally {
-        if (mode !== 'destroy') state.cancel();
+        if (mode !== 'destroy') await cancel(f);
         focus.mockRestore();
         active.mockRestore();
         trigger.remove();
@@ -1054,7 +1117,7 @@ describe('Docker page', () => {
     expect(v.locked()).toBe(false);
     expect(v.error()).toContain('No se pudo confirmar');
   });
-  it('serializes inspection, preserves stale detail and reinspects only after both inventories refresh', () => {
+  it('serializes inspection, preserves stale detail and reinspects only after both inventories refresh', async () => {
     const f = initial(),
       v = f.componentInstance.state;
     v.inspect(project.name);
@@ -1069,7 +1132,7 @@ describe('Docker page', () => {
     expect(v.detail.data()).toEqual(project);
     expect(v.detail.stale()).toBe(true);
     v.prepare('restart', container);
-    v.confirm();
+    await confirm(f);
     http
       .expectOne(`${base}/containers/restart`)
       .flush({ container: container.id, status: 'restarted' });
@@ -1096,7 +1159,7 @@ describe('Docker page', () => {
     expect(v.detail.data()).toBeNull();
     expect(v.detail.loading()).toBe(false);
   });
-  it('does not reinspect a selection removed by post-action refresh', () => {
+  it('does not reinspect a selection removed by post-action refresh', async () => {
     const f = initial(),
       v = f.componentInstance.state;
     v.inspect(project.name);
@@ -1104,7 +1167,7 @@ describe('Docker page', () => {
       .expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`)
       .flush(project);
     v.prepare('delete', container);
-    v.confirm();
+    await confirm(f);
     http
       .expectOne(`${base}/containers/delete`)
       .flush({ container: container.id, status: 'deleted' });
@@ -1116,11 +1179,11 @@ describe('Docker page', () => {
   });
   it.each(['leave', 'session'] as const)(
     'cleans confirmation and ignores old responses on %s',
-    (mode) => {
+    async (mode) => {
       const f = initial(),
         v = f.componentInstance.state;
       v.prepare('delete', container);
-      v.cancel();
+      await cancel(f);
       v.refreshContainers();
       const old = http.expectOne(`${base}/containers`);
       if (mode === 'leave') v.ionViewWillLeave();
@@ -1129,7 +1192,7 @@ describe('Docker page', () => {
       expect(v.inventory.data()).toBeNull();
       old.flush(inventory);
       expect(v.inventory.data()).toBeNull();
-      v.confirm();
+      await confirm(f);
       http.expectNone(`${base}/containers/delete`);
     },
   );
@@ -1162,7 +1225,7 @@ describe('Docker page', () => {
     expect(v.selected()).toBeNull();
     expect(v.detail.data()).toBeNull();
   });
-  it('closes an open confirmation on session expiry', () => {
+  it('closes an open confirmation on session expiry', async () => {
     const f = initial(),
       v = f.componentInstance.state;
     v.prepare('delete', container);
@@ -1170,7 +1233,7 @@ describe('Docker page', () => {
     TestBed.inject(ThemeIdentity).begin();
     expect(f.nativeElement.querySelector('dialog').open).toBe(false);
     expect(v.pending()).toBeNull();
-    v.confirm();
+    await confirm(f);
     http.expectNone(`${base}/containers/delete`);
   });
 });

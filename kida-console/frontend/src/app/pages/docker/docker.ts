@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, inject, viewChild } from '@angular/core';
+import { Component, OnDestroy, inject } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { DockerFacade } from './services/docker.facade';
 import { DockerConfirmationService } from './services/docker-confirmation.service';
@@ -12,14 +12,6 @@ import { DockerConfirmationService } from './services/docker-confirmation.servic
 })
 export class Docker implements OnDestroy {
   readonly state = inject(DockerFacade);
-  readonly confirmations = inject(DockerConfirmationService);
-  private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmation');
-  constructor() {
-    this.confirmations.dialog = () => this.dialog()?.nativeElement;
-  }
-  trapFocus(event: KeyboardEvent): void {
-    this.confirmations.trapFocus(event, () => this.state.cancel());
-  }
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();
   }

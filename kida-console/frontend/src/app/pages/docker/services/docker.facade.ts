@@ -3,7 +3,10 @@ import { Observable, Subscription, catchError, finalize, forkJoin, map, of, tap 
 import { ThemeIdentity } from '../../../../theme/integration';
 import { classifyCoreFailure } from '../../../services/core-failure';
 import { DockerService } from './docker.service';
-import { DockerConfirmationService } from './docker-confirmation.service';
+import {
+  DockerConfirmationSession,
+  DockerConfirmationService,
+} from './docker-confirmation.service';
 import {
   ComposeProject,
   ContainerAction,
@@ -33,6 +36,8 @@ function reading<T>() {
     stale: signal(false),
   };
 }
+
+export type DockerReading<T> = ReturnType<typeof reading<T>>;
 
 @Injectable()
 export class DockerFacade implements OnDestroy {
@@ -116,6 +121,7 @@ export class DockerFacade implements OnDestroy {
       this.uncertain() ||
       this.inventory.data() === null,
   );
+  private confirmation?: DockerConfirmationSession;
   private active = false;
   private generation = 0;
   private selectionRevision = 0;
@@ -182,7 +188,7 @@ export class DockerFacade implements OnDestroy {
     return this.active && generation === this.generation && revision === this.identity.snapshot();
   }
   private load<T>(
-    state: ReturnType<typeof reading<T>>,
+    state: DockerReading<T>,
     request: Observable<T>,
     accept: (value: T) => void = () => {},
   ): Observable<boolean> {
@@ -312,45 +318,47 @@ export class DockerFacade implements OnDestroy {
       (action === 'stop' && !container.online)
     );
   }
-  prepare(action: ContainerAction, container: DockerContainer): void {
+  async prepare(action: ContainerAction, container: DockerContainer): Promise<void> {
     const current = this.inventory.data()?.containers.find((c) => c.id === container.id);
     if (!this.active || !current || this.actionLocked(action, current.id)) return;
-    this.confirmations.captureFocus(this.focusContext());
     const snapshot = Object.freeze({ action, id: current.id, name: current.name });
+    const valid = this.focusContext();
+    let confirmation: DockerConfirmationSession;
+    try {
+      confirmation = this.confirmations.prepare(
+        snapshot,
+        valid,
+        this.inspectedContainer() !== null,
+      );
+      this.confirmation = confirmation;
+    } catch {
+      this.error.set('No se pudo abrir la confirmación.');
+      return;
+    }
     if (action === 'start') {
       this.execute(snapshot);
       return;
     }
     this.error.set('');
     this.pending.set(snapshot);
-    this.confirmations.open(
-      this.inspectedContainer() !== null,
-      () => this.active && this.pending() === snapshot,
-      () => {
-        this.closeConfirmation();
-        this.error.set('No se pudo abrir la confirmación.');
-        this.confirmations.restoreFocus();
-      },
-    );
-  }
-  cancel(): void {
-    if (!this.pending()) return;
-    this.closeConfirmation();
-    this.confirmations.restoreFocus();
-  }
-  private closeConfirmation(): void {
-    this.pending.set(null);
-    this.confirmations.close();
+    try {
+      const accepted = await confirmation.present();
+      if (this.confirmation !== confirmation || !valid()) return;
+      this.pending.set(null);
+      // Hand over the pending lock to execute() without yielding between them.
+      if (accepted) this.execute(snapshot);
+      else confirmation.restoreFocus();
+    } catch {
+      if (this.confirmation !== confirmation || !valid()) return;
+      this.pending.set(null);
+      this.error.set('No se pudo abrir la confirmación.');
+      confirmation.restoreFocus();
+    }
   }
   invalidateConfirmation(): void {
     this.pending.set(null);
-    this.confirmations.invalidate();
-  }
-  confirm(): void {
-    const pending = this.pending();
-    if (!this.active || !pending || this.busy() || !this.confirmations.isOpen()) return;
-    this.closeConfirmation();
-    this.execute(pending);
+    this.confirmation?.cancel();
+    this.confirmation = undefined;
   }
   private execute(snapshot: PendingContainer): void {
     const inspector = this.inspectedContainer();
@@ -396,7 +404,7 @@ export class DockerFacade implements OnDestroy {
         ) {
           // Let SidePanel restore focus after Ionic has dismissed the modal.
           this.inspectedContainer.set(null);
-          this.confirmations.invalidate();
+          this.invalidateConfirmation();
         }
         const selected = this.selected();
         if (projectsOk && selected !== null) this.inspect(selected, true);
@@ -414,7 +422,7 @@ export class DockerFacade implements OnDestroy {
   }
   private finishWrite(): void {
     this.busy.set(false);
-    this.confirmations.restoreFocus();
+    this.confirmation?.restoreFocus();
   }
   private focusContext(): () => boolean {
     const generation = this.generation;

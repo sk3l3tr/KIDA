@@ -1,31 +1,10 @@
 <ion-tabs (ionTabsWillChange)="state.leaveTab()">
   <ion-tab-bar slot="top" aria-label="Docker">
-    <ion-tab-button tab="projects" href="/docker/projects"><ion-label>Proyectos</ion-label></ion-tab-button>
-    <ion-tab-button tab="containers" href="/docker/containers"><ion-label>Contenedores</ion-label></ion-tab-button>
+    <ion-tab-button tab="projects" href="/docker/projects"
+      ><ion-label>Proyectos</ion-label></ion-tab-button
+    >
+    <ion-tab-button tab="containers" href="/docker/containers"
+      ><ion-label>Contenedores</ion-label></ion-tab-button
+    >
   </ion-tab-bar>
 </ion-tabs>
-  <dialog
-    class="console-dialog"
-    #confirmation
-    aria-labelledby="docker-confirm-title"
-    (cancel)="$event.preventDefault(); state.cancel()"
-    (keydown)="trapFocus($event)"
-  >
-    <h2 id="docker-confirm-title">Confirmar acción Docker</h2>
-    @if (state.pending(); as action) {
-      <p>Acción: {{ state.labels[action.action] }}</p>
-      <p>Nombre: {{ action.name }}</p>
-      <p>ID: {{ action.id }}</p>
-      @if (action.action === 'delete') {
-        <p>Eliminar es irreversible. CORE decidirá si puede eliminar el contenedor.</p>
-      } @else if (action.action === 'restart') {
-        <p>Reiniciar puede interrumpir temporalmente los servicios del contenedor.</p>
-      } @else {
-        <p>Esta operación puede interrumpir los servicios del contenedor.</p>
-      }
-    }
-    <div class="dialog-buttons">
-      <button type="button" class="secondary" autofocus (click)="state.cancel()">Cancelar</button>
-      <button type="button" (click)="state.confirm()">Confirmar</button>
-    </div>
-  </dialog>

@@ -1,0 +1,163 @@
+<ion-content>
+  <div class="console-layout docker-layout">
+    <app-docker-indicators />
+    <app-docker-operation-status [showDetails]="true" />
+    <section aria-labelledby="docker-containers-title" [attr.aria-busy]="state.inventory.loading()">
+      <div class="section-header">
+        <div>
+          <h2 id="docker-containers-title" #listHeading data-docker-heading tabindex="-1">
+            Contenedores Docker
+          </h2>
+        </div>
+        <button
+          type="button"
+          (click)="state.refreshContainers()"
+          [disabled]="state.inventory.loading() || state.busy() || state.pending() !== null"
+        >
+          Actualizar contenedores
+        </button>
+      </div>
+      <div class="panel inventory-panel">
+        <h3>Inventario de contenedores</h3>
+        <app-docker-section-status
+          [state]="state.inventory"
+          loadingText="Cargando contenedores…"
+          errorPrefix="Error de actualización:"
+          staleText="Datos anteriores, desactualizados; actualiza contenedores."
+        />
+        @if (state.inventory.data(); as data) {
+          <p>
+            {{ data.containers.length }}
+            {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}
+          </p>
+          <p>
+            Total: {{ state.counter(data.total) }} · En ejecución:
+            {{ state.counter(data.running) }}
+          </p>
+          <div class="inventory-tools">
+            <label for="docker-search">Buscar contenedores</label>
+            <input
+              id="docker-search"
+              class="console-control"
+              type="search"
+              placeholder="Nombre, ID, imagen, proyecto o servicio"
+              [value]="state.search()"
+              (input)="state.search.set($any($event.target).value)"
+            />
+            <label for="docker-activity">Actividad</label>
+            <select
+              id="docker-activity"
+              class="console-control"
+              [value]="state.activity()"
+              (change)="state.activity.set($any($event.target).value)"
+            >
+              <option value="all">Todos</option>
+              <option value="online">En ejecución</option>
+              <option value="offline">Fuera de línea</option>
+            </select>
+            <span aria-live="polite"
+              >{{ state.visibleContainers().length }}
+              {{ state.visibleContainers().length === 1 ? 'resultado' : 'resultados' }}</span
+            >
+          </div>
+          <div class="table-wrap">
+            <table class="container-list">
+              <colgroup>
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col class="operations-column" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Contenedor</th>
+                  <th>Estado</th>
+                  <th>Imagen</th>
+                  <th>Servicio / Proyecto</th>
+                  <th>Salud</th>
+                  <th>Salida</th>
+                  <th>Operaciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (container of data.containers; track container.id) {
+                  <tr
+                    class="inventory-row"
+                    [class.row-hidden]="!state.visibleContainerIds().has(container.id)"
+                    [attr.data-container-id]="container.id"
+                    [inert]="!state.visibleContainerIds().has(container.id)"
+                  >
+                    <td>
+                      <span class="mobile-label">Contenedor</span>
+                      <button
+                        type="button"
+                        [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
+                        (click)="state.openContainer(container.id, 'inventory')"
+                      >
+                        {{ container.name }}
+                      </button>
+                    </td>
+                    <td>
+                      <span class="mobile-label">Estado</span
+                      >{{ container.online ? 'En ejecución' : 'Fuera de línea' }}
+                    </td>
+                    <td><span class="mobile-label">Imagen</span>{{ container.image }}</td>
+                    <td>
+                      <span class="mobile-label">Servicio / Proyecto</span>
+                      @if (state.associations(); as associations) {
+                        @let association = associations.get(container.id);
+                        @if (association === 'ambiguous') {
+                          Asociación ambigua
+                        } @else if (association) {
+                          {{ association.service === null ? 'Sin nombre' : association.service }}
+                          / {{ association.project }}
+                        } @else {
+                          Sin asociación Compose observada
+                        }
+                        @if (state.projects.stale()) {
+                          <small>Lectura de proyectos desactualizada.</small>
+                        }
+                      } @else {
+                        Asociación no disponible
+                      }
+                    </td>
+                    <td>
+                      <span class="mobile-label">Salud</span>{{ state.display(container.health) }}
+                    </td>
+                    <td>
+                      <span class="mobile-label">Salida</span
+                      >{{ state.counter(container.exit_code) }}
+                    </td>
+                    <td>
+                      <span class="mobile-label">Operaciones</span>
+                      <app-container-actions [containerId]="container.id" [compact]="true" />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (!data.containers.length) {
+            <p>No hay contenedores.</p>
+          } @else if (!state.visibleContainers().length) {
+            <p>No hay contenedores que coincidan con la búsqueda y los filtros.</p>
+          }
+        }
+      </div>
+    </section>
+    <app-docker-inspector source="containers" [fallbackFocus]="listHeading" />
+    @if (
+      state.limitedPrecision(state.inventory.data()) ||
+      state.limitedPrecision(state.projects.data()) ||
+      state.limitedPrecision(state.detail.data()) ||
+      state.limitedPrecision(state.result())
+    ) {
+      <p role="status">
+        Precisión limitada: algún valor numérico no es un entero seguro de JavaScript.
+      </p>
+    }
+  </div>
+</ion-content>

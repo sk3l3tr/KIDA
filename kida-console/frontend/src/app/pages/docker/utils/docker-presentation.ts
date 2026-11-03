@@ -21,11 +21,17 @@ export function composeAssociations(projects: ComposeProject[]): Map<string, Com
   return result;
 }
 
-export const actionLabels: Record<ContainerAction, string> = {
+export const actionIcons: Record<ContainerAction, string> = {
   start: 'play',
   stop: 'stop',
   restart: 'restart',
   delete: 'trash',
+};
+export const actionLabels: Record<ContainerAction, string> = {
+  start: 'Arrancar',
+  stop: 'Parar',
+  restart: 'Reiniciar',
+  delete: 'Eliminar',
 };
 export function display(value: unknown): string {
   return value === null || value === undefined ? 'Desconocido / no disponible' : String(value);
