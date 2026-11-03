@@ -3,7 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { HttpErrorResponse } from '@angular/common/http';
 import { createComponent, EnvironmentInjector, getDebugNode, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
+import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { appConfig } from '../../../app.config';
 import { environment } from '../../../../environments/environment';
 import { ThemeIdentity } from '../../../../theme/integration';
@@ -51,6 +52,7 @@ function setup(projectPanel = false) {
         useFactory: () => ({
           actions: inject(ArcaActionsService),
           panels: inject(ArcaPanelsService),
+          modals: inject(ArcaModalService),
         }),
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
@@ -107,27 +109,14 @@ describe('Docker HTTP through ARCA', () => {
 
 describe('Docker page', () => {
   let http: HttpTestingController;
+  let dialogs: ReturnType<typeof mockArcaDialogs>;
   beforeEach(() => {
     http = setup(true);
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = true;
-        },
-      },
-      close: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = false;
-        },
-      },
-    });
+    dialogs = mockArcaDialogs();
   });
   afterEach(() => {
+    dialogs.dismiss();
     http.verify();
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
   function enter() {
     const fixture = TestBed.createComponent(Docker);
@@ -142,14 +131,12 @@ describe('Docker page', () => {
     fixture.detectChanges();
     return fixture;
   }
-  async function confirm(f: ReturnType<typeof initial>) {
-    const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement | null;
-    if (dialog?.open) dialog.querySelector<HTMLButtonElement>('button:last-child')!.click();
+  async function confirm(_f: ReturnType<typeof initial>) {
+    dialogs.choose('confirm');
     await Promise.resolve();
   }
   async function cancel(f: ReturnType<typeof initial>) {
-    const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement | null;
-    if (dialog?.open) dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
+    if (dialogs.element) dialogs.choose('cancel');
     else f.componentInstance.state.invalidateConfirmation();
     await Promise.resolve();
   }
@@ -169,6 +156,19 @@ describe('Docker page', () => {
       v.location.nativeElement.querySelector('app-docker-inspector')!,
     )!.injector.get(DockerInspector);
   }
+  it('uses the common ARCA dialog and rejects an unrelated result', () => {
+    const f = initial();
+    const state = f.componentInstance.state;
+    state.prepare('delete', container);
+    expect(dialogs.config?.title).toBe('Confirmar acción Docker');
+    TestBed.inject(ArcaActionsService).dispatchAction('DOCKER_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context: 'old' },
+    });
+    http.expectNone(`${base}/containers/delete`);
+    dialogs.choose();
+    http.expectOne(`${base}/containers/delete`).flush({}, { status: 502, statusText: 'Rejected' });
+  });
   it('renders each tab independently while sharing its facade and snapshots', () => {
     const f = initial();
     const projects = view(f, 'projects');
@@ -474,7 +474,7 @@ describe('Docker page', () => {
       v.changeDetectorRef.detectChanges();
       expect(start.disabled).toBe(true);
       expect(state.pending()).toBeNull();
-      expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+      expect(dialogs.element !== null).toBe(false);
       const request = http.expectOne(`${base}/containers/start`);
       expect(request.request.method).toBe('POST');
       expect(request.request.body).toEqual({ container: container.id });
@@ -711,8 +711,8 @@ describe('Docker page', () => {
       TestBed.tick();
       expect(Object.isFrozen(state.pending())).toBe(true);
       expect(state.pending()).toEqual({ action, name: container.name, id: container.id });
-      const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
-      expect(dialog.open).toBe(true);
+      const dialog = dialogs.element!;
+      expect(dialogs.element).not.toBeNull();
       expect(dialog.textContent).toContain('Acción: ' + label);
       expect(dialog.textContent).toContain(container.name);
       expect(dialog.textContent).toContain(container.id);
@@ -729,7 +729,7 @@ describe('Docker page', () => {
         ...inventory,
         containers: [{ ...current, name: 'new inventory name' }],
       });
-      f.nativeElement.querySelector('.dialog-buttons button:last-child').click();
+      dialogs.choose();
       await confirm(f);
       const request = http.expectOne(`${base}/containers/${action}`);
       expect(request.request.body).toEqual({ container: container.id });
@@ -791,8 +791,8 @@ describe('Docker page', () => {
   describe.each(['stop', 'restart', 'delete'] as const)('%s confirmation safeguards', (action) => {
     const label = { stop: 'Parar', restart: 'Reiniciar', delete: 'Eliminar' }[action];
     const status = { stop: 'stopped', restart: 'restarted', delete: 'deleted' }[action];
-    it.each(['button', 'escape', 'cancel-event'] as const)(
-      'cancels inspector action by %s, restores the lower focus trap and requests focus on its trigger',
+    it.each(['button', 'escape', 'backdrop'] as const)(
+      'cancels inspector action by %s, retaining the panel and restoring workflow focus',
       async (mode) => {
         const f = initial(),
           state = f.componentInstance.state;
@@ -801,49 +801,22 @@ describe('Docker page', () => {
         const v = view(f, 'containers');
         const root = v.location.nativeElement as HTMLElement;
         document.body.append(root);
-        const stop = root.querySelector<HTMLButtonElement>(
+        const control = root.querySelector<HTMLButtonElement>(
           `app-side-panel button[aria-label^="${label} contenedor"]`,
         )!;
         const panel = getDebugNode(root.querySelector('app-side-panel')!)!.injector.get(SidePanel);
-        const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(stop);
-        const focus = vi.spyOn(stop, 'focus').mockImplementation(() => {});
-        const show = vi
-          .spyOn(HTMLDialogElement.prototype, 'showModal')
-          .mockImplementation(function (this: HTMLDialogElement) {
-            expect(panel.focusTrap()).toBe(false);
-            this.open = true;
-          });
-        const documentKeydown = vi.fn();
-        document.addEventListener('keydown', documentKeydown);
+        const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(control);
+        const focus = vi.spyOn(control, 'focus').mockImplementation(() => {});
         try {
-          stop.click();
-          expect(show).not.toHaveBeenCalled();
+          control.click();
+          v.changeDetectorRef.detectChanges();
+          expect(panel.focusTrap()).toBe(false);
+          expect(dialogs.element).not.toBeNull();
+          if (mode === 'button') dialogs.choose('cancel');
+          else dialogs.dismiss();
           v.changeDetectorRef.detectChanges();
           f.detectChanges();
           TestBed.tick();
-          expect(show).toHaveBeenCalledOnce();
-          const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
-          if (mode === 'button') dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
-          else if (mode === 'escape') {
-            const event = new KeyboardEvent('keydown', {
-              key: 'Escape',
-              bubbles: true,
-              cancelable: true,
-            });
-            dialog.dispatchEvent(event);
-            expect(event.defaultPrevented).toBe(true);
-            expect(documentKeydown).not.toHaveBeenCalled();
-          } else {
-            const event = new Event('cancel', { cancelable: true });
-            dialog.dispatchEvent(event);
-            expect(event.defaultPrevented).toBe(true);
-          }
-          await Promise.resolve();
-          v.changeDetectorRef.detectChanges();
-          f.detectChanges();
-          TestBed.tick();
-          await f.whenStable();
-          expect(dialog.open).toBe(false);
           expect(state.pending()).toBeNull();
           expect(panel.focusTrap()).toBe(true);
           expect(panel.open()).toBe(true);
@@ -851,11 +824,8 @@ describe('Docker page', () => {
           await confirm(f);
           http.expectNone(() => true);
         } finally {
-          await cancel(f);
-          show.mockRestore();
           active.mockRestore();
           focus.mockRestore();
-          document.removeEventListener('keydown', documentKeydown);
           root.remove();
         }
       },
@@ -872,7 +842,7 @@ describe('Docker page', () => {
         v.changeDetectorRef.detectChanges();
         f.detectChanges();
         TestBed.tick();
-        expect(f.nativeElement.querySelector('dialog').open).toBe(true);
+        expect(dialogs.element !== null).toBe(true);
         if (mode === 'close') inspector(v).closePanel();
         else if (mode === 'container') state.openContainer('another', 'inventory');
         else if (mode === 'project') {
@@ -887,7 +857,7 @@ describe('Docker page', () => {
         else TestBed.inject(ThemeIdentity).begin();
         v.changeDetectorRef.detectChanges();
         expect(state.pending()).toBeNull();
-        expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+        expect(dialogs.element !== null).toBe(false);
         expect(
           getDebugNode(v.location.nativeElement.querySelector('app-side-panel'))!
             .injector.get(SidePanel)
@@ -909,7 +879,7 @@ describe('Docker page', () => {
       f.detectChanges();
       TestBed.tick();
       expect(state.pending()).toBeNull();
-      expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+      expect(dialogs.element !== null).toBe(false);
       await confirm(f);
       http.expectNone(() => true);
     });
@@ -997,24 +967,27 @@ describe('Docker page', () => {
     expect(v.error()).toContain('CORE rechazó');
     expect(v.busy()).toBe(false);
   });
-  it('keeps a newer pending lock through obsolete cancellation and accepted microtasks', async () => {
-    const f = initial();
-    const state = f.componentInstance.state;
+  it('keeps a newer pending lock through obsolete results and consumes acceptance once', async () => {
+    const f = initial(),
+      state = f.componentInstance.state;
     state.prepare('restart', container);
-    const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
-    dialog.querySelector<HTMLButtonElement>('[autofocus]')!.click();
-    state.invalidateConfirmation();
+    const old = dialogs.config!.context;
+    dialogs.choose('cancel');
     state.prepare('delete', container);
     const latest = state.pending();
-    await Promise.resolve();
-    expect(state.pending()).toBe(latest);
-    expect(latest?.action).toBe('delete');
-    dialog.querySelector<HTMLButtonElement>('button:last-child')!.click();
-    dialog.querySelector<HTMLButtonElement>('button:last-child')!.click();
-    state.prepare('restart', container);
+    TestBed.inject(ArcaActionsService).dispatchAction('DOCKER_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context: old },
+    });
     expect(state.pending()).toBe(latest);
     http.expectNone(() => true);
-    await Promise.resolve();
+    const context = dialogs.config!.context;
+    dialogs.choose();
+    TestBed.inject(ArcaActionsService).dispatchAction('DOCKER_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    state.prepare('restart', container);
     expect(state.pending()).toBeNull();
     expect(state.busy()).toBe(true);
     http
@@ -1025,7 +998,7 @@ describe('Docker page', () => {
   it('recovers when opening a dialog fails', async () => {
     const f = initial(),
       v = f.componentInstance.state;
-    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementationOnce(() => {
+    dialogs.open.mockImplementationOnce(() => {
       throw new Error();
     });
     await v.prepare('restart', container);
@@ -1034,30 +1007,25 @@ describe('Docker page', () => {
     expect(v.error()).toContain('No se pudo abrir');
     http.expectNone(`${base}/containers/restart`);
   });
-  it('opens only the newest confirmation when the previous deferred opening was cancelled', async () => {
+  it('cancels an opening before accepting another and never executes its old target', () => {
     const f = initial(),
       state = f.componentInstance.state;
     state.openContainer(container.id, 'inventory');
-    const v = view(f, 'containers');
-    const show = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
     state.prepare('restart', container);
-    const previous = state.pending();
-    await confirm(f);
-    http.expectNone(() => true);
-    await cancel(f);
+    const old = dialogs.config!.context;
+    state.invalidateConfirmation();
+    expect(dialogs.element).toBeNull();
     state.prepare('delete', container);
-    const current = state.pending();
-    expect(current).not.toBe(previous);
-    v.changeDetectorRef.detectChanges();
-    f.detectChanges();
-    TestBed.tick();
-    expect(show).toHaveBeenCalledOnce();
-    expect(state.pending()).toBe(current);
-    expect(f.nativeElement.querySelector('dialog').open).toBe(true);
-    await confirm(f);
-    await confirm(f);
-    const request = http.expectOne(`${base}/containers/delete`);
-    request.flush({ detail: { code: 'core_error' } }, { status: 502, statusText: 'Rejected' });
+    const pending = state.pending();
+    TestBed.inject(ArcaActionsService).dispatchAction('DOCKER_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context: old },
+    });
+    expect(state.pending()).toBe(pending);
+    dialogs.choose();
+    http
+      .expectOne(`${base}/containers/delete`)
+      .flush({ detail: { code: 'core_error' } }, { status: 502, statusText: 'Rejected' });
     http.expectNone(`${base}/containers/restart`);
   });
   it.each(['panel', 'tab', 'leave', 'session', 'confirmation', 'destroy'] as const)(
@@ -1083,7 +1051,7 @@ describe('Docker page', () => {
         expect(focus).not.toHaveBeenCalled();
         if (mode === 'confirmation') {
           expect(state.pending()?.action).toBe('delete');
-          expect(f.nativeElement.querySelector('dialog').open).toBe(true);
+          expect(dialogs.element !== null).toBe(true);
         }
         http.expectNone(() => true);
       } finally {
@@ -1229,9 +1197,9 @@ describe('Docker page', () => {
     const f = initial(),
       v = f.componentInstance.state;
     v.prepare('delete', container);
-    expect(f.nativeElement.querySelector('dialog').open).toBe(true);
+    expect(dialogs.element !== null).toBe(true);
     TestBed.inject(ThemeIdentity).begin();
-    expect(f.nativeElement.querySelector('dialog').open).toBe(false);
+    expect(dialogs.element !== null).toBe(false);
     expect(v.pending()).toBeNull();
     await confirm(f);
     http.expectNone(`${base}/containers/delete`);

@@ -1,3 +1,4 @@
+import { mockArcaDialogs } from '../components/app-dialog/app-dialog.testing';
 import { THEME_STORAGE, ThemeService } from '../../lib/theming/theme.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -5,7 +6,7 @@ import { inject } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { environment } from '../../environments/environment';
 import { appConfig } from '../app.config';
 import { AppHeaderComponent } from '../components/app-header/app-header.component';
@@ -20,7 +21,11 @@ const arcaProviders = [
   ...appConfig.providers,
   {
     provide: ArcaService,
-    useFactory: () => ({ actions: inject(ArcaActionsService), panels: inject(ArcaPanelsService) }),
+    useFactory: () => ({
+      actions: inject(ArcaActionsService),
+      panels: inject(ArcaPanelsService),
+      modals: inject(ArcaModalService),
+    }),
   },
   {
     provide: ArcaPanelsService,
@@ -674,12 +679,13 @@ describe('Authentication views', () => {
     fixture.componentInstance.ionViewWillEnter();
     fixture.detectChanges();
     await fixture.whenStable();
+    const dialogs = mockArcaDialogs();
     const buttons = fixture.nativeElement.querySelectorAll('.accounts-list .danger');
     buttons[1].click();
     fixture.detectChanges();
     expect(remove).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.querySelector('.confirmation').textContent).toContain('second');
-    fixture.nativeElement.querySelector('.confirmation .danger').click();
+    expect(dialogs.element!.textContent).toContain('second');
+    dialogs.choose();
     expect(remove).toHaveBeenCalledWith(2);
   });
 });

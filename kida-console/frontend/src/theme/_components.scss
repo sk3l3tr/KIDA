@@ -8,15 +8,15 @@
 textarea.console-control {
   resize: vertical;
 }
-.console-dialog {
-  padding: var(--kida-space);
-  font-family: var(--kida-font);
-  background: var(--ion-item-background);
-  color: var(--ion-text-color);
-  border: var(--kida-border-width) solid var(--ion-border-color);
-  border-radius: var(--kida-radius);
-  box-shadow: var(--kida-shadow), var(--kida-effect);
-}
-.console-dialog::backdrop {
-  background: var(--kida-overlay-backdrop);
+// ARCA presents AppDialog inside an Ionic modal.
+ion-modal.app-dialog-modal {
+  --width: min(36rem, 92vw);
+  --height: auto;
+  --max-height: 85dvh;
+  --background: var(--ion-item-background);
+  --border-radius: var(--kida-radius);
+  --border-width: var(--kida-border-width);
+  --border-style: solid;
+  --border-color: var(--ion-border-color);
+  --box-shadow: var(--kida-shadow), var(--kida-effect);
 }

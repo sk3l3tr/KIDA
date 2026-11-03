@@ -1,12 +1,11 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { DockerFacade } from './services/docker.facade';
-import { DockerConfirmationService } from './services/docker-confirmation.service';
 
 @Component({
   selector: 'app-docker',
   imports: [IonicModule],
-  providers: [DockerFacade, DockerConfirmationService],
+  providers: [DockerFacade],
   templateUrl: './docker.html',
   styleUrl: './docker-tabs.scss',
 })

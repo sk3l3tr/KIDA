@@ -1,4 +1,4 @@
-import { trapDialogFocus, restoreDialogFocus } from '../../services/dialog-focus';
+import { restoreDialogFocus } from '../../services/dialog-focus';
 import {
   Component,
   ElementRef,
@@ -11,7 +11,16 @@ import {
 import { DOCUMENT, DatePipe, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonContent } from '@ionic/angular/standalone';
-import { Subscription, finalize } from 'rxjs';
+import { Subscription, filter, finalize, take } from 'rxjs';
+import { ArcaService } from 'arca';
+import { AppDialog } from '../../components/app-dialog/app-dialog';
+import {
+  APP_DIALOG_CANCEL,
+  APP_DIALOG_OPEN,
+  AppDialogConfig,
+  AppDialogResult,
+  newDialogContext,
+} from '../../components/app-dialog/app-dialog.models';
 import { ThemeIdentity } from '../../../theme/integration';
 import { SchedulerService } from './scheduler.service';
 import { ListedSchedule, OriginFilter, PendingSchedule, Schedule } from './scheduler.models';
@@ -29,7 +38,9 @@ export class Scheduler implements OnDestroy {
   private readonly identity = inject(ThemeIdentity);
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
-  private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmation');
+  private readonly arca = inject(ArcaService);
+  private dialogContext?: string;
+  private dialogSubscription?: Subscription;
   private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
   readonly entries = signal<ListedSchedule[] | null>(null);
   readonly loading = signal(false);
@@ -130,24 +141,70 @@ export class Scheduler implements OnDestroy {
     this.open({ action: 'delete', body: { id: entry.id }, entry });
   }
   private open(pending: PendingSchedule): void {
+    if (this.arca.modals.modalOpen) return;
     this.trigger = this.document.activeElement;
-    try {
-      const dialog = this.dialog()?.nativeElement;
-      if (!dialog) throw new Error('Confirmation is unavailable');
-      this.pending.set(freezeSnapshot(pending));
-      this.busy.set(true);
-      this.error.set('');
-      dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>('[autofocus]')?.focus();
-    } catch {
+    const snapshot = freezeSnapshot(pending);
+    this.pending.set(snapshot);
+    this.busy.set(true);
+    this.error.set('');
+    const context = newDialogContext();
+    this.dialogContext = context;
+    const config: AppDialogConfig = {
+      context,
+      title: 'Confirmar programación',
+      type: pending.action === 'delete' ? 'danger' : 'confirmation',
+      text:
+        snapshot.action === 'add'
+          ? [
+              `Crear: ${snapshot.body.command}`,
+              JSON.stringify(snapshot.body.params, null, 2),
+              ruleSummary(snapshot.body.schedule),
+              `Zona local del navegador: ${this.zone}.`,
+            ]
+          : [
+              `Eliminar: ${snapshot.entry.command}`,
+              `Identificador: ${snapshot.body.id}`,
+              JSON.stringify(snapshot.entry.params, null, 2),
+              ruleSummary(snapshot.entry.schedule),
+              'Eliminar la programación no cancela comandos ya encolados.',
+              `Zona local del navegador: ${this.zone}.`,
+            ],
+      buttons: [
+        { id: 'cancel', text: 'Cancelar', style: 'secondary' },
+        {
+          id: 'confirm',
+          text: 'Confirmar',
+          style: pending.action === 'delete' ? 'danger' : undefined,
+        },
+      ],
+    };
+    const failed = () => {
+      if (this.dialogContext !== context) return;
       this.closeConfirmation();
       this.busy.set(false);
       this.error.set('No se pudo abrir la confirmación.');
       this.restoreFocus();
+    };
+    try {
+      this.arca.actions.cleanActions(['SCHEDULER_DIALOG_CLOSE', APP_DIALOG_OPEN]);
+      this.dialogSubscription = this.arca.actions
+        .listenAction('SCHEDULER_DIALOG_CLOSE')
+        .pipe(
+          filter((result: AppDialogResult) => result?.data?.context === context),
+          take(1),
+        )
+        .subscribe((result: AppDialogResult) => {
+          if (!this.active || this.dialogContext !== context || this.pending() !== snapshot) return;
+          this.dialogContext = undefined;
+          if (result.option === 'confirm') this.confirm();
+          else this.cancel();
+        });
+      void this.arca.modals
+        .openModal(AppDialog, config, APP_DIALOG_OPEN, 'SCHEDULER_DIALOG_CLOSE')
+        .catch(failed);
+    } catch {
+      failed();
     }
-  }
-  trapFocus(event: KeyboardEvent): void {
-    trapDialogFocus(event, this.dialog()?.nativeElement, this.document);
   }
   cancel(): void {
     if (!this.pending()) return;
@@ -157,8 +214,9 @@ export class Scheduler implements OnDestroy {
   }
   private closeConfirmation(): void {
     this.pending.set(null);
-    const dialog = this.dialog()?.nativeElement;
-    if (dialog?.open) dialog.close();
+    this.dialogSubscription?.unsubscribe();
+    if (this.dialogContext) this.arca.actions.dispatchAction(APP_DIALOG_CANCEL, this.dialogContext);
+    this.dialogContext = undefined;
   }
   private restoreFocus(): void {
     if (!this.active) return;

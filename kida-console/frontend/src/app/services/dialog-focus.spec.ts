@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { trapDialogFocus, restoreDialogFocus } from './dialog-focus';
+import { restoreDialogFocus } from './dialog-focus';
 
 @Component({ template: '' })
 class FocusHost {}
@@ -9,42 +9,6 @@ describe('Dialog focus helpers', () => {
   afterEach(() => {
     document.body.replaceChildren();
     TestBed.resetTestingModule();
-  });
-
-  function dialog() {
-    const element = document.createElement('dialog');
-    element.innerHTML = '<button>Cancel</button><button>Confirm</button>';
-    // jsdom has no modal top layer; keyboard wrapping does not depend on it.
-    element.open = true;
-    document.body.append(element);
-    return element;
-  }
-
-  it.each([false, true])('wraps Tab with shift=%s at the boundary', (shiftKey) => {
-    const element = dialog();
-    const [first, last] = element.querySelectorAll('button');
-    (shiftKey ? first : last).focus();
-    const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, cancelable: true });
-    trapDialogFocus(event, element, document);
-    expect(event.defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(shiftKey ? last : first);
-  });
-
-  it('leaves interior Tab, other keys, and missing or empty dialogs untouched', () => {
-    const element = dialog();
-    const first = element.querySelector('button')!;
-    first.focus();
-    for (const [key, target] of [
-      ['Tab', element],
-      ['Escape', element],
-      ['Tab', undefined],
-      ['Tab', document.createElement('dialog')],
-    ] as const) {
-      const event = new KeyboardEvent('keydown', { key, cancelable: true });
-      trapDialogFocus(event, target, document);
-      expect(event.defaultPrevented).toBe(false);
-      expect(document.activeElement).toBe(first);
-    }
   });
 
   it.each(['connected', 'removed', 'disabled', 'null'])(

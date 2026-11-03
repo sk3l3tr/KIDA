@@ -1,8 +1,18 @@
-import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
-import { Observable, Subscription, finalize } from 'rxjs';
+import { Injectable, Injector, OnDestroy, computed, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ArcaService } from 'arca';
+import { Observable, Subscription, filter, finalize, take } from 'rxjs';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { SystemService } from './system.service';
-import { SystemConfirmation, SystemConfirmationService } from './system-confirmation.service';
+import { AppDialog } from '../../../components/app-dialog/app-dialog';
+import {
+  APP_DIALOG_CANCEL,
+  APP_DIALOG_OPEN,
+  AppDialogConfig,
+  AppDialogResult,
+  newDialogContext,
+} from '../../../components/app-dialog/app-dialog.models';
+import { restoreDialogFocus } from '../../../services/dialog-focus';
 import {
   fields,
   sensorGroups,
@@ -16,11 +26,8 @@ import {
   cycleRequest,
   systemFailure,
   validWhen,
+  actionLabels,
 } from '../utils/system.models';
-
-interface ConfirmationContext {
-  readonly confirmationRevision: number;
-}
 
 function section<T>(title: string) {
   return {
@@ -36,7 +43,9 @@ export type SystemSection<T> = ReturnType<typeof section<T>>;
 @Injectable()
 export class SystemFacade implements OnDestroy {
   private readonly service = inject(SystemService);
-  private readonly confirmations = inject(SystemConfirmationService);
+  private readonly arca = inject(ArcaService);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
   private readonly identity = inject(ThemeIdentity);
 
   readonly health = section<SystemHealth>('Salud y sensores');
@@ -59,7 +68,8 @@ export class SystemFacade implements OnDestroy {
   private confirming = false;
   private confirmationRevision = 0;
   private subscriptions = new Subscription();
-  private confirmation?: SystemConfirmation;
+  private dialogContext?: string;
+  private dialogSubscription?: Subscription;
   private readonly sessionChanges = this.identity.changes.subscribe(() => this.ionViewWillLeave());
 
   ionViewWillEnter(): void {
@@ -83,8 +93,9 @@ export class SystemFacade implements OnDestroy {
   leaveEnergy(): void {
     this.energyActive = false;
     ++this.confirmationRevision;
-    this.confirmation?.cancel();
-    this.confirmation = undefined;
+    this.dialogSubscription?.unsubscribe();
+    if (this.dialogContext) this.arca.actions.dispatchAction(APP_DIALOG_CANCEL, this.dialogContext);
+    this.dialogContext = undefined;
     // Invalidation owns the pending confirmation's lock; stale continuations must not
     // clear it later, as a new confirmation may already be using it.
     if (this.confirming) this.busy.set(false);
@@ -133,29 +144,86 @@ export class SystemFacade implements OnDestroy {
     return cycleRequest(this.wakeMode, this.wakeTime, this.wakeSeconds, this.shutdownTime);
   }
 
-  async confirm(action: PowerAction): Promise<void> {
-    if (!this.canConfirm()) return;
+  confirm(action: PowerAction): void {
+    if (!this.active || !this.energyActive || this.busy() || this.arca.modals.modalOpen) return;
     const pending = this.buildAction(action);
     if (!pending) return;
-
-    const context: ConfirmationContext = {
-      confirmationRevision: this.confirmationRevision,
+    const context = newDialogContext();
+    const revision = this.confirmationRevision;
+    const trigger = this.document.activeElement;
+    const current = () =>
+      this.active && this.energyActive && revision === this.confirmationRevision;
+    const restoreFocus = () => restoreDialogFocus(this.injector, trigger, () => undefined, current);
+    const text =
+      pending.action === 'powerCycle'
+        ? [
+            'wake_time' in pending.body
+              ? `Encendido a las ${pending.body.wake_time}`
+              : `Encendido en ${pending.body.wake_after_seconds} segundos`,
+            `Apagado: ${pending.body.shutdown_time ?? '+1'}.`,
+          ]
+        : [`Cuándo: ${pending.body.when}.`];
+    const config: AppDialogConfig = {
+      context,
+      title: `Confirmar: ${actionLabels[action]}`,
+      text: [...text, 'Horas locales del servidor. La operación puede desconectar el equipo.'],
+      type: 'danger',
+      buttons: [
+        { id: 'cancel', text: 'Cancelar', style: 'secondary' },
+        { id: 'confirm', text: 'Confirmar', style: 'danger' },
+      ],
     };
-    let confirmation: SystemConfirmation;
+    this.confirming = true;
+    this.busy.set(true);
+    this.dialogContext = context;
+    const failed = () => {
+      if (!current() || this.dialogContext !== context) return;
+      this.dialogSubscription?.unsubscribe();
+      this.dialogContext = undefined;
+      this.confirming = false;
+      this.busy.set(false);
+      restoreFocus();
+    };
     try {
-      confirmation = this.confirmations.prepare(pending, () => this.canExecute(context));
+      this.arca.actions.cleanActions(['SYSTEM_DIALOG_CLOSE', APP_DIALOG_OPEN]);
+      this.dialogSubscription = this.arca.actions
+        .listenAction('SYSTEM_DIALOG_CLOSE')
+        .pipe(
+          filter((result: AppDialogResult) => result?.data?.context === context),
+          take(1),
+        )
+        .subscribe((result: AppDialogResult) => {
+          if (!current() || this.dialogContext !== context) return;
+          this.dialogContext = undefined;
+          this.confirming = false;
+          if (result.option !== 'confirm') {
+            this.busy.set(false);
+            restoreFocus();
+            return;
+          }
+          try {
+            this.subscriptions.add(
+              this.service
+                .execute(pending)
+                .pipe(
+                  finalize(() => {
+                    this.busy.set(false);
+                    restoreFocus();
+                  }),
+                )
+                .subscribe({ error: () => {} }),
+            );
+          } catch {
+            this.busy.set(false);
+            restoreFocus();
+          }
+        });
+      void this.arca.modals
+        .openModal(AppDialog, config, APP_DIALOG_OPEN, 'SYSTEM_DIALOG_CLOSE')
+        .catch(failed);
     } catch {
-      this.confirmationFailed(context);
-      return;
+      failed();
     }
-    const confirmed = await this.askConfirmation(confirmation, context);
-    if (!confirmed || !this.canExecute(context)) return;
-
-    this.execute(pending, context, confirmation);
-  }
-
-  private canConfirm(): boolean {
-    return this.active && this.energyActive && !this.busy();
   }
 
   private buildAction(action: PowerAction): PendingAction | null {
@@ -169,76 +237,5 @@ export class SystemFacade implements OnDestroy {
       pending = { action, body: Object.freeze({ when: this.when }) };
     }
     return Object.freeze(pending);
-  }
-
-  private isCurrentConfirmation(context: ConfirmationContext): boolean {
-    return context.confirmationRevision === this.confirmationRevision;
-  }
-
-  private canExecute(context: ConfirmationContext): boolean {
-    return this.active && this.energyActive && this.isCurrentConfirmation(context);
-  }
-
-  private async askConfirmation(
-    confirmation: SystemConfirmation,
-    context: ConfirmationContext,
-  ): Promise<boolean> {
-    // leaveEnergy() (also called by reset()) releases this lock on invalidation.
-    // Stale continuations must not change state owned by a newer confirmation.
-    this.confirmation?.cancel();
-    this.confirmation = confirmation;
-    this.confirming = true;
-    this.busy.set(true);
-    try {
-      const confirmed = await confirmation.present();
-      if (!this.canExecute(context)) return false;
-      // Retain the session so leaving Energy can cancel deferred focus too.
-      if (!confirmed) {
-        this.confirming = false;
-        this.busy.set(false);
-        confirmation.restoreFocus();
-        return false;
-      }
-      // Keep the lock until execute() takes over, including the intervening microtask.
-      return true;
-    } catch {
-      this.confirmationFailed(context);
-      return false;
-    }
-  }
-
-  private execute(
-    pending: PendingAction,
-    context: ConfirmationContext,
-    confirmation: SystemConfirmation,
-  ): void {
-    this.confirming = false;
-    try {
-      this.subscriptions.add(
-        this.service
-          .execute(pending)
-          .pipe(
-            finalize(() => {
-              this.busy.set(false);
-              confirmation.restoreFocus();
-            }),
-          )
-          .subscribe({
-            error: () => {},
-          }),
-      );
-    } catch {
-      if (!this.isCurrentConfirmation(context)) return;
-      this.busy.set(false);
-      confirmation.restoreFocus();
-    }
-  }
-
-  private confirmationFailed(context: ConfirmationContext): void {
-    if (!this.isCurrentConfirmation(context)) return;
-    this.confirming = false;
-    this.busy.set(false);
-    this.confirmation?.cancel();
-    this.confirmation = undefined;
   }
 }

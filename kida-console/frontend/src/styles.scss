@@ -199,14 +199,6 @@ fieldset {
   padding: 1rem;
   border-radius: 0.5rem;
 }
-.confirmation {
-  background: var(--ion-item-background);
-  padding: 1rem;
-  border-radius: 0.5rem;
-}
-.confirmation button {
-  margin: 0.25rem;
-}
 @media (max-width: 700px) {
   .console-layout {
     grid-template-columns: 1fr;
@@ -218,7 +210,7 @@ h2,
 h3 {
   font-family: var(--kida-heading-font);
 }
-:is(fieldset, .panel, .login-card, .confirmation) {
+:is(fieldset, .panel, .login-card) {
   border-radius: var(--kida-radius);
   border-width: var(--kida-border-width);
 }
@@ -322,27 +314,4 @@ td {
 // Keep the scroll position stable when theme typography changes layout.
 ion-content::part(scroll) {
   overflow-anchor: none;
-}
-
-ion-alert.system-confirmation {
-  --background: var(--ion-item-background);
-  --max-width: min(32rem, 92vw);
-  color: var(--ion-text-color);
-  font-family: var(--kida-font);
-  .alert-wrapper {
-    border: var(--kida-border-width) solid var(--ion-border-color);
-    border-radius: var(--kida-radius);
-    box-shadow: var(--kida-shadow), var(--kida-effect);
-  }
-  .alert-title,
-  .alert-message {
-    color: var(--ion-text-color);
-  }
-  .alert-button {
-    color: var(--ion-color-primary);
-    min-height: 44px;
-  }
-  .alert-button-role-confirm {
-    color: var(--ion-color-danger);
-  }
 }

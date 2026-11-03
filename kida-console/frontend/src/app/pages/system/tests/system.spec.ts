@@ -3,15 +3,13 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AlertController } from '@ionic/angular';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../../app.config';
 import { environment } from '../../../../environments/environment';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { ArcaRequestService } from '../../../services/arca-request.service';
 import { SystemService } from '../services/system.service';
 import { SystemFacade } from '../services/system.facade';
-import { SystemConfirmationService } from '../services/system-confirmation.service';
 import { SystemOverview } from '../tabs/system-overview/system-overview';
 import { SystemEnergy } from '../tabs/system-energy/system-energy';
 import { SystemInspector } from '../tabs/system-inspector/system-inspector';
@@ -50,13 +48,13 @@ function setup() {
     providers: [
       ...appConfig.providers,
       SystemFacade,
-      SystemConfirmationService,
       provideHttpClientTesting(),
       {
         provide: ArcaService,
         useFactory: () => ({
           actions: inject(ArcaActionsService),
           panels: inject(ArcaPanelsService),
+          modals: inject(ArcaModalService),
         }),
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
@@ -173,31 +171,12 @@ describe('System validation and failures', () => {
   });
 });
 
-describe('System page', () => {
+describe('System page through ARCA dialogs', () => {
   let http: HttpTestingController;
-  let dismiss: (value: { role: string }) => void;
-  let dialog: {
-    present: ReturnType<typeof vi.fn>;
-    onDidDismiss: ReturnType<typeof vi.fn>;
-    dismiss: ReturnType<typeof vi.fn>;
-    remove: ReturnType<typeof vi.fn>;
-    querySelector: ReturnType<typeof vi.fn>;
-  };
+  let open: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     http = setup();
-    dialog = {
-      present: vi.fn().mockResolvedValue(undefined),
-      onDidDismiss: vi.fn(
-        () =>
-          new Promise((resolve) => {
-            dismiss = resolve;
-          }),
-      ),
-      dismiss: vi.fn().mockResolvedValue(true),
-      remove: vi.fn(),
-      querySelector: vi.fn(),
-    };
-    vi.spyOn(TestBed.inject(AlertController), 'create').mockResolvedValue(dialog as never);
+    open = vi.spyOn(TestBed.inject(ArcaModalService), 'openModal').mockResolvedValue();
   });
   afterEach(() => http.verify());
   function enter() {
@@ -210,26 +189,33 @@ describe('System page', () => {
     fixture.detectChanges();
     return fixture;
   }
-  async function ready() {
-    await Promise.resolve();
-    await Promise.resolve();
+  function respond(option = 'confirm', context = open.mock.calls.at(-1)![1].context) {
+    TestBed.inject(ArcaActionsService).dispatchAction('SYSTEM_DIALOG_CLOSE', {
+      option,
+      data: { context },
+    });
+  }
+  function returnToEnergy(view: SystemFacade) {
+    view.ionViewWillEnter();
+    http
+      .match((request) => request.method === 'GET')
+      .forEach((request) => request.flush(request.request.url.endsWith('/health') ? health : wake));
+    view.enterEnergy();
   }
   it('places the three energy panels in masonry', () => {
     const fixture = enter();
     const masonry = fixture.nativeElement.querySelector('app-system-energy app-masonry');
-    const items = () => masonry.querySelectorAll(':scope > [appMasonryItem]');
-    expect([...items()].map((item: Element) => item.getAttribute('aria-label'))).toEqual([
-      'Capacidades RTC',
-      'Apagado y reinicio',
-      'Ciclo de energía',
-    ]);
+    expect(
+      [...masonry.querySelectorAll(':scope > [appMasonryItem]')].map((item: any) =>
+        item.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Capacidades RTC', 'Apagado y reinicio', 'Ciclo de energía']);
   });
   it('updates quick choices and manual input without sending an operation', async () => {
     const fixture = enter();
     const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
     const input = card.querySelector<HTMLInputElement>('#power-when')!;
-    const choices = Array.from(card.querySelectorAll<HTMLButtonElement>('.quick-action'));
-    const actions = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
+    const choices = [...card.querySelectorAll<HTMLButtonElement>('.quick-action')];
     expect(choices.map((button) => button.getAttribute('aria-pressed'))).toEqual([
       'false',
       'true',
@@ -240,9 +226,7 @@ describe('System page', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       expect(fixture.componentInstance.state.when).toBe(value);
-      expect(choices.map((button) => button.getAttribute('aria-pressed'))).toEqual(
-        choices.map((_, choice) => String(choice === index)),
-      );
+      expect(choices[index].getAttribute('aria-pressed')).toBe('true');
     }
     input.value = '23:45';
     input.dispatchEvent(new Event('input'));
@@ -253,69 +237,75 @@ describe('System page', () => {
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
     expect(card.textContent).toContain('Introduce now');
-    expect(Array.from(actions).every((button) => button.disabled)).toBe(true);
-    http.expectNone(`${base}/shutdown`);
-    http.expectNone(`${base}/reboot`);
-    expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
+    expect(
+      [...card.querySelectorAll<HTMLButtonElement>('.power-buttons button')].every(
+        (button) => button.disabled,
+      ),
+    ).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+    http.expectNone((request) => request.method === 'POST');
   });
   it.each(['shutdown', 'reboot'] as const)(
     'confirms %s from the card with frozen parameters',
-    async (action) => {
+    (action) => {
       const fixture = enter();
-      const confirmation = vi.spyOn(fixture.componentInstance.state, 'confirm');
+      const view = fixture.componentInstance.state;
       const card: HTMLElement = fixture.nativeElement.querySelector('app-system-power-card');
-      const buttons = card.querySelectorAll<HTMLButtonElement>('.power-buttons button');
-      const form = card.querySelector<HTMLFormElement>('form')!;
       if (action === 'shutdown')
-        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-      else buttons[1].click();
-      await ready();
+        card
+          .querySelector('form')!
+          .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      else card.querySelectorAll<HTMLButtonElement>('.power-buttons button')[1].click();
       fixture.detectChanges();
-      expect(Array.from(buttons).every((button) => button.disabled)).toBe(true);
-      card.querySelector<HTMLButtonElement>('.quick-action')!.click();
-      dismiss({ role: 'confirm' });
-      await confirmation.mock.results[0].value;
+      expect(
+        [...card.querySelectorAll<HTMLButtonElement>('.power-buttons button')].every(
+          (button) => button.disabled,
+        ),
+      ).toBe(true);
+      view.when = 'now';
+      respond('confirm', 'unrelated');
+      http.expectNone(`${base}/${action}`);
+      respond();
       const request = http.expectOne(`${base}/${action}`);
       expect(request.request.body).toEqual({ when: '+1' });
       request.flush({ scheduled: true, when: '+1' });
+      expect(view.busy()).toBe(false);
     },
   );
-  it('rejects invalid parameters and confirmations outside Energy without a dialog', async () => {
+  it('rejects invalid parameters, inactive views, other tabs and a globally occupied modal', () => {
     const view = enter().componentInstance.state;
     view.when = 'invalid';
-    await view.confirm('shutdown');
+    view.confirm('shutdown');
     view.wakeTime = 'invalid';
-    await view.confirm('powerCycle');
+    view.confirm('powerCycle');
     view.when = '+1';
     view.leaveEnergy();
-    await view.confirm('reboot');
+    view.confirm('shutdown');
+    returnToEnergy(view);
+    TestBed.inject(ArcaModalService).modalOpen = true;
+    view.confirm('shutdown');
+    TestBed.inject(ArcaModalService).modalOpen = false;
     view.ionViewWillLeave();
-    view.enterEnergy();
-    await view.confirm('shutdown');
-    expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
-    expect(view.busy()).toBe(false);
+    view.confirm('shutdown');
+    expect(open).not.toHaveBeenCalled();
     http.expectNone((request) => request.method === 'POST');
   });
-
-  it.each(['time', 'seconds'])('freezes the %s power-cycle payload and summary', async (mode) => {
+  it.each(['time', 'seconds'])('freezes the %s cycle body and shared dialog summary', (mode) => {
     const view = enter().componentInstance.state;
     const execute = vi.spyOn(TestBed.inject(SystemService), 'execute');
     view.wakeMode = mode;
     view.wakeTime = '08:30';
     view.wakeSeconds = '240';
     view.shutdownTime = '23:00';
-    const operation = view.confirm('powerCycle');
-    await ready();
+    view.confirm('powerCycle');
+    const config = open.mock.calls[0][1];
+    expect(config.text.join(' ')).toContain(mode === 'time' ? '08:30' : '240 segundos');
+    expect(config.text.join(' ')).toContain('23:00');
+    expect(config.text.join(' ')).toContain('Horas locales del servidor');
     view.wakeTime = '09:00';
     view.wakeSeconds = '360';
     view.shutdownTime = '';
-    expect(TestBed.inject(AlertController).create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining(mode === 'time' ? '08:30' : '240 segundos'),
-      }),
-    );
-    dismiss({ role: 'confirm' });
-    await operation;
+    respond();
     const pending = execute.mock.calls[0][0];
     expect(Object.isFrozen(pending)).toBe(true);
     expect(Object.isFrozen(pending.body)).toBe(true);
@@ -325,390 +315,161 @@ describe('System page', () => {
       shutdown_time: '23:00',
     });
     request.flush({ shutdown_scheduled: true });
-    expect(view.busy()).toBe(false);
   });
-
-  it.each(['create', 'present'] as const)(
-    'releases the lock after a dialog %s failure and allows retry',
-    async (stage) => {
+  it.each(['cancel', 'backdrop'])('does not execute a %s choice', (option) => {
+    const view = enter().componentInstance.state;
+    view.confirm('shutdown');
+    respond(option);
+    expect(view.busy()).toBe(false);
+    http.expectNone((request) => request.method === 'POST');
+  });
+  it.each(['sync', 'async'])(
+    'releases the local lock after a %s ARCA opening failure',
+    async (kind) => {
       const view = enter().componentInstance.state;
-      const failure = new Error('dialog failed');
-      if (stage === 'create')
-        vi.mocked(TestBed.inject(AlertController).create).mockRejectedValueOnce(failure);
-      else dialog.present.mockRejectedValueOnce(failure);
-      await view.confirm('shutdown');
+      if (kind === 'sync')
+        open.mockImplementationOnce(() => {
+          throw new Error('opening');
+        });
+      else open.mockRejectedValueOnce(new Error('opening'));
+      view.confirm('shutdown');
+      await Promise.resolve();
       expect(view.busy()).toBe(false);
       http.expectNone(`${base}/shutdown`);
-      const retry = view.confirm('shutdown');
-      await ready();
-      expect(view.busy()).toBe(true);
-      dismiss({ role: 'cancel' });
-      await retry;
-      expect(view.busy()).toBe(false);
+      view.confirm('reboot');
+      respond();
+      http.expectOne(`${base}/reboot`).flush({ scheduled: true });
     },
   );
-
-  it('handles synchronous preparation failures and allows retry', async () => {
-    const view = enter().componentInstance.state;
-    vi.spyOn(TestBed.inject(SystemConfirmationService), 'prepare').mockImplementationOnce(() => {
-      throw new Error('prepare failed');
-    });
-    await expect(view.confirm('shutdown')).resolves.toBeUndefined();
-    expect(view.busy()).toBe(false);
-    expect(TestBed.inject(AlertController).create).not.toHaveBeenCalled();
-    http.expectNone(`${base}/shutdown`);
-    const retry = view.confirm('reboot');
-    await ready();
-    dismiss({ role: 'confirm' });
-    await retry;
-    http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
-    expect(view.busy()).toBe(false);
-  });
-
-  it('releases the lock after a synchronous execution failure and allows retry', async () => {
+  it('recovers from synchronous execution failure without retrying', () => {
     const view = enter().componentInstance.state;
     vi.spyOn(TestBed.inject(SystemService), 'execute').mockImplementationOnce(() => {
-      throw new Error('execution failed');
+      throw new Error('execute');
     });
-    const operation = view.confirm('shutdown');
-    await ready();
-    dismiss({ role: 'confirm' });
-    await operation;
+    view.confirm('shutdown');
+    respond();
     expect(view.busy()).toBe(false);
     http.expectNone(`${base}/shutdown`);
-    const retry = view.confirm('reboot');
-    await ready();
-    dismiss({ role: 'confirm' });
-    await retry;
-    http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
-    expect(view.busy()).toBe(false);
+    view.confirm('reboot');
+    respond();
+    http.expectOne(`${base}/reboot`).flush({ scheduled: true });
   });
-
   it.each(['tab', 'view', 'session', 'destroy'] as const)(
-    'invalidates the confirmation before cancelling it on %s',
-    async (leaving) => {
+    'invalidates before cancellation on %s and ignores an old acceptance',
+    (leaving) => {
       const view = enter().componentInstance.state;
-      const prepare = vi.spyOn(TestBed.inject(SystemConfirmationService), 'prepare');
-      const operation = view.confirm('shutdown');
-      await ready();
-      const isCurrent = prepare.mock.calls[0][1];
-      const confirmation = prepare.mock.results[0].value;
-      const cancel = confirmation.cancel.bind(confirmation);
-      const cancellation = vi.spyOn(confirmation, 'cancel').mockImplementation(() => {
-        expect(isCurrent()).toBe(false);
-        cancel();
-      });
-      expect(isCurrent()).toBe(true);
-
+      view.confirm('shutdown');
+      const old = open.mock.calls[0][1].context;
+      const actions = TestBed.inject(ArcaActionsService);
+      const dispatch = vi.spyOn(actions, 'dispatchAction');
       if (leaving === 'tab') view.leaveEnergy();
       else if (leaving === 'view') view.ionViewWillLeave();
       else if (leaving === 'session') TestBed.inject(ThemeIdentity).clear();
       else view.ngOnDestroy();
-
-      expect(cancellation).toHaveBeenCalledOnce();
-      await operation;
+      expect(dispatch).toHaveBeenCalledWith('APP_DIALOG_CANCEL', old);
       expect(view.busy()).toBe(false);
-      http.expectNone((request) => request.method === 'POST');
-    },
-  );
-
-  it.each(['tab', 'view', 'session'] as const)(
-    'releases a pending creation on %s invalidation without unlocking a newer dialog',
-    async (leaving) => {
-      const view = enter().componentInstance.state;
-      let resolveOld!: (alert: HTMLIonAlertElement) => void;
-      const oldDialog = { ...dialog, remove: vi.fn() };
-      vi.mocked(TestBed.inject(AlertController).create).mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveOld = resolve;
-          }),
-      );
-      const old = view.confirm('shutdown');
-      expect(view.busy()).toBe(true);
-      if (leaving === 'tab') view.leaveEnergy();
-      else if (leaving === 'view') view.ionViewWillLeave();
-      else TestBed.inject(ThemeIdentity).clear();
-      // Cleanup is immediate, even though the old create() is still unresolved.
-      expect(view.busy()).toBe(false);
-      if (leaving !== 'tab') {
-        view.ionViewWillEnter();
-        http.expectOne(`${base}/health`).flush(health);
-        http.expectOne(`${base}/wake-capabilities`).flush(wake);
-      }
-      view.enterEnergy();
-      const current = view.confirm('reboot');
-      await ready();
-      resolveOld(oldDialog as unknown as HTMLIonAlertElement);
-      await old;
-      expect(oldDialog.remove).toHaveBeenCalledOnce();
-      expect(view.busy()).toBe(true);
-      await view.confirm('shutdown');
-      expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
-      dismiss({ role: 'cancel' });
-      await current;
-      expect(view.busy()).toBe(false);
-      http.expectNone((request) => request.method === 'POST');
-    },
-  );
-
-  it.each(['tab', 'view', 'session'] as const)(
-    'does not let an old dismissal unlock or execute over a new confirmation after %s invalidation',
-    async (leaving) => {
-      const view = enter().componentInstance.state;
-      const old = view.confirm('shutdown');
-      await ready();
-      const dismissOld = dismiss;
-      if (leaving === 'tab') view.leaveEnergy();
-      else if (leaving === 'view') view.ionViewWillLeave();
-      else TestBed.inject(ThemeIdentity).clear();
-      if (leaving !== 'tab') {
-        view.ionViewWillEnter();
-        http.expectOne(`${base}/health`).flush(health);
-        http.expectOne(`${base}/wake-capabilities`).flush(wake);
-      }
-      view.enterEnergy();
-      const current = view.confirm('reboot');
-      await ready();
-      dismissOld({ role: 'confirm' });
-      await old;
-      expect(view.busy()).toBe(true);
-      await view.confirm('shutdown');
-      expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+      respond('confirm', old);
       http.expectNone(`${base}/shutdown`);
-      dismiss({ role: 'confirm' });
-      await current;
-      http.expectOne(`${base}/reboot`).flush({ scheduled: true, when: '+1' });
-      expect(view.busy()).toBe(false);
-    },
-  );
-
-  it.each(['tab', 'view', 'session'] as const)(
-    'releases the confirmation lock when leaving between dismissal and execution after %s invalidation',
-    async (leaving) => {
-      const view = enter().componentInstance.state;
-      const operation = view.confirm('shutdown');
-      await ready();
-      dismiss({ role: 'confirm' });
-      queueMicrotask(() => {
-        if (leaving === 'tab') view.leaveEnergy();
-        else if (leaving === 'view') view.ionViewWillLeave();
-        else TestBed.inject(ThemeIdentity).clear();
-        if (leaving !== 'tab') {
-          view.ionViewWillEnter();
-          http.expectOne(`${base}/health`).flush(health);
-          http.expectOne(`${base}/wake-capabilities`).flush(wake);
-        }
-        view.enterEnergy();
-      });
-      await operation;
-      expect(view.busy()).toBe(false);
-      http.expectNone(`${base}/shutdown`);
-      const retry = view.confirm('reboot');
-      await ready();
-      dismiss({ role: 'cancel' });
-      await retry;
-      expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
-    },
-  );
-
-  it.each(['tab', 'view', 'session'] as const)(
-    'does not let an old dialog creation failure affect a new confirmation after %s invalidation',
-    async (leaving) => {
-      const view = enter().componentInstance.state;
-      let rejectOld!: (reason: Error) => void;
-      vi.mocked(TestBed.inject(AlertController).create).mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            rejectOld = reject;
-          }),
-      );
-      const old = view.confirm('shutdown');
-      if (leaving === 'tab') view.leaveEnergy();
-      else if (leaving === 'view') view.ionViewWillLeave();
-      else TestBed.inject(ThemeIdentity).clear();
-      if (leaving !== 'tab') {
-        view.ionViewWillEnter();
-        http.expectOne(`${base}/health`).flush(health);
-        http.expectOne(`${base}/wake-capabilities`).flush(wake);
-      }
-      view.enterEnergy();
-      const current = view.confirm('reboot');
-      await ready();
-      rejectOld(new Error('late failure'));
-      await old;
+      if (leaving === 'destroy') return;
+      returnToEnergy(view);
+      view.confirm('reboot');
+      respond('confirm', old);
       expect(view.busy()).toBe(true);
-      dismiss({ role: 'cancel' });
-      await current;
-      expect(view.busy()).toBe(false);
-      http.expectNone((request) => request.method === 'POST');
+      http.expectNone(`${base}/shutdown`);
+      respond();
+      http.expectOne(`${base}/reboot`).flush({ scheduled: true });
     },
   );
-
-  it.each(['cancel', 'success', 'failure', 'start-failure'] as const)(
-    'restores focus after %s',
-    async (outcome) => {
-      const fixture = enter();
-      const view = fixture.componentInstance.state;
+  it('ignores a late opening failure without unlocking a newer confirmation', async () => {
+    const view = enter().componentInstance.state;
+    let reject!: (reason: Error) => void;
+    open.mockImplementationOnce(
+      () =>
+        new Promise((_, fail) => {
+          reject = fail;
+        }),
+    );
+    view.confirm('shutdown');
+    view.leaveEnergy();
+    view.enterEnergy();
+    view.confirm('reboot');
+    reject(new Error('late'));
+    await Promise.resolve();
+    expect(view.busy()).toBe(true);
+    respond('cancel');
+    expect(view.busy()).toBe(false);
+    http.expectNone((request) => request.method === 'POST');
+  });
+  it('consumes a confirmation once and keeps an in-flight write locked across tabs', () => {
+    const view = enter().componentInstance.state;
+    view.confirm('shutdown');
+    view.confirm('reboot');
+    expect(open).toHaveBeenCalledTimes(1);
+    const context = open.mock.calls[0][1].context;
+    respond();
+    respond('confirm', context);
+    const request = http.expectOne(`${base}/shutdown`);
+    view.leaveEnergy();
+    view.enterEnergy();
+    view.confirm('reboot');
+    expect(view.busy()).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
+    request.error(new ProgressEvent('error'));
+    expect(view.busy()).toBe(false);
+    http.expectNone(`${base}/shutdown`);
+  });
+  it.each(['cancel', 'success', 'failure', 'start-failure'])(
+    'restores workflow focus after %s',
+    (outcome) => {
+      const view = enter().componentInstance.state;
       const trigger = document.createElement('button');
       document.body.append(trigger);
-      const cancelButton = document.createElement('button');
-      const cancelFocus = vi.spyOn(cancelButton, 'focus');
-      dialog.querySelector.mockReturnValue(cancelButton);
-      try {
-        trigger.focus();
-        const focus = vi.spyOn(trigger, 'focus');
-        if (outcome === 'start-failure') {
-          vi.spyOn(TestBed.inject(SystemService), 'execute').mockImplementationOnce(() => {
-            throw new Error('execution failed');
-          });
-        }
-        const operation = view.confirm('shutdown');
-        await ready();
-        expect(cancelFocus).toHaveBeenCalled();
-        dismiss({ role: outcome === 'cancel' ? 'cancel' : 'confirm' });
-        await operation;
-        if (outcome !== 'cancel' && outcome !== 'start-failure') {
-          const request = http.expectOne(`${base}/shutdown`);
-          if (outcome === 'success') request.flush({ scheduled: true, when: '+1' });
-          else request.error(new ProgressEvent('error'));
-        }
-        TestBed.tick();
-        expect(view.busy()).toBe(false);
-        expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-      } finally {
-        trigger.remove();
-      }
-    },
-  );
-
-  it('does not restore focus after leaving and returning to Energy', async () => {
-    const fixture = enter();
-    const view = fixture.componentInstance.state;
-    const prepare = vi.spyOn(TestBed.inject(SystemConfirmationService), 'prepare');
-    const trigger = document.createElement('button');
-    document.body.append(trigger);
-    try {
       trigger.focus();
       const focus = vi.spyOn(trigger, 'focus');
-      const operation = view.confirm('shutdown');
-      await ready();
-      const confirmation = prepare.mock.results[0].value;
-      const restoreFocus = confirmation.restoreFocus.bind(confirmation);
-      vi.spyOn(confirmation, 'restoreFocus').mockImplementationOnce(() => {
-        restoreFocus();
-        // Invalidate after registration, before Angular can run the deferred focus.
-        view.leaveEnergy();
-        view.enterEnergy();
-      });
-      dismiss({ role: 'cancel' });
-      await operation;
+      if (outcome === 'start-failure')
+        vi.spyOn(TestBed.inject(SystemService), 'execute').mockImplementationOnce(() => {
+          throw new Error();
+        });
+      view.confirm('shutdown');
+      respond(outcome === 'cancel' ? 'cancel' : 'confirm');
+      if (outcome !== 'cancel' && outcome !== 'start-failure') {
+        const request = http.expectOne(`${base}/shutdown`);
+        if (outcome === 'success') request.flush({ scheduled: true });
+        else request.error(new ProgressEvent('error'));
+      }
       TestBed.tick();
-      expect(focus).not.toHaveBeenCalled();
-    } finally {
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
       trigger.remove();
-    }
-  });
-
-  it('cancels without sending an action and freezes confirmed parameters, blocking duplicates', async () => {
+    },
+  );
+  it('invalidates queued focus after leaving and returning to Energy', () => {
     const view = enter().componentInstance.state;
-    const cancel = view.confirm('shutdown');
-    await ready();
-    dismiss({ role: 'cancel' });
-    await cancel;
-    http.expectNone(`${base}/shutdown`);
-    expect(view.busy()).toBe(false);
-    const confirmed = view.confirm('shutdown');
-    await ready();
-    view.when = 'now';
-    await view.confirm('reboot');
-    dismiss({ role: 'confirm' });
-    await confirmed;
-    const request = http.expectOne(`${base}/shutdown`);
-    expect(request.request.body).toEqual({ when: '+1' });
-    await view.confirm('shutdown');
-    http.expectNone(`${base}/shutdown`);
-    request.flush({ scheduled: true, when: '+1' });
-    expect(view.busy()).toBe(false);
-    expect(TestBed.inject(AlertController).create).toHaveBeenCalledTimes(2);
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const focus = vi.spyOn(trigger, 'focus');
+    view.confirm('shutdown');
+    respond('cancel');
+    view.leaveEnergy();
+    view.enterEnergy();
+    TestBed.tick();
+    expect(focus).not.toHaveBeenCalled();
+    trigger.remove();
   });
-  it('invalidates confirmation on leave and session transitions, including async creation', async () => {
+  it('discards late HTTP responses on leave and reloads on reentry', () => {
     const view = enter().componentInstance.state;
-    const leaving = view.confirm('shutdown');
-    await ready();
+    view.confirm('reboot');
+    respond();
+    const request = http.expectOne(`${base}/reboot`);
     view.ionViewWillLeave();
-    dismiss({ role: 'confirm' });
-    await leaving;
-    http.expectNone(`${base}/shutdown`);
-    expect(dialog.dismiss).toHaveBeenCalled();
-    view.ionViewWillEnter();
-    view.enterEnergy();
-    http.expectNone(`${base}/info`);
-    http.expectOne(`${base}/health`).flush(health);
-    http.expectOne(`${base}/wake-capabilities`).flush(wake);
-    const session = view.confirm('reboot');
-    TestBed.inject(ThemeIdentity).clear();
-    await session;
-    expect(dialog.remove).toHaveBeenCalled();
-    http.expectNone(`${base}/reboot`);
+    request.flush({ scheduled: true });
     expect(view.health.data()).toBeNull();
-  });
-  it('invalidates pending confirmation on tab leave, even after returning to Energy', async () => {
-    const view = enter().componentInstance.state;
-    const pending = view.confirm('shutdown');
-    await ready();
-    view.leaveEnergy();
-    view.enterEnergy();
-    dismiss({ role: 'confirm' });
-    await pending;
-    http.expectNone(`${base}/shutdown`);
     expect(view.busy()).toBe(false);
-    expect(view.health.data()).toEqual(health);
-    expect(dialog.dismiss).toHaveBeenCalled();
-  });
-  it('invalidates asynchronous dialog creation on tab leave and keeps a sent request blocked across tabs', async () => {
-    const view = enter().componentInstance.state;
-    const pending = view.confirm('reboot');
-    view.leaveEnergy();
-    view.enterEnergy();
-    await pending;
-    expect(dialog.remove).toHaveBeenCalled();
-    http.expectNone(`${base}/reboot`);
-    const sent = view.confirm('reboot');
-    await ready();
-    dismiss({ role: 'confirm' });
-    await sent;
-    const action = http.expectOne(`${base}/reboot`);
-    view.leaveEnergy();
-    expect(view.busy()).toBe(true);
-    view.enterEnergy();
-    await view.confirm('shutdown');
-    http.expectNone(`${base}/shutdown`);
-    action.error(new ProgressEvent('error'));
-    expect(view.busy()).toBe(false);
-    expect(view.health.data()).toEqual(health);
-  });
-  it('discards late responses on leave, reloads on entry and unlocks after a failed execution', async () => {
-    const view = enter().componentInstance.state;
-    const operation = view.confirm('reboot');
-    await ready();
-    dismiss({ role: 'confirm' });
-    await operation;
-    const action = http.expectOne(`${base}/reboot`);
-    view.ionViewWillLeave();
-    action.flush({ scheduled: true, when: '+1' });
-    expect(view.busy()).toBe(false);
-    expect(view.health.data()).toBeNull();
-    view.ionViewWillEnter();
-    view.enterEnergy();
-    http.expectNone(`${base}/info`);
-    http.expectOne(`${base}/health`).flush(health);
-    http.expectOne(`${base}/wake-capabilities`).flush(wake);
-    const uncertain = view.confirm('reboot');
-    await ready();
-    dismiss({ role: 'confirm' });
-    await uncertain;
+    returnToEnergy(view);
+    view.confirm('reboot');
+    respond();
     http.expectOne(`${base}/reboot`).error(new ProgressEvent('error'));
+    expect(view.health.data()).toEqual(health);
     expect(view.busy()).toBe(false);
     http.expectNone(`${base}/reboot`);
   });

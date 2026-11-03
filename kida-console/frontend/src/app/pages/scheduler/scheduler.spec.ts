@@ -1,9 +1,10 @@
+import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
@@ -14,6 +15,7 @@ import { createBody, emptyForm, freezeSnapshot, localToUtc } from './scheduler-f
 import { localDate, schedulerFailure, ruleSummary } from './scheduler-presentation';
 import { schedulerActions } from './scheduler.actions';
 
+let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/scheduler`;
 const entry: ListedSchedule = {
   id: 'c6482104-f062-44d2-9fbe-53942c708567',
@@ -35,12 +37,14 @@ function setup() {
         useFactory: () => ({
           actions: inject(ArcaActionsService),
           panels: inject(ArcaPanelsService),
+          modals: inject(ArcaModalService),
         }),
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  dialogs = mockArcaDialogs();
   return TestBed.inject(HttpTestingController);
 }
 
@@ -49,7 +53,10 @@ describe('Scheduler API through ARCA', () => {
   beforeEach(() => {
     http = setup();
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    dialogs.dismiss();
+    http.verify();
+  });
   it('registers three independent channels without a global loader', () => {
     expect(schedulerActions.map((a) => a.actionName)).toEqual([
       'SCHEDULER_LIST_REQUEST',
@@ -197,25 +204,10 @@ describe('Scheduler page', () => {
   beforeEach(() => {
     http = setup();
     // jsdom has no modal top layer. Real focus/keyboard behavior is checked with Playwright.
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = true;
-        },
-      },
-      close: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = false;
-        },
-      },
-    });
   });
   afterEach(() => {
+    dialogs.dismiss();
     http.verify();
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
   function enter(data = [entry]) {
     const fixture = TestBed.createComponent(Scheduler);
@@ -234,6 +226,17 @@ describe('Scheduler page', () => {
     };
     return fixture;
   }
+  it('opens a common ARCA dialog with the frozen schedule summary', () => {
+    const fixture = enter();
+    fixture.componentInstance.prepareAdd();
+    expect(dialogs.config?.title).toBe('Confirmar programación');
+    expect(dialogs.config?.text).toEqual(
+      expect.arrayContaining([expect.stringContaining('system.info')]),
+    );
+    dialogs.choose();
+    http.expectOne(`${base}/add`).flush(entry);
+    http.expectOne(`${base}?origin=USER`).flush([entry]);
+  });
   it('renders empty states, safe HTML text, future fields and unknown origins without delete', () => {
     const fixture = enter([]);
     expect(fixture.nativeElement.textContent).toContain('No hay programaciones');
@@ -282,7 +285,7 @@ describe('Scheduler page', () => {
     view.form.command = '<b>command</b>';
     view.prepareAdd();
     fixture.detectChanges();
-    const dialog = fixture.nativeElement.querySelector('dialog');
+    const dialog = dialogs.element!;
     expect(dialog.textContent).toContain('<b>command</b>');
     expect(dialog.querySelector('b')).toBeNull();
     view.form.command = 'changed';
@@ -311,9 +314,7 @@ describe('Scheduler page', () => {
     view.prepareDelete(selected);
     selected.id = 'changed';
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('dialog').textContent).toContain(
-      'no cancela comandos ya encolados',
-    );
+    expect(dialogs.element!.textContent).toContain('no cancela comandos ya encolados');
     view.confirm();
     const request = http.expectOne(`${base}/delete`);
     expect(request.request.body).toEqual({ id: entry.id });
@@ -382,7 +383,7 @@ describe('Scheduler page', () => {
       const fixture = enter(),
         view = fixture.componentInstance;
       const form = structuredClone(view.form);
-      vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementationOnce(() => {
+      dialogs.open.mockImplementationOnce(() => {
         throw new DOMException('Disconnected dialog', 'InvalidStateError');
       });
       if (action === 'add') view.prepareAdd();

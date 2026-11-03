@@ -1,8 +1,9 @@
+import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
 import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
@@ -11,6 +12,7 @@ import { Backups } from './backups';
 import { BackupReports } from './reports';
 import { HealthReport } from './reports.models';
 
+let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/backup`;
 const listUrl = `${base}/health/reports`;
 const deleteUrl = `${listUrl}/delete`;
@@ -34,12 +36,14 @@ function setup() {
         useFactory: () => ({
           actions: inject(ArcaActionsService),
           panels: inject(ArcaPanelsService),
+          modals: inject(ArcaModalService),
         }),
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  dialogs = mockArcaDialogs();
   return TestBed.inject(HttpTestingController);
 }
 
@@ -48,7 +52,10 @@ describe('Health report contracts through ARCA', () => {
   beforeEach(() => {
     http = setup();
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    dialogs.dismiss();
+    http.verify();
+  });
 
   it('keeps list, detail and deletion on independent channels', () => {
     const service = TestBed.inject(BackupsService),
@@ -67,25 +74,10 @@ describe('Health report state, confirmation and page integration', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     http = setup();
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = true;
-        },
-      },
-      close: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = false;
-        },
-      },
-    });
   });
   afterEach(() => {
+    dialogs.dismiss();
     http.verify();
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
   function entry(rows = [id, 'second']) {
     const fixture = TestBed.createComponent(Backups);
@@ -117,6 +109,15 @@ describe('Health report state, confirmation and page integration', () => {
     await fixture.whenStable();
     return { page, reports: page.reports, fixture, component: fixture.componentInstance };
   }
+  it('uses the shared ARCA dialog for the exact report identifier', async () => {
+    const { component, reports } = await reportView();
+    component.prepare(id);
+    expect(dialogs.config?.title).toBe('Confirmar eliminación de informe');
+    expect(dialogs.element?.textContent).toContain(id);
+    dialogs.choose('cancel');
+    expect(reports.pending()).toBeNull();
+    http.expectNone(deleteUrl);
+  });
   it('loads on entry without polling and distinguishes initial failure, retry and empty', () => {
     const fixture = TestBed.createComponent(Backups),
       page = fixture.componentInstance;
@@ -191,25 +192,22 @@ describe('Health report state, confirmation and page integration', () => {
     http.expectNone(`${base}/health/create`);
     http.expectNone(`${base}/health`);
     http.expectNone(listUrl);
-    const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
-    expect(dialog.open).toBe(true);
-    const cancel = new Event('cancel', { cancelable: true });
-    dialog.dispatchEvent(cancel);
-    expect(cancel.defaultPrevented).toBe(true);
+    expect(dialogs.element).not.toBeNull();
+    dialogs.dismiss();
     expect(reports.pending()).toBeNull();
-    expect(dialog.open).toBe(false);
+    expect(dialogs.element).toBeNull();
     http.expectNone(deleteUrl);
     component.prepare(id);
     reports.selectedId.set('second');
     reports.detail.set({ run_id: 'second', markdown: 'changed' });
     fixture.detectChanges();
-    expect(dialog.querySelector('pre')?.textContent).toContain(id);
+    expect(dialogs.element!.textContent).toContain(id);
     component.confirm();
     component.confirm();
     reports.confirm();
     const request = http.expectOne(deleteUrl);
     expect(request.request.body).toEqual({ run_id: id });
-    expect(dialog.open).toBe(false);
+    expect(dialogs.element).toBeNull();
     request.flush(deleted);
     http.expectOne(`${base}/health`).flush([]);
     http.expectOne(listUrl).flush(['second']);
@@ -218,8 +216,8 @@ describe('Health report state, confirmation and page integration', () => {
     expect(reports.occupied()).toBe(false);
   });
   it('fails closed when the dialog cannot open', async () => {
-    const { reports, fixture, component } = await reportView();
-    vi.spyOn(fixture.nativeElement.querySelector('dialog'), 'showModal').mockImplementation(() => {
+    const { reports, component } = await reportView();
+    dialogs.open.mockImplementationOnce(() => {
       throw new Error();
     });
     component.prepare(id);
@@ -408,12 +406,12 @@ describe('Health report state, confirmation and page integration', () => {
   });
 
   it('rejects malformed Unicode before opening or dispatching', async () => {
-    const { reports, fixture, component } = await reportView();
+    const { reports, component } = await reportView();
     component.prepare('\ud800');
     component.confirm();
     expect(reports.error()).toContain('Unicode');
     expect(reports.pending()).toBeNull();
-    expect(fixture.nativeElement.querySelector('dialog').open).toBe(false);
+    expect(dialogs.element !== null).toBe(false);
     http.expectNone(deleteUrl);
   });
   it.each(['leave', 'session'] as const)(
@@ -422,11 +420,11 @@ describe('Health report state, confirmation and page integration', () => {
       const { page, reports, fixture, component } = await reportView();
       component.prepare(id);
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('dialog').open).toBe(true);
+      expect(dialogs.element !== null).toBe(true);
       if (reason === 'leave') page.ionViewWillLeave();
       else TestBed.inject(ThemeIdentity).clear();
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('dialog').open).toBe(false);
+      expect(dialogs.element !== null).toBe(false);
       expect(reports.pending()).toBeNull();
       expect(reports.detail()).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain(report.markdown);
@@ -435,7 +433,7 @@ describe('Health report state, confirmation and page integration', () => {
     },
   );
   it.each([200, 502, 504])(
-    'traps keyboard and restores operation focus after %s',
+    'focuses Cancel and restores operation focus after %s',
     async (status) => {
       const { reports, fixture, component } = await reportView();
       const trigger = [...fixture.nativeElement.querySelectorAll('button')].find(
@@ -444,21 +442,10 @@ describe('Health report state, confirmation and page integration', () => {
       trigger.focus();
       component.prepare(id);
       fixture.detectChanges();
-      const buttons = fixture.nativeElement.querySelectorAll('dialog button');
-      expect(document.activeElement).toBe(buttons[0]);
-      buttons[0].dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: 'Tab',
-          shiftKey: true,
-          bubbles: true,
-          cancelable: true,
-        }),
+      TestBed.tick();
+      expect(document.activeElement).toBe(
+        dialogs.element!.querySelector('[data-dialog-option="cancel"]'),
       );
-      expect(document.activeElement).toBe(buttons[1]);
-      buttons[1].dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
-      );
-      expect(document.activeElement).toBe(buttons[0]);
       component.cancel();
       TestBed.tick();
       await fixture.whenStable();
@@ -495,7 +482,7 @@ describe('Health report state, confirmation and page integration', () => {
     ).componentInstance as BackupReports;
     component.prepare(id);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('app-backup-reports dialog').open).toBe(true);
+    expect(dialogs.element !== null).toBe(true);
     fixture.changeDetectorRef.detach();
     TestBed.inject(ThemeIdentity).clear();
     await fixture.whenStable();

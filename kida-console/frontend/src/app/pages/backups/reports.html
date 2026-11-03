@@ -100,21 +100,3 @@
     }
   </section>
 }
-<dialog
-  class="console-dialog"
-  #confirmation
-  aria-labelledby="backup-report-confirm-title"
-  (cancel)="$event.preventDefault(); cancel()"
-  (keydown)="trapFocus($event)"
->
-  <h2 id="backup-report-confirm-title">Confirmar eliminación de informe</h2>
-  @if (state().pending(); as operation) {
-    <p>Acción: Eliminar informe</p>
-    <pre>run_id: {{ operation.run_id }}</pre>
-    <p>Esta operación solicita a CORE eliminar el informe de Health.</p>
-  }
-  <div class="row-actions">
-    <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
-    <button class="danger" type="button" (click)="confirm()">Confirmar</button>
-  </div>
-</dialog>

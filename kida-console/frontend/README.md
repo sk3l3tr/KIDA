@@ -111,8 +111,8 @@ finite readings and positive reported critical thresholds; `max` is never capaci
 Zero RPM does not imply a fault. Leaving Energy invalidates pending confirmations;
 a request already sent remains blocked until its response, and can keep executing.
 
-Run `node src/app/pages/system/system.browser.cjs` against the development server
-on port 4230 for the intercepted API matrix (seven theme modes, 360/768/1440 px).
+The previous System browser script was removed because its selectors target the
+confirmation implementation replaced by the shared ARCA dialog.
 See [System verification](src/app/pages/system/system.verification.md) for scope and
 connected-read evidence.
 
@@ -201,18 +201,9 @@ heading. Leaving or changing session invalidates scheduled focus restoration.
 
 Validation: `pnpm exec ng test --watch=false` and
 `pnpm exec ng build --configuration production`. Browser verification must use
-isolated mocked responses, never schedules against the regular CORE. The repeatable
-Playwright script is `src/app/pages/scheduler/scheduler.browser.cjs`. With a dev server
-on `http://127.0.0.1:4226`, run:
-
-```bash
-PLAYWRIGHT_MODULE=/path/to/existing/playwright CHROMIUM_PATH=/path/to/chromium \
-  node src/app/pages/scheduler/scheduler.browser.cjs
-```
-
-Both paths refer to existing installations; this adds no frontend dependencies.
-`SCHEDULER_TEST_URL` overrides the dev URL, and `SCHEDULER_TEST_OUTPUT` overrides
-`/tmp/kida-scheduler-evidence`. The script mocks every API request before navigation.
+isolated mocked responses, never schedules against the regular CORE. The previous
+Scheduler browser script was removed because its selectors target the confirmation
+implementation replaced by the shared ARCA dialog.
 See [recorded validation](src/app/pages/scheduler/scheduler.verification.md).
 
 ## Facade conventions

@@ -1,9 +1,10 @@
+import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
 import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
@@ -12,6 +13,7 @@ import { BackupHealth } from './health';
 import { healthBody, healthFailure } from './health-state';
 import { HealthAction, HealthExecution, HealthHistoryRecord } from './health.models';
 
+let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/backup`;
 const run: HealthExecution = {
   run_id: 'run /?&+#ñ',
@@ -88,12 +90,14 @@ function setup() {
         useFactory: () => ({
           actions: inject(ArcaActionsService),
           panels: inject(ArcaPanelsService),
+          modals: inject(ArcaModalService),
         }),
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  dialogs = mockArcaDialogs();
   return TestBed.inject(HttpTestingController);
 }
 
@@ -102,7 +106,10 @@ describe('Health basic contracts through ARCA', () => {
   beforeEach(() => {
     http = setup();
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    dialogs.dismiss();
+    http.verify();
+  });
 
   it('validates mode and Unicode without interpreting host paths', () => {
     expect(healthBody('', 'MANUAL')).toEqual({ definition_path: '', mode: 'MANUAL' });
@@ -119,25 +126,10 @@ describe('Health basic state and page integration', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     http = setup();
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = true;
-        },
-      },
-      close: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = false;
-        },
-      },
-    });
   });
   afterEach(() => {
+    dialogs.dismiss();
     http.verify();
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
   function enter(rows = [record]) {
     const fixture = TestBed.createComponent(Backups);
@@ -345,6 +337,16 @@ describe('Health basic state and page integration', () => {
     await fixture.whenStable();
     return { page, health: page.health, fixture, component: fixture.componentInstance };
   }
+  it('uses the shared dialog for Health with its exact target and warning', async () => {
+    const { component, health } = await healthView();
+    component.prepare('stop');
+    expect(dialogs.config?.title).toBe('Confirmar operación de Health');
+    expect(dialogs.element?.textContent).toContain(run.run_id);
+    expect(dialogs.element?.textContent).toContain('CORE decide la limpieza');
+    dialogs.choose('cancel');
+    expect(health.pending()).toBeNull();
+    http.expectNone(`${base}/health/stop`);
+  });
   it.each(operations)(
     'freezes %s, locks both panels, cancels, confirms once and refreshes',
     async (action) => {
@@ -369,13 +371,10 @@ describe('Health basic state and page integration', () => {
       http.expectNone(`${base}/config`);
       http.expectNone(`${base}/health/create`);
       http.expectNone(`${base}/health`);
-      const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
-      expect(dialog.open).toBe(true);
-      const event = new Event('cancel', { cancelable: true });
-      dialog.dispatchEvent(event);
+      expect(dialogs.element).not.toBeNull();
+      dialogs.dismiss();
       fixture.detectChanges();
-      expect(event.defaultPrevented).toBe(true);
-      expect(dialog.open).toBe(false);
+      expect(dialogs.element).toBeNull();
       expect(health.pending()).toBeNull();
       expect(health.automaticPath).toBe(' ./exact/../automatic.toml ');
       http.expectNone(`${base}/health/${action}`);
@@ -388,7 +387,7 @@ describe('Health basic state and page integration', () => {
         definition: { ...run.definition, name: 'changed' },
       });
       fixture.detectChanges();
-      expect(dialog.textContent).toContain(pending!.target);
+      expect(dialogs.element!.textContent).toContain(pending!.target);
       component.confirm();
       component.confirm();
       health.confirm();
@@ -398,7 +397,7 @@ describe('Health basic state and page integration', () => {
           ? { definition_path: ' ./exact/../automatic.toml ' }
           : { run_id: run.run_id },
       );
-      expect(dialog.open).toBe(false);
+      expect(dialogs.element).toBeNull();
       request.flush(operationResponse(action));
       expect(health.result()).toEqual(operationResponse(action));
       if (action === 'run') expect(health.automaticPath).toBe('');
@@ -418,8 +417,8 @@ describe('Health basic state and page integration', () => {
     },
   );
   it.each(operations)('fails closed when the %s dialog cannot open', async (action) => {
-    const { health, fixture, component } = await healthView();
-    vi.spyOn(fixture.nativeElement.querySelector('dialog'), 'showModal').mockImplementation(() => {
+    const { health, component } = await healthView();
+    dialogs.open.mockImplementationOnce(() => {
       throw new Error();
     });
     health.automaticPath = '/keep';
@@ -551,12 +550,12 @@ describe('Health basic state and page integration', () => {
       health.automaticPath = '/private';
       component.prepare('run');
       fixture.detectChanges();
-      const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
-      expect(dialog.open).toBe(true);
+      const dialog = dialogs.element!;
+      expect(dialogs.element).not.toBeNull();
       if (reason === 'leave') page.ionViewWillLeave();
       else TestBed.inject(ThemeIdentity).clear();
       fixture.detectChanges();
-      expect(dialog.open).toBe(false);
+      expect(dialogs.element).toBeNull();
       expect(dialog.textContent).not.toContain('/private');
       expect(health.pending()).toBeNull();
       expect(health.automaticPath).toBe('');
@@ -565,16 +564,16 @@ describe('Health basic state and page integration', () => {
     },
   );
   it('rejects invalid automatic Unicode without opening or dispatching', async () => {
-    const { health, fixture, component } = await healthView();
+    const { health, component } = await healthView();
     health.automaticPath = '\ud800';
     component.prepare('run');
     component.confirm();
     expect(health.error()).toContain('Unicode');
-    expect(fixture.nativeElement.querySelector('dialog').open).toBe(false);
+    expect(dialogs.element !== null).toBe(false);
     http.expectNone(`${base}/health/run`);
   });
   it.each([200, 502, 504])(
-    'traps dialog keyboard and restores operation focus after %s',
+    'focuses Cancel and restores operation focus after %s',
     async (status) => {
       const { health, fixture, component } = await healthView();
       const trigger = [...fixture.nativeElement.querySelectorAll('button')].find(
@@ -583,21 +582,10 @@ describe('Health basic state and page integration', () => {
       trigger.focus();
       component.prepare('start');
       fixture.detectChanges();
-      const buttons = fixture.nativeElement.querySelectorAll('dialog button');
-      expect(document.activeElement).toBe(buttons[0]);
-      buttons[0].dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: 'Tab',
-          shiftKey: true,
-          bubbles: true,
-          cancelable: true,
-        }),
+      TestBed.tick();
+      expect(document.activeElement).toBe(
+        dialogs.element!.querySelector('[data-dialog-option="cancel"]'),
       );
-      expect(document.activeElement).toBe(buttons[1]);
-      buttons[1].dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
-      );
-      expect(document.activeElement).toBe(buttons[0]);
       component.cancel();
       TestBed.tick();
       await fixture.whenStable();
@@ -705,7 +693,7 @@ describe('Health basic state and page integration', () => {
     ).componentInstance as BackupHealth;
     healthComponent.prepare('run');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('app-backup-health dialog').open).toBe(true);
+    expect(dialogs.element !== null).toBe(true);
     fixture.changeDetectorRef.detach();
     TestBed.inject(ThemeIdentity).clear();
     await fixture.whenStable();

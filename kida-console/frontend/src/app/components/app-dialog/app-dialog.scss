@@ -1,0 +1,34 @@
+:host {
+  display: block;
+  padding: var(--kida-space);
+  font-family: var(--kida-font);
+  color: var(--ion-text-color);
+  background: var(--ion-item-background);
+  overflow: auto;
+}
+:host(.ion-page) {
+  position: relative;
+  contain: content;
+}
+h2 {
+  font-family: var(--kida-heading-font);
+}
+p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+[data-dialog-type='danger'] h2 {
+  color: var(--ion-color-danger);
+}
+[data-dialog-type='warning'] h2 {
+  color: var(--ion-color-warning);
+}
+[data-dialog-type='info'] h2 {
+  color: var(--ion-color-primary);
+}

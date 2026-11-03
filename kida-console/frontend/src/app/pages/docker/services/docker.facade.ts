@@ -1,12 +1,30 @@
-import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
-import { Observable, Subscription, catchError, finalize, forkJoin, map, of, tap } from 'rxjs';
+import { Injectable, Injector, OnDestroy, computed, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ArcaService } from 'arca';
+import {
+  Observable,
+  Subscription,
+  catchError,
+  finalize,
+  forkJoin,
+  filter,
+  map,
+  of,
+  tap,
+  take,
+} from 'rxjs';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { classifyCoreFailure } from '../../../services/core-failure';
 import { DockerService } from './docker.service';
+import { AppDialog } from '../../../components/app-dialog/app-dialog';
 import {
-  DockerConfirmationSession,
-  DockerConfirmationService,
-} from './docker-confirmation.service';
+  APP_DIALOG_CANCEL,
+  APP_DIALOG_OPEN,
+  AppDialogConfig,
+  AppDialogResult,
+  newDialogContext,
+} from '../../../components/app-dialog/app-dialog.models';
+import { restoreDialogFocus } from '../../../services/dialog-focus';
 import {
   ComposeProject,
   ContainerAction,
@@ -43,7 +61,9 @@ export type DockerReading<T> = ReturnType<typeof reading<T>>;
 export class DockerFacade implements OnDestroy {
   private readonly service = inject(DockerService);
   private readonly identity = inject(ThemeIdentity);
-  private readonly confirmations = inject(DockerConfirmationService);
+  private readonly arca = inject(ArcaService);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
 
   readonly inventory = reading<DockerContainers>();
   readonly projectPanelOpen = signal<string | null>(null);
@@ -121,7 +141,10 @@ export class DockerFacade implements OnDestroy {
       this.uncertain() ||
       this.inventory.data() === null,
   );
-  private confirmation?: DockerConfirmationSession;
+  private dialogContext?: string;
+  private dialogSubscription?: Subscription;
+  private focusRevision = 0;
+  private restoreFocus: () => void = () => {};
   private active = false;
   private generation = 0;
   private selectionRevision = 0;
@@ -318,47 +341,92 @@ export class DockerFacade implements OnDestroy {
       (action === 'stop' && !container.online)
     );
   }
-  async prepare(action: ContainerAction, container: DockerContainer): Promise<void> {
+  prepare(action: ContainerAction, container: DockerContainer): void {
     const current = this.inventory.data()?.containers.find((c) => c.id === container.id);
-    if (!this.active || !current || this.actionLocked(action, current.id)) return;
-    const snapshot = Object.freeze({ action, id: current.id, name: current.name });
-    const valid = this.focusContext();
-    let confirmation: DockerConfirmationSession;
-    try {
-      confirmation = this.confirmations.prepare(
-        snapshot,
-        valid,
-        this.inspectedContainer() !== null,
-      );
-      this.confirmation = confirmation;
-    } catch {
-      this.error.set('No se pudo abrir la confirmación.');
+    if (
+      !this.active ||
+      !current ||
+      this.actionLocked(action, current.id) ||
+      this.arca.modals.modalOpen
+    )
       return;
-    }
+    const snapshot = Object.freeze({ action, id: current.id, name: current.name });
+    ++this.focusRevision;
+    const valid = this.focusContext();
+    const trigger = this.document.activeElement;
+    this.restoreFocus = () =>
+      restoreDialogFocus(
+        this.injector,
+        trigger,
+        () =>
+          Array.from(this.document.querySelectorAll<HTMLElement>('[data-docker-heading]')).find(
+            (heading) => !heading.closest('.ion-page-hidden'),
+          ),
+        valid,
+      );
     if (action === 'start') {
       this.execute(snapshot);
       return;
     }
-    this.error.set('');
+    const context = newDialogContext();
+    const config: AppDialogConfig = {
+      context,
+      title: 'Confirmar acción Docker',
+      type: action === 'delete' ? 'danger' : 'confirmation',
+      text: [
+        `Acción: ${this.labels[action]}`,
+        `Nombre: ${snapshot.name}`,
+        `ID: ${snapshot.id}`,
+        action === 'delete'
+          ? 'Eliminar es irreversible. CORE decidirá si puede eliminar el contenedor.'
+          : action === 'restart'
+            ? 'Reiniciar puede interrumpir temporalmente los servicios del contenedor.'
+            : 'Esta operación puede interrumpir los servicios del contenedor.',
+      ],
+      buttons: [
+        { id: 'cancel', text: 'Cancelar', style: 'secondary' },
+        { id: 'confirm', text: 'Confirmar', style: action === 'delete' ? 'danger' : undefined },
+      ],
+    };
+    this.dialogContext = context;
     this.pending.set(snapshot);
-    try {
-      const accepted = await confirmation.present();
-      if (this.confirmation !== confirmation || !valid()) return;
-      this.pending.set(null);
-      // Hand over the pending lock to execute() without yielding between them.
-      if (accepted) this.execute(snapshot);
-      else confirmation.restoreFocus();
-    } catch {
-      if (this.confirmation !== confirmation || !valid()) return;
+    this.error.set('');
+    const failed = () => {
+      if (!valid() || this.dialogContext !== context) return;
+      this.dialogSubscription?.unsubscribe();
+      this.dialogContext = undefined;
       this.pending.set(null);
       this.error.set('No se pudo abrir la confirmación.');
-      confirmation.restoreFocus();
+      this.restoreFocus();
+    };
+    try {
+      this.arca.actions.cleanActions(['DOCKER_DIALOG_CLOSE', APP_DIALOG_OPEN]);
+      this.dialogSubscription = this.arca.actions
+        .listenAction('DOCKER_DIALOG_CLOSE')
+        .pipe(
+          filter((result: AppDialogResult) => result?.data?.context === context),
+          take(1),
+        )
+        .subscribe((result: AppDialogResult) => {
+          if (!valid() || this.dialogContext !== context) return;
+          this.dialogContext = undefined;
+          this.pending.set(null);
+          if (result.option === 'confirm') this.execute(snapshot);
+          else this.restoreFocus();
+        });
+      void this.arca.modals
+        .openModal(AppDialog, config, APP_DIALOG_OPEN, 'DOCKER_DIALOG_CLOSE')
+        .catch(failed);
+    } catch {
+      failed();
     }
   }
   invalidateConfirmation(): void {
     this.pending.set(null);
-    this.confirmation?.cancel();
-    this.confirmation = undefined;
+    ++this.focusRevision;
+    this.dialogSubscription?.unsubscribe();
+    if (this.dialogContext) this.arca.actions.dispatchAction(APP_DIALOG_CANCEL, this.dialogContext);
+    this.dialogContext = undefined;
   }
   private execute(snapshot: PendingContainer): void {
     const inspector = this.inspectedContainer();
@@ -422,16 +490,18 @@ export class DockerFacade implements OnDestroy {
   }
   private finishWrite(): void {
     this.busy.set(false);
-    this.confirmation?.restoreFocus();
+    this.restoreFocus();
   }
   private focusContext(): () => boolean {
     const generation = this.generation;
     const revision = this.identity.snapshot();
+    const focusRevision = this.focusRevision;
     const selectionRevision = this.selectionRevision;
     const container = this.inspectedContainer();
     const project = this.projectPanelOpen();
     return () =>
       this.valid(generation, revision) &&
+      focusRevision === this.focusRevision &&
       selectionRevision === this.selectionRevision &&
       container === this.inspectedContainer() &&
       project === this.projectPanelOpen();

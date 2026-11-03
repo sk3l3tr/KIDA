@@ -191,31 +191,4 @@
       </div>
     </section>
   </div>
-  <dialog
-    class="console-dialog"
-    #confirmation
-    aria-labelledby="scheduler-confirm-title"
-    (cancel)="$event.preventDefault(); cancel()"
-    (keydown)="trapFocus($event)"
-  >
-    <h2 id="scheduler-confirm-title">Confirmar programación</h2>
-    @if (pending(); as action) {
-      @if (action.action === 'add') {
-        <p>Crear: {{ action.body.command }}</p>
-        <pre>{{ action.body.params | json }}</pre>
-        <p>{{ ruleSummary(action.body.schedule) }}</p>
-      } @else {
-        <p>Eliminar: {{ action.entry.command }}</p>
-        <p>Identificador: {{ action.body.id }}</p>
-        <pre>{{ action.entry.params | json }}</pre>
-        <p>{{ ruleSummary(action.entry.schedule) }}</p>
-        <p>Eliminar la programación no cancela comandos ya encolados.</p>
-      }
-      <p>Zona local del navegador: {{ zone }}.</p>
-    }
-    <div class="dialog-buttons">
-      <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
-      <button type="button" (click)="confirm()">Confirmar</button>
-    </div>
-  </dialog>
 </ion-content>

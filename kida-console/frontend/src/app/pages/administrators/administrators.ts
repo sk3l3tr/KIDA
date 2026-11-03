@@ -1,6 +1,15 @@
 import { Component, OnDestroy, effect, inject, signal, untracked } from '@angular/core';
+import { ArcaService } from 'arca';
+import { AppDialog } from '../../components/app-dialog/app-dialog';
+import {
+  APP_DIALOG_CANCEL,
+  APP_DIALOG_OPEN,
+  AppDialogConfig,
+  AppDialogResult,
+  newDialogContext,
+} from '../../components/app-dialog/app-dialog.models';
 import { FormsModule } from '@angular/forms';
-import { Observable, Subscription, finalize } from 'rxjs';
+import { Observable, Subscription, filter, finalize, take } from 'rxjs';
 import { Account, AuthService } from '../../auth/auth.service';
 import { errorMessage } from '../../utils/messages';
 import { IonContent } from '@ionic/angular/standalone';
@@ -14,6 +23,9 @@ import { Masonry, MasonryItem } from '../../components/masonry/masonry';
 })
 export class Administrators implements OnDestroy {
   readonly auth = inject(AuthService);
+  private readonly arca = inject(ArcaService);
+  private dialogContext?: string;
+  private dialogSubscription?: Subscription;
   readonly accounts = signal<Account[]>([]);
   readonly pendingDelete = signal<Account | null>(null);
   readonly busy = signal(false);
@@ -62,6 +74,9 @@ export class Administrators implements OnDestroy {
   }
 
   private reset(): void {
+    this.dialogSubscription?.unsubscribe();
+    if (this.dialogContext) this.arca.actions.dispatchAction(APP_DIALOG_CANCEL, this.dialogContext);
+    this.dialogContext = undefined;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
     this.ownUsername = this.auth.user()?.username ?? '';
@@ -138,6 +153,68 @@ export class Administrators implements OnDestroy {
         this.adminPassword = '';
       },
     );
+  }
+  prepareDelete(account: Account): void {
+    if (
+      !this.active ||
+      this.busy() ||
+      this.pendingDelete() ||
+      this.accounts().length <= 1 ||
+      this.arca.modals.modalOpen
+    )
+      return;
+    const current = this.accounts().find((entry) => entry.id === account.id);
+    if (!current) return;
+    const target = Object.freeze({ ...current });
+    const context = newDialogContext();
+    this.dialogContext = context;
+    this.pendingDelete.set(target);
+    const config: AppDialogConfig = {
+      context,
+      title: 'Confirmar eliminación de cuenta',
+      type: 'danger',
+      text: [
+        `¿Eliminar la cuenta ${target.username}? Se cerrarán todas sus sesiones.`,
+        ...(target.id === this.auth.user()?.id ? ['Tu sesión también se cerrará.'] : []),
+      ],
+      buttons: [
+        { id: 'cancel', text: 'Cancelar', style: 'secondary' },
+        { id: 'confirm', text: 'Confirmar eliminación', icon: 'trash', style: 'danger' },
+      ],
+    };
+    const failed = () => {
+      if (this.dialogContext !== context) return;
+      this.dialogSubscription?.unsubscribe();
+      this.pendingDelete.set(null);
+      this.dialogContext = undefined;
+      this.error.set('No se pudo abrir la confirmación.');
+    };
+    try {
+      this.arca.actions.cleanActions(['ACCOUNT_DIALOG_CLOSE', APP_DIALOG_OPEN]);
+      this.dialogSubscription = this.arca.actions
+        .listenAction('ACCOUNT_DIALOG_CLOSE')
+        .pipe(
+          filter((result: AppDialogResult) => result?.data?.context === context),
+          take(1),
+        )
+        .subscribe((result: AppDialogResult) => {
+          if (!this.active || this.dialogContext !== context || this.pendingDelete() !== target)
+            return;
+          this.dialogContext = undefined;
+          this.pendingDelete.set(null);
+          if (
+            result.option === 'confirm' &&
+            this.accounts().length > 1 &&
+            this.accounts().some((entry) => entry.id === target.id)
+          )
+            this.remove(target);
+        });
+      void this.arca.modals
+        .openModal(AppDialog, config, APP_DIALOG_OPEN, 'ACCOUNT_DIALOG_CLOSE')
+        .catch(failed);
+    } catch {
+      failed();
+    }
   }
   remove(account: Account): void {
     this.run(this.auth.delete(account.id), () => {

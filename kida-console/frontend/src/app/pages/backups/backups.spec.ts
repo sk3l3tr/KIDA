@@ -1,9 +1,10 @@
+import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ArcaActionsService, ArcaPanelsService, ArcaService } from 'arca';
+import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../app.config';
 import { environment } from '../../../environments/environment';
 import { ThemeIdentity } from '../../../theme/integration';
@@ -13,6 +14,7 @@ import { BackupJob } from './backups.models';
 import { createBody, emptyForm, newCommand, newTarget, parseJson } from './backups-form';
 import { backupActions } from './backups.actions';
 
+let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/backup`;
 const job: BackupJob = {
   id: 'id /?&+#ñ',
@@ -36,12 +38,14 @@ function setup() {
         useFactory: () => ({
           actions: inject(ArcaActionsService),
           panels: inject(ArcaPanelsService),
+          modals: inject(ArcaModalService),
         }),
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  dialogs = mockArcaDialogs();
   return TestBed.inject(HttpTestingController);
 }
 function validForm() {
@@ -173,7 +177,10 @@ describe('Backups through real ARCA transport', () => {
   beforeEach(() => {
     http = setup();
   });
-  afterEach(() => http.verify());
+  afterEach(() => {
+    dialogs.dismiss();
+    http.verify();
+  });
   it('registers fourteen independent channels and preserves open read responses', () => {
     expect(backupActions.map((a) => a.actionName)).toEqual([
       'BACKUP_CONFIG_LIST_REQUEST',
@@ -207,25 +214,10 @@ describe('Backups page', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     http = setup();
-    Object.defineProperties(HTMLDialogElement.prototype, {
-      showModal: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = true;
-        },
-      },
-      close: {
-        configurable: true,
-        value: function (this: HTMLDialogElement) {
-          this.open = false;
-        },
-      },
-    });
   });
   afterEach(() => {
+    dialogs.dismiss();
     http.verify();
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
   });
   function enterPage(view: Backups) {
     view.ionViewWillEnter();
@@ -242,6 +234,14 @@ describe('Backups page', () => {
     view.form = validForm();
     return fixture;
   }
+  it('confirms a backup operation through the shared ARCA action protocol', () => {
+    const view = enter().componentInstance;
+    view.prepare('run', job);
+    expect(dialogs.config?.title).toBe('Confirmar operación de backup');
+    dialogs.choose();
+    http.expectOne(`${base}/run`).flush({ state: 'QUEUED', execution_id: 'test' });
+    http.expectOne(`${base}/config`).flush({ backups: [job] });
+  });
   it('keeps last data on refresh failure, updates selected details and clears vanished selection', () => {
     const fixture = enter(),
       view = fixture.componentInstance;
@@ -368,7 +368,7 @@ describe('Backups page', () => {
   });
   it('fails closed if the confirmation cannot open', () => {
     const view = enter().componentInstance;
-    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementationOnce(() => {
+    dialogs.open.mockImplementationOnce(() => {
       throw new Error();
     });
     view.prepare('delete', job);
@@ -401,7 +401,7 @@ describe('Backups page', () => {
     http.expectNone(`${base}/config`);
   });
 
-  it('focuses Cancel before rendering the pending snapshot and restores the trigger on cancel', async () => {
+  it('focuses Cancel after rendering the shared dialog and restores the trigger on cancel', async () => {
     const fixture = enter(),
       view = fixture.componentInstance;
     fixture.autoDetectChanges();
@@ -409,6 +409,7 @@ describe('Backups page', () => {
     const trigger = fixture.nativeElement.querySelector('.backup-list button') as HTMLButtonElement;
     trigger.focus();
     view.prepare('run', job);
+    TestBed.tick();
     expect(document.activeElement?.textContent?.trim()).toBe('Cancelar');
     view.cancel();
     TestBed.tick();

@@ -1,8 +1,7 @@
 .scheduler-layout {
   padding-bottom: 3rem;
 }
-.section-header,
-.dialog-buttons {
+.section-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -44,9 +43,4 @@ form {
 }
 fieldset {
   margin-top: 0;
-}
-dialog {
-  width: min(36rem, 92vw);
-  max-height: 85dvh;
-  overflow: auto;
 }

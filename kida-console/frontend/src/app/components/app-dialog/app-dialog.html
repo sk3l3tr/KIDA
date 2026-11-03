@@ -1,0 +1,24 @@
+@if (config(); as dialog) {
+  <section [attr.data-dialog-type]="dialog.type" aria-labelledby="app-dialog-title">
+    <h2 id="app-dialog-title">{{ dialog.title }}</h2>
+    @for (paragraph of paragraphs(); track $index) {
+      <p>{{ paragraph }}</p>
+    }
+    <div class="dialog-buttons">
+      @for (button of dialog.buttons; track button.id) {
+        <button
+          type="button"
+          [attr.data-dialog-option]="button.id"
+          [class]="button.style ?? ''"
+          [disabled]="closing()"
+          (click)="choose(button.id)"
+        >
+          @if (button.icon) {
+            <span [class]="'i i-' + button.icon" aria-hidden="true"></span>
+          }
+          {{ button.text }}
+        </button>
+      }
+    </div>
+  </section>
+}

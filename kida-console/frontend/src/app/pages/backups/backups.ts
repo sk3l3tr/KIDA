@@ -12,10 +12,19 @@ import {
 import { DOCUMENT, DatePipe, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonContent } from '@ionic/angular/standalone';
-import { Observable, Subscription, finalize } from 'rxjs';
+import { Observable, Subscription, filter, finalize, take } from 'rxjs';
 import { ThemeIdentity } from '../../../theme/integration';
 import { classifyCoreFailure, formatCoreFailure } from '../../services/core-failure';
-import { restoreDialogFocus, trapDialogFocus } from '../../services/dialog-focus';
+import { restoreDialogFocus } from '../../services/dialog-focus';
+import { ArcaService } from 'arca';
+import { AppDialog } from '../../components/app-dialog/app-dialog';
+import {
+  APP_DIALOG_CANCEL,
+  APP_DIALOG_OPEN,
+  AppDialogConfig,
+  AppDialogResult,
+  newDialogContext,
+} from '../../components/app-dialog/app-dialog.models';
 import { BackupsService } from './backups.service';
 import { BackupJob, PendingBackup, Queued } from './backups.models';
 import { createBody, emptyForm, newCommand, newTarget } from './backups-form';
@@ -57,7 +66,9 @@ export class Backups implements OnDestroy {
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly changeDetector = inject(ChangeDetectorRef);
-  private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmation');
+  private readonly arca = inject(ArcaService);
+  private dialogContext?: string;
+  private dialogSubscription?: Subscription;
   private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
   readonly health = inject(BackupHealthState);
   readonly reports = inject(BackupReportsState);
@@ -185,25 +196,59 @@ export class Backups implements OnDestroy {
     }
   }
   prepare(action: PendingBackup['action'], job: BackupJob): void {
-    if (!this.available()) return;
+    if (!this.available() || this.arca.modals.modalOpen) return;
     this.trigger = this.document.activeElement;
-    try {
-      const dialog = this.dialog()?.nativeElement;
-      if (!dialog) throw new Error();
-      this.pending.set(Object.freeze({ action, id: job.id, name: job.name }));
-      this.busy.set(true);
-      this.error.set('');
-      dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>('[autofocus]')?.focus();
-    } catch {
+    const snapshot = Object.freeze({ action, id: job.id, name: job.name });
+    this.pending.set(snapshot);
+    this.busy.set(true);
+    this.error.set('');
+    const context = newDialogContext();
+    this.dialogContext = context;
+    const config: AppDialogConfig = {
+      context,
+      title: 'Confirmar operación de backup',
+      type: action === 'delete' ? 'danger' : 'confirmation',
+      text: [
+        `Acción: ${action === 'delete' ? 'Eliminar configuración' : 'Solicitar backup'}`,
+        `Nombre: ${snapshot.name}`,
+        `ID: ${snapshot.id}`,
+        action === 'delete'
+          ? 'Eliminar la configuración no elimina sus archivos de backup.'
+          : 'La admisión en cola no confirma el inicio ni la finalización del backup.',
+      ],
+      buttons: [
+        { id: 'cancel', text: 'Cancelar', style: 'secondary' },
+        { id: 'confirm', text: 'Confirmar', style: action === 'delete' ? 'danger' : undefined },
+      ],
+    };
+    const failed = () => {
+      if (this.dialogContext !== context) return;
       this.closeConfirmation();
       this.busy.set(false);
       this.error.set('No se pudo abrir la confirmación.');
       this.restoreFocus();
+    };
+    try {
+      this.arca.actions.cleanActions(['BACKUP_DIALOG_CLOSE', APP_DIALOG_OPEN]);
+      this.dialogSubscription = this.arca.actions
+        .listenAction('BACKUP_DIALOG_CLOSE')
+        .pipe(
+          filter((result: AppDialogResult) => result?.data?.context === context),
+          take(1),
+        )
+        .subscribe((result: AppDialogResult) => {
+          if (!this.active() || this.dialogContext !== context || this.pending() !== snapshot)
+            return;
+          this.dialogContext = undefined;
+          if (result.option === 'confirm') this.confirm();
+          else this.cancel();
+        });
+      void this.arca.modals
+        .openModal(AppDialog, config, APP_DIALOG_OPEN, 'BACKUP_DIALOG_CLOSE')
+        .catch(failed);
+    } catch {
+      failed();
     }
-  }
-  trapFocus(event: KeyboardEvent): void {
-    trapDialogFocus(event, this.dialog()?.nativeElement, this.document);
   }
   cancel(): void {
     if (!this.pending()) return;
@@ -213,8 +258,9 @@ export class Backups implements OnDestroy {
   }
   private closeConfirmation(): void {
     this.pending.set(null);
-    const dialog = this.dialog()?.nativeElement;
-    if (dialog?.open) dialog.close();
+    this.dialogSubscription?.unsubscribe();
+    if (this.dialogContext) this.arca.actions.dispatchAction(APP_DIALOG_CANCEL, this.dialogContext);
+    this.dialogContext = undefined;
   }
   private restoreFocus(): void {
     if (!this.active()) return;

@@ -10,7 +10,17 @@ import {
   viewChild,
 } from '@angular/core';
 import { DOCUMENT, DatePipe, JsonPipe } from '@angular/common';
-import { restoreDialogFocus, trapDialogFocus } from '../../services/dialog-focus';
+import { restoreDialogFocus } from '../../services/dialog-focus';
+import { ArcaService } from 'arca';
+import { Subscription, filter, take } from 'rxjs';
+import { AppDialog } from '../../components/app-dialog/app-dialog';
+import {
+  APP_DIALOG_CANCEL,
+  APP_DIALOG_OPEN,
+  AppDialogConfig,
+  AppDialogResult,
+  newDialogContext,
+} from '../../components/app-dialog/app-dialog.models';
 import { BackupReportsState } from './reports-state';
 import { limitedPrecision } from './backups-presentation';
 
@@ -25,7 +35,9 @@ export class BackupReports implements OnDestroy {
   readonly limitedPrecision = limitedPrecision;
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
-  private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('confirmation');
+  private readonly arca = inject(ArcaService);
+  private dialogContext?: string;
+  private dialogSubscription?: Subscription;
   private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
   private readonly restoreRequested = signal(false);
   private trigger: Element | null = null;
@@ -33,8 +45,7 @@ export class BackupReports implements OnDestroy {
   constructor() {
     effect(() => {
       const state = this.state();
-      if (!state.pending() && this.dialog()?.nativeElement.open)
-        this.dialog()?.nativeElement.close();
+      if (!state.pending()) this.closeConfirmation();
       if (!this.restoreRequested() || state.disabled()) return;
       this.restoreRequested.set(false);
       restoreDialogFocus(
@@ -47,28 +58,57 @@ export class BackupReports implements OnDestroy {
   }
   ngOnDestroy(): void {
     this.restoreRequested.set(false);
-    const dialog = this.dialog()?.nativeElement;
-    if (dialog?.open) dialog.close();
+    this.closeConfirmation();
   }
   prepare(id: string): void {
     const state = this.state();
-    if (state.disabled()) return;
+    if (state.disabled() || this.arca.modals.modalOpen) return;
     this.trigger = this.document.activeElement;
     if (!state.prepare(id)) return;
-    try {
-      const dialog = this.dialog()?.nativeElement;
-      if (!dialog) throw new Error();
-      dialog.showModal();
-      dialog.querySelector<HTMLButtonElement>('[autofocus]')?.focus();
-    } catch {
-      state.cancel();
+    const pending = state.pending()!;
+    const context = newDialogContext();
+    this.dialogContext = context;
+    const config: AppDialogConfig = {
+      context,
+      title: 'Confirmar eliminación de informe',
+      type: 'danger',
+      text: [
+        'Acción: Eliminar informe',
+        `run_id: ${pending.run_id}`,
+        'Esta operación solicita a CORE eliminar el informe de Health.',
+      ],
+      buttons: [
+        { id: 'cancel', text: 'Cancelar', style: 'secondary' },
+        { id: 'confirm', text: 'Confirmar', style: 'danger' },
+      ],
+    };
+    const failed = () => {
+      if (this.dialogContext !== context) return;
       this.closeConfirmation();
+      state.cancel();
       state.error.set('No se pudo abrir la confirmación.');
       this.restoreRequested.set(true);
+    };
+    try {
+      this.arca.actions.cleanActions(['REPORT_DIALOG_CLOSE', APP_DIALOG_OPEN]);
+      this.dialogSubscription = this.arca.actions
+        .listenAction('REPORT_DIALOG_CLOSE')
+        .pipe(
+          filter((result: AppDialogResult) => result?.data?.context === context),
+          take(1),
+        )
+        .subscribe((result: AppDialogResult) => {
+          if (this.dialogContext !== context || state.pending() !== pending) return;
+          this.dialogContext = undefined;
+          if (result.option === 'confirm') this.confirm();
+          else this.cancel();
+        });
+      void this.arca.modals
+        .openModal(AppDialog, config, APP_DIALOG_OPEN, 'REPORT_DIALOG_CLOSE')
+        .catch(failed);
+    } catch {
+      failed();
     }
-  }
-  trapFocus(event: KeyboardEvent): void {
-    trapDialogFocus(event, this.dialog()?.nativeElement, this.document);
   }
   cancel(): void {
     if (!this.state().pending()) return;
@@ -83,7 +123,8 @@ export class BackupReports implements OnDestroy {
     this.state().confirm();
   }
   private closeConfirmation(): void {
-    const dialog = this.dialog()?.nativeElement;
-    if (dialog?.open) dialog.close();
+    this.dialogSubscription?.unsubscribe();
+    if (this.dialogContext) this.arca.actions.dispatchAction(APP_DIALOG_CANCEL, this.dialogContext);
+    this.dialogContext = undefined;
   }
 }

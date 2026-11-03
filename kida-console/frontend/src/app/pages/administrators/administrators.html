@@ -82,7 +82,7 @@
                 type="button"
                 class="danger"
                 [disabled]="busy() || accounts().length <= 1"
-                (click)="pendingDelete.set(account)"
+                (click)="prepareDelete(account)"
               >
                 Eliminar
               </button>
@@ -91,27 +91,6 @@
         </ul>
         @if (accounts().length === 1) {
           <p>Debe quedar al menos un administrador.</p>
-        }
-        @if (pendingDelete(); as target) {
-          <div class="confirmation" role="group" aria-label="Confirmar eliminación">
-            <p>
-              ¿Eliminar la cuenta {{ target.username }}? Se cerrarán todas sus sesiones.
-              @if (target.id === auth.user()?.id) {
-                Tu sesión también se cerrará.
-              }
-            </p>
-            <button type="button" class="danger" [disabled]="busy()" (click)="remove(target)">
-              Confirmar eliminación
-            </button>
-            <button
-              type="button"
-              class="secondary"
-              [disabled]="busy()"
-              (click)="pendingDelete.set(null)"
-            >
-              Cancelar
-            </button>
-          </div>
         }
       </section>
       <section appMasonryItem class="panel" aria-labelledby="create-title">

@@ -341,31 +341,4 @@
       }
     </section>
   </div>
-  <dialog
-    class="console-dialog"
-    #confirmation
-    aria-labelledby="backup-confirm-title"
-    (cancel)="$event.preventDefault(); cancel()"
-    (keydown)="trapFocus($event)"
-  >
-    <h2 id="backup-confirm-title">Confirmar operación de backup</h2>
-    @if (pending(); as operation) {
-      <p>
-        Acción: {{ operation.action === 'delete' ? 'Eliminar configuración' : 'Solicitar backup' }}
-      </p>
-      <p>Nombre: {{ operation.name }}</p>
-      <p>ID: {{ operation.id }}</p>
-      @if (operation.action === 'delete') {
-        <p>Eliminar la configuración no elimina sus archivos de backup.</p>
-      } @else {
-        <p>La admisión en cola no confirma el inicio ni la finalización del backup.</p>
-      }
-    }
-    <div class="row-actions">
-      <button class="secondary" type="button" autofocus (click)="cancel()">Cancelar</button>
-      <button type="button" [class.danger]="pending()?.action === 'delete'" (click)="confirm()">
-        Confirmar
-      </button>
-    </div>
-  </dialog>
 </ion-content>
