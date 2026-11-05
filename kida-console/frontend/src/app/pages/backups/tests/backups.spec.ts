@@ -1,18 +1,19 @@
-import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
+import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
-import { appConfig } from '../../app.config';
-import { environment } from '../../../environments/environment';
-import { ThemeIdentity } from '../../../theme/integration';
-import { BackupsService } from './backups.service';
-import { Backups, backupFailure, limitedPrecision } from './backups';
-import { BackupJob } from './backups.models';
-import { createBody, emptyForm, newCommand, newTarget, parseJson } from './backups-form';
-import { backupActions } from './backups.actions';
+import { appConfig } from '../../../app.config';
+import { environment } from '../../../../environments/environment';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { BackupsService } from '../services/backups.service';
+import { Backups } from '../backups';
+import { backupFailure, limitedPrecision } from '../utils/backups-presentation';
+import { BackupJob } from '../utils/backups.models';
+import { createBody, emptyForm, newCommand, newTarget, parseJson } from '../utils/backups-form';
+import { backupActions } from '../utils/backups.actions';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/backup`;
@@ -231,94 +232,116 @@ describe('Backups page', () => {
     enterPage(view);
     http.expectOne(`${base}/config`).flush({ backups: data });
     fixture.detectChanges();
-    view.form = validForm();
+    view.state.configurations.form = validForm();
     return fixture;
   }
   it('confirms a backup operation through the shared ARCA action protocol', () => {
     const view = enter().componentInstance;
-    view.prepare('run', job);
+    view.state.configurations.prepare('run', job);
     expect(dialogs.config?.title).toBe('Confirmar operación de backup');
     dialogs.choose();
     http.expectOne(`${base}/run`).flush({ state: 'QUEUED', execution_id: 'test' });
     http.expectOne(`${base}/config`).flush({ backups: [job] });
   });
+  it('submits the extracted configuration form including lifecycle commands', async () => {
+    const fixture = enter();
+    const configurations = fixture.componentInstance.state.configurations;
+    configurations.form.pre_backup = [{ command: 'before', params: { mode: 'null', value: '' } }];
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const form = fixture.nativeElement.querySelector(
+      'app-backup-create-form form',
+    ) as HTMLFormElement;
+    (form.querySelector('input[name="backup-lifecycle"]') as HTMLInputElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(form.textContent).toContain('Comando pre_backup 1');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const request = http.expectOne(`${base}/config/create`);
+    expect(request.request.body).toEqual(createBody(configurations.form));
+    request.flush(job);
+    http.expectOne(`${base}/config`).flush({ backups: [job] });
+    expect(configurations.form).toEqual(emptyForm());
+  });
   it('keeps last data on refresh failure, updates selected details and clears vanished selection', () => {
     const fixture = enter(),
       view = fixture.componentInstance;
-    view.select(job.id);
-    view.refresh();
+    view.state.configurations.select(job.id);
+    view.state.configurations.refresh();
     http.expectOne(`${base}/config`).flush({}, { status: 503, statusText: 'Unavailable' });
-    expect(view.entries()).toEqual([job]);
-    expect(view.selected()).toEqual(job);
-    expect(view.listError()).not.toBe('');
+    expect(view.state.configurations.entries()).toEqual([job]);
+    expect(view.state.configurations.selected()).toEqual(job);
+    expect(view.state.configurations.listError()).not.toBe('');
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Datos anteriores');
     expect(fixture.nativeElement.querySelector('img')).toBeNull();
-    view.refresh();
+    view.state.configurations.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [{ ...job, name: 'changed' }] });
-    expect(view.selected()?.name).toBe('changed');
-    view.refresh();
+    expect(view.state.configurations.selected()?.name).toBe('changed');
+    view.state.configurations.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [] });
-    expect(view.selected()).toBeNull();
-    expect(view.selectedId()).toBeNull();
+    expect(view.state.configurations.selected()).toBeNull();
+    expect(view.state.configurations.selectedId()).toBeNull();
   });
   it('distinguishes initial error, empty and loading without overlapping requests', () => {
     const fixture = TestBed.createComponent(Backups);
     fixture.detectChanges();
     const view = fixture.componentInstance;
     enterPage(view);
-    view.refresh();
+    view.state.configurations.refresh();
     const r = http.expectOne(`${base}/config`);
-    expect(view.loading()).toBe(true);
+    expect(view.state.configurations.loading()).toBe(true);
     r.flush({}, { status: 503, statusText: 'Unavailable' });
-    expect(view.entries()).toBeNull();
-    expect(view.updated()).toBeNull();
-    view.refresh();
+    expect(view.state.configurations.entries()).toBeNull();
+    expect(view.state.configurations.updated()).toBeNull();
+    view.state.configurations.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [] });
-    expect(view.entries()).toEqual([]);
-    expect(view.listError()).toBe('');
+    expect(view.state.configurations.entries()).toEqual([]);
+    expect(view.state.configurations.listError()).toBe('');
   });
   it('creates once, resets form on success and distinguishes post-write refresh failure', () => {
     const fixture = enter(),
       view = fixture.componentInstance;
-    view.create();
-    view.create();
-    view.refresh();
+    view.state.configurations.create();
+    view.state.configurations.create();
+    view.state.configurations.refresh();
     const r = http.expectOne(`${base}/config/create`);
     http.expectNone(`${base}/config`);
     r.flush(job);
-    expect(view.form).toEqual(emptyForm());
-    expect(view.resultLabel()).toContain('creada');
-    expect(view.loading()).toBe(true);
-    view.create();
+    expect(view.state.configurations.form).toEqual(emptyForm());
+    expect(view.state.configurations.resultLabel()).toContain('creada');
+    expect(view.state.configurations.loading()).toBe(true);
+    view.state.configurations.create();
     http.expectNone(`${base}/config/create`);
     http.expectOne(`${base}/config`).flush({}, { status: 503, statusText: 'Unavailable' });
-    expect(view.result()).toEqual(job);
-    expect(view.listError()).not.toBe('');
-    expect(view.selected()).toEqual(job);
+    expect(view.state.configurations.result()).toEqual(job);
+    expect(view.state.configurations.listError()).not.toBe('');
+    expect(view.state.configurations.selected()).toEqual(job);
   });
   it.each([422, 504, 0])('retains form after failed create %s and never retries', (status) => {
     const view = enter().componentInstance,
-      form = structuredClone(view.form);
-    view.create();
+      form = structuredClone(view.state.configurations.form);
+    view.state.configurations.create();
     const r = http.expectOne(`${base}/config/create`);
     if (status === 0) r.error(new ProgressEvent('error'));
     else r.flush({}, { status, statusText: 'Failed' });
-    expect(view.form).toEqual(form);
-    expect(view.busy()).toBe(false);
-    expect(status === 422 ? view.error() : view.uncertainties().join()).toContain(
-      status === 422 ? 'Validación' : 'No se pudo confirmar',
-    );
+    expect(view.state.configurations.form).toEqual(form);
+    expect(view.state.configurations.busy()).toBe(false);
+    expect(
+      status === 422
+        ? view.state.configurations.error()
+        : view.state.configurations.uncertainties().join(),
+    ).toContain(status === 422 ? 'Validación' : 'No se pudo confirmar');
     http.expectNone(`${base}/config/create`);
     http.expectNone(`${base}/config`);
   });
   it('blocks invalid JSON before dispatch', () => {
     const view = enter().componentInstance;
-    view.form.schedule = { mode: 'value', value: '{' };
-    view.create();
+    view.state.configurations.form.schedule = { mode: 'value', value: '{' };
+    view.state.configurations.create();
     http.expectNone(`${base}/config/create`);
-    expect(view.error()).toContain('JSON');
-    expect(view.busy()).toBe(false);
+    expect(view.state.configurations.error()).toContain('JSON');
+    expect(view.state.configurations.busy()).toBe(false);
   });
   it.each(['run', 'delete'] as const)(
     'freezes %s confirmation, cancels without dispatch and consumes it once',
@@ -326,77 +349,77 @@ describe('Backups page', () => {
       const fixture = enter(),
         view = fixture.componentInstance,
         copy = structuredClone(job);
-      view.prepare(action, copy);
-      view.refresh();
-      view.create();
+      view.state.configurations.prepare(action, copy);
+      view.state.configurations.refresh();
+      view.state.configurations.create();
       http.expectNone(`${base}/config`);
       http.expectNone(`${base}/config/create`);
       copy.id = 'changed';
-      expect(view.pending()?.id).toBe(job.id);
-      expect(Object.isFrozen(view.pending())).toBe(true);
-      view.cancel();
-      view.confirm();
+      expect(view.state.configurations.pending()?.id).toBe(job.id);
+      expect(Object.isFrozen(view.state.configurations.pending())).toBe(true);
+      view.state.configurations.cancel();
+      view.state.configurations.confirm();
       http.expectNone(`${base}/${action === 'run' ? 'run' : 'config/delete'}`);
-      view.prepare(action, job);
-      view.confirm();
-      view.confirm();
+      view.state.configurations.prepare(action, job);
+      view.state.configurations.confirm();
+      view.state.configurations.confirm();
       const r = http.expectOne(`${base}/${action === 'run' ? 'run' : 'config/delete'}`);
       expect(r.request.body).toEqual({ id: job.id });
       r.flush(action === 'run' ? { state: 'QUEUED', execution_id: 'execution' } : job);
       http.expectOne(`${base}/config`).flush({ backups: action === 'delete' ? [] : [job] });
-      expect(view.resultLabel()).toContain(
+      expect(view.state.configurations.resultLabel()).toContain(
         action === 'run' ? 'no confirma inicio ni finalización' : 'archivos se conservan',
       );
     },
   );
   it('preserves uncertain admission across successful refreshes and later writes', () => {
     const view = enter().componentInstance;
-    view.prepare('run', job);
-    view.confirm();
+    view.state.configurations.prepare('run', job);
+    view.state.configurations.confirm();
     http.expectOne(`${base}/run`).flush({}, { status: 504, statusText: 'Timeout' });
-    const warning = view.uncertainties()[0];
+    const warning = view.state.configurations.uncertainties()[0];
     expect(warning).toContain(job.id);
-    view.refresh();
+    view.state.configurations.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [job] });
-    expect(view.uncertainties()).toEqual([warning]);
-    view.prepare('run', job);
-    view.confirm();
+    expect(view.state.configurations.uncertainties()).toEqual([warning]);
+    view.state.configurations.prepare('run', job);
+    view.state.configurations.confirm();
     http.expectOne(`${base}/run`).flush({ state: 'FUTURE', execution_id: 'future' });
     http.expectOne(`${base}/config`).flush({ backups: [job] });
-    expect(view.resultLabel()).toContain('FUTURE');
-    expect(view.uncertainties()).toEqual([warning]);
+    expect(view.state.configurations.resultLabel()).toContain('FUTURE');
+    expect(view.state.configurations.uncertainties()).toEqual([warning]);
   });
   it('fails closed if the confirmation cannot open', () => {
     const view = enter().componentInstance;
     dialogs.open.mockImplementationOnce(() => {
       throw new Error();
     });
-    view.prepare('delete', job);
-    view.confirm();
-    expect(view.pending()).toBeNull();
-    expect(view.busy()).toBe(false);
-    expect(view.error()).toContain('confirmación');
+    view.state.configurations.prepare('delete', job);
+    view.state.configurations.confirm();
+    expect(view.state.configurations.pending()).toBeNull();
+    expect(view.state.configurations.busy()).toBe(false);
+    expect(view.state.configurations.error()).toContain('confirmación');
     http.expectNone(`${base}/config/delete`);
   });
   it('clears selection, data, form and dialogs on leave or session change', () => {
     const view = enter().componentInstance;
-    view.select(job.id);
-    view.prepare('run', job);
+    view.state.configurations.select(job.id);
+    view.state.configurations.prepare('run', job);
     view.ionViewWillLeave();
-    view.confirm();
-    expect(view.entries()).toBeNull();
-    expect(view.form).toEqual(emptyForm());
-    expect(view.selectedId()).toBeNull();
-    expect(view.pending()).toBeNull();
+    view.state.configurations.confirm();
+    expect(view.state.configurations.entries()).toBeNull();
+    expect(view.state.configurations.form).toEqual(emptyForm());
+    expect(view.state.configurations.selectedId()).toBeNull();
+    expect(view.state.configurations.pending()).toBeNull();
     http.expectNone(`${base}/run`);
     enterPage(view);
     http.expectOne(`${base}/config`).flush({ backups: [job] });
-    view.prepare('delete', job);
+    view.state.configurations.prepare('delete', job);
     TestBed.inject(ThemeIdentity).clear();
-    view.confirm();
-    view.refresh();
-    expect(view.entries()).toBeNull();
-    expect(view.pending()).toBeNull();
+    view.state.configurations.confirm();
+    view.state.configurations.refresh();
+    expect(view.state.configurations.entries()).toBeNull();
+    expect(view.state.configurations.pending()).toBeNull();
     http.expectNone(`${base}/config/delete`);
     http.expectNone(`${base}/config`);
   });
@@ -408,10 +431,10 @@ describe('Backups page', () => {
     await fixture.whenStable();
     const trigger = fixture.nativeElement.querySelector('.backup-list button') as HTMLButtonElement;
     trigger.focus();
-    view.prepare('run', job);
+    view.state.configurations.prepare('run', job);
     TestBed.tick();
     expect(document.activeElement?.textContent?.trim()).toBe('Cancelar');
-    view.cancel();
+    view.state.configurations.cancel();
     TestBed.tick();
     await fixture.whenStable();
     expect(document.activeElement).toBe(trigger);
@@ -426,7 +449,7 @@ describe('Backups page', () => {
       'button[type="submit"]',
     ) as HTMLButtonElement;
     trigger.focus();
-    view.create();
+    view.state.configurations.create();
     http.expectOne(`${base}/config/create`).flush(job);
     fixture.detectChanges();
     expect(trigger.matches(':disabled')).toBe(true);
@@ -445,8 +468,8 @@ describe('Backups page', () => {
       '.backup-list .danger',
     ) as HTMLButtonElement;
     trigger.focus();
-    view.prepare('delete', job);
-    view.confirm();
+    view.state.configurations.prepare('delete', job);
+    view.state.configurations.confirm();
     http.expectOne(`${base}/config/delete`).flush(job);
     http.expectOne(`${base}/config`).flush({ backups: [] });
     TestBed.tick();
@@ -464,12 +487,12 @@ describe('Backups page', () => {
     name.value = ' cached form ';
     name.dispatchEvent(new Event('input', { bubbles: true }));
     await fixture.whenStable();
-    expect(fixture.componentInstance.form.name).toBe(' cached form ');
+    expect(fixture.componentInstance.state.configurations.form.name).toBe(' cached form ');
     expect(name.value).toBe(' cached form ');
     fixture.changeDetectorRef.detach();
     TestBed.inject(ThemeIdentity).clear();
     await fixture.whenStable();
-    expect(fixture.componentInstance.entries()).toBeNull();
+    expect(fixture.componentInstance.state.configurations.entries()).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.backup-list li').length).toBe(0);
     expect(fixture.nativeElement.querySelector('#backup-name')).toBeNull();
     enterPage(fixture.componentInstance);

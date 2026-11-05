@@ -1,3 +1,4 @@
+import { CreateHealth, HealthMode } from './health.models';
 import { BackupForm, CommandForm, CreateBackup, OptionalField } from './backups.models';
 
 export function optionalField(): OptionalField {
@@ -113,4 +114,9 @@ export function createBody(form: BackupForm): CreateBackup {
       throw new Error('Selecciona una retención válida.');
   }
   return body;
+}
+
+export function healthBody(path: string, mode: HealthMode): CreateHealth {
+  if (mode !== 'AUTOMATIC' && mode !== 'MANUAL') throw new Error('Selecciona un modo válido.');
+  return { definition_path: validString(path), mode };
 }

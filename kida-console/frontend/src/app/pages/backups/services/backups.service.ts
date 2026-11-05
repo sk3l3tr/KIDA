@@ -1,8 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { ArcaRequestService } from '../../services/arca-request.service';
-import { CreateHealth, HealthExecution, HealthHistoryRecord, HealthQueued } from './health.models';
-import { BackupJob, BackupsResponse, CreateBackup, Queued } from './backups.models';
-import { DeletedHealthReport, HealthReport } from './reports.models';
+import { ArcaRequestService } from '../../../services/arca-request.service';
+import {
+  CreateHealth,
+  HealthExecution,
+  HealthHistoryRecord,
+  HealthQueued,
+} from '../utils/health.models';
+import { BackupJob, BackupsResponse, CreateBackup, Queued } from '../utils/backups.models';
+import { DeletedHealthReport, HealthReport } from '../utils/reports.models';
 
 @Injectable({ providedIn: 'root' })
 export class BackupsService {

@@ -11,26 +11,27 @@ import {
 } from '@angular/core';
 import { DOCUMENT, DatePipe, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { restoreDialogFocus } from '../../services/dialog-focus';
+import { restoreDialogFocus } from '../../../../services/dialog-focus';
 import { ArcaService } from 'arca';
 import { Subscription, filter, take } from 'rxjs';
-import { AppDialog } from '../../components/app-dialog/app-dialog';
+import { AppDialog } from '../../../../components/app-dialog/app-dialog';
 import {
   APP_DIALOG_CANCEL,
   APP_DIALOG_OPEN,
   AppDialogConfig,
   AppDialogResult,
   newDialogContext,
-} from '../../components/app-dialog/app-dialog.models';
-import { BackupHealthState } from './health-state';
-import { HealthAction } from './health.models';
-import { limitedPrecision } from './backups-presentation';
+} from '../../../../components/app-dialog/app-dialog.models';
+import { BackupHealthDetail } from '../backup-health-detail/backup-health-detail';
+import { BackupHealthState } from '../../services/health-state';
+import { HealthAction } from '../../utils/health.models';
+import { limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-health',
-  imports: [DatePipe, JsonPipe, FormsModule],
+  imports: [DatePipe, JsonPipe, FormsModule, BackupHealthDetail],
   templateUrl: './health.html',
-  styleUrl: './backups.scss',
+  styleUrl: '../../backups.scss',
 })
 export class BackupHealth implements OnDestroy {
   readonly state = input.required<BackupHealthState>();

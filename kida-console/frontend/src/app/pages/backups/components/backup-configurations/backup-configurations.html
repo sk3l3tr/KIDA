@@ -1,0 +1,128 @@
+@for (message of state.uncertainties(); track $index) {
+  <div class="error" role="alert">{{ message }}</div>
+}
+@if (state.error()) {
+  <p class="error" role="alert">{{ state.error() }}</p>
+}
+@if (state.result(); as response) {
+  <div class="success" role="status">
+    <strong>{{ state.resultLabel() }}</strong>
+    @if ('execution_id' in response) {
+      <p>execution_id: {{ response.execution_id }}</p>
+    }
+    @if (limitedPrecision(response)) {
+      <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+    }
+    <details>
+      <summary>Respuesta de CORE</summary>
+      <pre>{{ response | json }}</pre>
+    </details>
+  </div>
+}
+<section
+  class="panel"
+  aria-labelledby="backup-configurations-heading"
+  [attr.aria-busy]="state.loading()"
+>
+  <div class="section-header">
+    <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
+    <button class="secondary" (click)="state.refresh()" [disabled]="state.operationsBlocked()">
+      Actualizar configuraciones
+    </button>
+  </div>
+  <div aria-live="polite">
+    @if (state.loading()) {
+      <p>Cargando configuraciones…</p>
+    }
+    @if (state.updated()) {
+      <p>
+        Última actualización: {{ state.updated() | date: 'medium' }} (hora local del navegador).
+      </p>
+    }
+    @if (state.listError()) {
+      <p class="error" role="alert">Error de actualización: {{ state.listError() }}</p>
+    }
+    @if (state.entries() !== null && (state.loading() || state.listError())) {
+      <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
+    }
+    @if (state.entries()?.length === 0) {
+      <p>No hay configuraciones de backup.</p>
+    }
+  </div>
+  <ul class="backup-list">
+    @for (job of state.entries(); track job.id) {
+      <li>
+        <h3>{{ job.name }}</h3>
+        <p>ID: {{ job.id }}</p>
+        <div class="row-actions">
+          <button
+            class="secondary"
+            (click)="state.select(job.id)"
+            [attr.aria-pressed]="state.selectedId() === job.id"
+            [disabled]="state.operationsBlocked()"
+            [attr.aria-label]="'Ver configuración ' + job.name"
+          >
+            Ver detalles
+          </button>
+          <button
+            (click)="state.prepare('run', job)"
+            [disabled]="state.operationsBlocked()"
+            [attr.aria-label]="'Solicitar backup ' + job.name"
+          >
+            Solicitar backup
+          </button>
+          <button
+            class="danger"
+            (click)="state.prepare('delete', job)"
+            [disabled]="state.operationsBlocked()"
+            [attr.aria-label]="'Eliminar configuración ' + job.name"
+          >
+            Eliminar
+          </button>
+        </div>
+      </li>
+    }
+  </ul>
+  @if (state.selected(); as job) {
+    <section aria-labelledby="backup-detail-heading">
+      <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
+      <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
+      <h4>Orígenes</h4>
+      <ul>
+        @for (source of job.sources; track $index) {
+          <li>{{ source }}</li>
+        }
+      </ul>
+      <h4>Destinos</h4>
+      <ul>
+        @for (target of job.targets; track $index) {
+          <li>
+            {{ target.path }} · Obligatorio: {{ target.required ? 'Sí' : 'No' }} · UUID:
+            {{
+              target.filesystem_uuid === null
+                ? 'null'
+                : target.filesystem_uuid === undefined
+                  ? 'Omitido'
+                  : target.filesystem_uuid
+            }}
+          </li>
+        }
+      </ul>
+      <h4>Lifecycle</h4>
+      <pre>{{ job.lifecycle | json }}</pre>
+      <h4>Schedule</h4>
+      <pre>{{ job.schedule === undefined ? 'Omitido' : (job.schedule | json) }}</pre>
+      <h4>Retention</h4>
+      <pre>{{ job.retention === undefined ? 'Omitido' : (job.retention | json) }}</pre>
+      <p>Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.</p>
+      @if (limitedPrecision(job)) {
+        <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+      }
+      <details>
+        <summary>Configuración completa (JSON)</summary>
+        <pre>{{ job | json }}</pre>
+      </details>
+    </section>
+  }
+</section>
+<app-backup-create-form [state]="state" />

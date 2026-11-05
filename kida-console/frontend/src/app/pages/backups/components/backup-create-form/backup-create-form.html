@@ -1,0 +1,180 @@
+@let state = this.state();
+<section class="panel" aria-labelledby="backup-create-heading">
+  <h2 id="backup-create-heading">Crear configuración</h2>
+  <p>CORE valida las reglas de dominio. Las rutas pertenecen al servidor CORE.</p>
+  @if (state.active()) {
+    <form (ngSubmit)="state.create()">
+      <fieldset [disabled]="state.operationsBlocked()">
+        <legend>Configuración del backup</legend>
+        <label for="backup-name">Nombre</label
+        ><input
+          class="console-control"
+          id="backup-name"
+          name="backup-name"
+          [(ngModel)]="state.form.name"
+        />
+        <fieldset>
+          <legend>Orígenes</legend>
+          @for (source of state.form.sources; track source; let i = $index) {
+            <label
+              >Origen {{ i + 1
+              }}<input
+                class="console-control"
+                [(ngModel)]="source.path"
+                [ngModelOptions]="{ standalone: true }"
+            /></label>
+            <button
+              class="secondary"
+              type="button"
+              (click)="state.form.sources.splice(i, 1)"
+              [attr.aria-label]="'Quitar origen ' + (i + 1)"
+            >
+              Quitar origen
+            </button>
+          }
+          <button class="secondary" type="button" (click)="state.form.sources.push({ path: '' })">
+            Añadir origen
+          </button>
+        </fieldset>
+        <fieldset>
+          <legend>Destinos</legend>
+          @for (target of state.form.targets; track target; let i = $index) {
+            <fieldset>
+              <legend>Destino {{ i + 1 }}</legend>
+              <label
+                >Ruta destino {{ i + 1
+                }}<input
+                  class="console-control"
+                  [(ngModel)]="target.path"
+                  [ngModelOptions]="{ standalone: true }"
+              /></label>
+              <label
+                ><input
+                  type="checkbox"
+                  [(ngModel)]="target.required"
+                  [ngModelOptions]="{ standalone: true }"
+                />
+                Destino {{ i + 1 }} obligatorio</label
+              >
+              <app-backup-optional-field
+                [field]="target.filesystem_uuid"
+                [label]="'UUID destino ' + (i + 1)"
+              />
+              <button
+                class="secondary"
+                type="button"
+                (click)="state.form.targets.splice(i, 1)"
+                [attr.aria-label]="'Quitar destino ' + (i + 1)"
+              >
+                Quitar destino
+              </button>
+            </fieldset>
+          }
+          <button class="secondary" type="button" (click)="state.form.targets.push(newTarget())">
+            Añadir destino
+          </button>
+        </fieldset>
+        <p>Compresión: tar_zstd.</p>
+        <details>
+          <summary>Opciones avanzadas</summary>
+          <label
+            ><input
+              type="checkbox"
+              [(ngModel)]="state.form.lifecycleEnabled"
+              name="backup-lifecycle"
+            />
+            Incluir lifecycle</label
+          >
+          @if (state.form.lifecycleEnabled) {
+            @for (phase of phases; track phase) {
+              <fieldset>
+                <legend>{{ phase }}</legend>
+                @for (command of state.form[phase]; track command; let i = $index) {
+                  <label
+                    >Comando {{ phase }} {{ i + 1
+                    }}<input
+                      class="console-control"
+                      [(ngModel)]="command.command"
+                      [ngModelOptions]="{ standalone: true }"
+                  /></label>
+                  <app-backup-optional-field
+                    [field]="command.params"
+                    [label]="'Parámetros ' + phase + ' ' + (i + 1)"
+                    [json]="true"
+                  />
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="state.form[phase].splice(i, 1)"
+                    [attr.aria-label]="'Quitar comando ' + phase + ' ' + (i + 1)"
+                  >
+                    Quitar comando
+                  </button>
+                }
+                <button
+                  class="secondary"
+                  type="button"
+                  (click)="state.form[phase].push(newCommand())"
+                >
+                  Añadir comando {{ phase }}
+                </button>
+              </fieldset>
+            }
+          }
+          <app-backup-optional-field
+            [field]="state.form.schedule"
+            label="Schedule (JSON)"
+            [json]="true"
+          />
+          <p>
+            Schedule y retention son metadatos. Esta configuración no crea una programación ni
+            ejecuta limpieza.
+          </p>
+          <label
+            >Retention: modo<select
+              class="console-control"
+              [(ngModel)]="state.form.retention"
+              name="backup-retention"
+            >
+              <option value="omit">Omitir</option>
+              <option value="value">Valor</option>
+              <option value="null">null explícito</option>
+            </select></label
+          >
+          @if (state.form.retention === 'value') {
+            <app-backup-optional-field [field]="state.form.max_age" label="max_age" />
+            <app-backup-optional-field [field]="state.form.keep_last" label="keep_last" />
+            <fieldset>
+              <legend>Puntos de restauración protegidos</legend>
+              @for (point of state.form.protected_restore_points; track point; let i = $index) {
+                <label
+                  >Punto protegido {{ i + 1
+                  }}<input
+                    class="console-control"
+                    [(ngModel)]="point.path"
+                    [ngModelOptions]="{ standalone: true }"
+                /></label>
+                <button
+                  class="secondary"
+                  type="button"
+                  (click)="state.form.protected_restore_points.splice(i, 1)"
+                  [attr.aria-label]="'Quitar punto protegido ' + (i + 1)"
+                >
+                  Quitar punto
+                </button>
+              }
+              <button
+                class="secondary"
+                type="button"
+                (click)="state.form.protected_restore_points.push({ path: '' })"
+              >
+                Añadir punto protegido
+              </button>
+            </fieldset>
+          }
+        </details>
+        <button type="submit">Crear configuración</button>
+      </fieldset>
+    </form>
+  }
+</section>

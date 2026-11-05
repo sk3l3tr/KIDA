@@ -1,20 +1,12 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subscription, finalize } from 'rxjs';
-import { classifyCoreFailure, formatCoreFailure } from '../../services/core-failure';
+import { classifyCoreFailure } from '../../../services/core-failure';
 import { BackupsService } from './backups.service';
-import { validString } from './backups-form';
-import { DeletedHealthReport, HealthReport, PendingReport } from './reports.models';
+import { validString } from '../utils/backups-form';
+import { reportFailure } from '../utils/backups-presentation';
+import { DeletedHealthReport, HealthReport, PendingReport } from '../utils/reports.models';
 
-export function reportFailure(failure: unknown, writing = false): string {
-  return formatCoreFailure(failure, writing, {
-    uncertain:
-      'No se pudo confirmar la eliminación del informe. No se reenviará automáticamente. Actualizar los informes no resuelve esta incertidumbre.',
-    validation: 'Validación HTTP: datos rechazados por el servidor.',
-    rejected: 'core',
-  });
-}
-
-/** Page-local state; the page owns session invalidation and cross-panel coordination. */
+/** Page-local state; the facade owns session invalidation and cross-panel coordination. */
 @Injectable()
 export class BackupReportsState {
   private readonly service = inject(BackupsService);

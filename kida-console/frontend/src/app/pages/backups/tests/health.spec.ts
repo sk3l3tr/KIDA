@@ -1,17 +1,18 @@
-import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
+import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
-import { appConfig } from '../../app.config';
-import { environment } from '../../../environments/environment';
-import { ThemeIdentity } from '../../../theme/integration';
-import { Backups } from './backups';
-import { BackupHealth } from './health';
-import { healthBody, healthFailure } from './health-state';
-import { HealthAction, HealthExecution, HealthHistoryRecord } from './health.models';
+import { appConfig } from '../../../app.config';
+import { environment } from '../../../../environments/environment';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { Backups } from '../backups';
+import { BackupHealth } from '../components/backup-health/health';
+import { healthBody } from '../utils/backups-form';
+import { healthFailure } from '../utils/backups-presentation';
+import { HealthAction, HealthExecution, HealthHistoryRecord } from '../utils/health.models';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/backup`;
@@ -141,7 +142,7 @@ describe('Health basic state and page integration', () => {
     return fixture;
   }
   function selection(page: Backups) {
-    page.health.select(run.run_id);
+    page.state.health.select(run.run_id);
     http.expectOne(getUrl()).flush(run);
   }
   it('loads once on entry, without polling, and distinguishes initial error from empty', () => {
@@ -150,22 +151,22 @@ describe('Health basic state and page integration', () => {
     fixture.detectChanges();
     page.ionViewWillEnter();
     http.expectOne(`${base}/health/reports`).flush([]);
-    page.health.refresh();
+    page.state.health.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [] });
-    expect(page.health.loading()).toBe(true);
+    expect(page.state.health.loading()).toBe(true);
     http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
-    expect(page.health.entries()).toBeNull();
-    expect(page.health.updated()).toBeNull();
-    expect(page.health.listError()).not.toBe('');
-    page.health.refresh();
+    expect(page.state.health.entries()).toBeNull();
+    expect(page.state.health.updated()).toBeNull();
+    expect(page.state.health.listError()).not.toBe('');
+    page.state.health.refresh();
     http.expectOne(`${base}/health`).flush([]);
-    expect(page.health.entries()).toEqual([]);
-    expect(page.health.listError()).toBe('');
+    expect(page.state.health.entries()).toEqual([]);
+    expect(page.state.health.listError()).toBe('');
     http.expectNone(`${base}/health`);
   });
   it('keeps previous history/detail on failure, refreshes selected detail and clears vanished selection', () => {
     const page = enter().componentInstance,
-      health = page.health;
+      health = page.state.health;
     selection(page);
     health.refresh();
     http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
@@ -190,7 +191,7 @@ describe('Health basic state and page integration', () => {
   });
   it('never shows another selection detail and prevents overlapping detail reads', () => {
     const page = enter([record, { ...record, run_id: 'second' }]).componentInstance,
-      health = page.health;
+      health = page.state.health;
     selection(page);
     health.select('second');
     health.select(run.run_id);
@@ -206,14 +207,14 @@ describe('Health basic state and page integration', () => {
     'creates %s once, resets form only on success, refreshes list and detail',
     (mode) => {
       const page = enter().componentInstance,
-        health = page.health;
+        health = page.state.health;
       health.definitionPath = ' ./a.toml ';
       health.mode = mode;
       health.create();
       health.create();
       health.refresh();
-      page.create();
-      page.refresh();
+      page.state.configurations.create();
+      page.state.configurations.refresh();
       const r = http.expectOne(`${base}/health/create`);
       expect(r.request.body).toEqual({ definition_path: ' ./a.toml ', mode });
       http.expectNone(`${base}/config/create`);
@@ -234,7 +235,7 @@ describe('Health basic state and page integration', () => {
     },
   );
   it('keeps success separate from failed post-create refresh and keeps selected returned detail', () => {
-    const health = enter().componentInstance.health;
+    const health = enter().componentInstance.state.health;
     health.definitionPath = '/a';
     health.create();
     http.expectOne(`${base}/health/create`).flush({ ...run, run_id: 'new' });
@@ -253,7 +254,7 @@ describe('Health basic state and page integration', () => {
   ] as const)(
     'retains failed form %s, classifies rejection/uncertainty and never retries',
     (status, code, text) => {
-      const health = enter().componentInstance.health;
+      const health = enter().componentInstance.state.health;
       health.definitionPath = ' /a ';
       health.mode = 'AUTOMATIC';
       health.create();
@@ -270,7 +271,7 @@ describe('Health basic state and page integration', () => {
     },
   );
   it('retains uncertain creation after refresh and later success', () => {
-    const health = enter().componentInstance.health;
+    const health = enter().componentInstance.state.health;
     health.definitionPath = ' /a ';
     health.mode = 'AUTOMATIC';
     health.create();
@@ -289,8 +290,8 @@ describe('Health basic state and page integration', () => {
   });
   it('blocks Health while a configuration confirmation/write is active and while configurations refresh', () => {
     const page = enter().componentInstance,
-      health = page.health;
-    page.prepare('run', { id: 'backup', name: 'name' } as never);
+      health = page.state.health;
+    page.state.configurations.prepare('run', { id: 'backup', name: 'name' } as never);
     health.create();
     health.refresh();
     health.select(run.run_id);
@@ -298,7 +299,7 @@ describe('Health basic state and page integration', () => {
     http.expectNone(`${base}/health/create`);
     http.expectNone(`${base}/health`);
     http.expectNone(getUrl());
-    page.confirm();
+    page.state.configurations.confirm();
     health.create();
     http.expectNone(`${base}/health/create`);
     http.expectOne(`${base}/run`).flush({ state: 'QUEUED', execution_id: 'e' });
@@ -309,19 +310,19 @@ describe('Health basic state and page integration', () => {
   });
   it('blocks configuration operations and Health writes during Health reads', () => {
     const page = enter().componentInstance;
-    page.health.select(run.run_id);
-    page.prepare('run', { id: 'b', name: 'b' } as never);
-    page.create();
-    page.refresh();
-    page.health.create();
-    expect(page.pending()).toBeNull();
+    page.state.health.select(run.run_id);
+    page.state.configurations.prepare('run', { id: 'b', name: 'b' } as never);
+    page.state.configurations.create();
+    page.state.configurations.refresh();
+    page.state.health.create();
+    expect(page.state.configurations.pending()).toBeNull();
     http.expectNone(`${base}/config/create`);
     http.expectNone(`${base}/config`);
     http.expectNone(`${base}/health/create`);
     http.expectOne(getUrl()).flush(run);
   });
   it('rejects invalid form before sending', () => {
-    const health = enter().componentInstance.health;
+    const health = enter().componentInstance.state.health;
     health.definitionPath = '\ud800';
     health.create();
     expect(health.error()).toContain('Unicode');
@@ -332,10 +333,10 @@ describe('Health basic state and page integration', () => {
     const page = enter().componentInstance;
     selection(page);
     const fixture = TestBed.createComponent(BackupHealth);
-    fixture.componentRef.setInput('state', page.health);
+    fixture.componentRef.setInput('state', page.state.health);
     fixture.autoDetectChanges();
     await fixture.whenStable();
-    return { page, health: page.health, fixture, component: fixture.componentInstance };
+    return { page, health: page.state.health, fixture, component: fixture.componentInstance };
   }
   it('uses the shared dialog for Health with its exact target and warning', async () => {
     const { component, health } = await healthView();
@@ -346,6 +347,23 @@ describe('Health basic state and page integration', () => {
     dialogs.choose('cancel');
     expect(health.pending()).toBeNull();
     http.expectNone(`${base}/health/stop`);
+  });
+  it.each([
+    ['Iniciar Health', 'start'],
+    ['Detener Health', 'stop'],
+    ['Eliminar Health', 'delete'],
+  ] as const)('opens confirmation from the extracted detail action %s', async (label, action) => {
+    const { health, fixture } = await healthView();
+    const detail = fixture.nativeElement.querySelector('app-backup-health-detail') as HTMLElement;
+    const button = [...detail.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent?.trim() === label,
+    )!;
+    button.click();
+    expect(health.pending()?.action).toBe(action);
+    expect(dialogs.element?.textContent).toContain(run.run_id);
+    dialogs.choose('cancel');
+    expect(health.pending()).toBeNull();
+    http.expectNone(`${base}/health/${action}`);
   });
   it.each(operations)(
     'freezes %s, locks both panels, cancels, confirms once and refreshes',
@@ -360,13 +378,13 @@ describe('Health basic state and page integration', () => {
         action === 'run' ? health.automaticPath : `${run.definition.name} (${run.run_id})`,
       );
       expect(health.disabled()).toBe(true);
-      page.prepare('run', { id: 'b', name: 'b' } as never);
-      page.create();
-      page.refresh();
+      page.state.configurations.prepare('run', { id: 'b', name: 'b' } as never);
+      page.state.configurations.create();
+      page.state.configurations.refresh();
       health.create();
       health.refresh();
       health.select('other');
-      expect(page.pending()).toBeNull();
+      expect(page.state.configurations.pending()).toBeNull();
       http.expectNone(`${base}/config/create`);
       http.expectNone(`${base}/config`);
       http.expectNone(`${base}/health/create`);
@@ -616,7 +634,7 @@ describe('Health basic state and page integration', () => {
     const page = enter().componentInstance;
     selection(page);
     const fixture = TestBed.createComponent(BackupHealth);
-    fixture.componentRef.setInput('state', page.health);
+    fixture.componentRef.setInput('state', page.state.health);
     fixture.detectChanges();
     await fixture.whenStable();
     const text = fixture.nativeElement.textContent;
@@ -634,7 +652,7 @@ describe('Health basic state and page integration', () => {
     ])
       expect(text).toContain(value);
     expect(fixture.nativeElement.querySelector('img,script')).toBeNull();
-    page.health.refresh();
+    page.state.health.refresh();
     http.expectOne(`${base}/health`).flush([record]);
     http.expectOne(getUrl()).flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges();
@@ -645,7 +663,7 @@ describe('Health basic state and page integration', () => {
     async (status) => {
       const page = enter().componentInstance;
       const fixture = TestBed.createComponent(BackupHealth);
-      fixture.componentRef.setInput('state', page.health);
+      fixture.componentRef.setInput('state', page.state.health);
       fixture.autoDetectChanges();
       await fixture.whenStable();
       const trigger = fixture.nativeElement.querySelector(
@@ -686,8 +704,8 @@ describe('Health basic state and page integration', () => {
     input.value = ' cached health ';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await fixture.whenStable();
-    expect(page.health.definitionPath).toBe(' cached health ');
-    page.health.automaticPath = '/cached/automatic';
+    expect(page.state.health.definitionPath).toBe(' cached health ');
+    page.state.health.automaticPath = '/cached/automatic';
     const healthComponent = fixture.debugElement.query(
       (element) => element.componentInstance instanceof BackupHealth,
     ).componentInstance as BackupHealth;
@@ -697,12 +715,12 @@ describe('Health basic state and page integration', () => {
     fixture.changeDetectorRef.detach();
     TestBed.inject(ThemeIdentity).clear();
     await fixture.whenStable();
-    expect(page.health.entries()).toBeNull();
-    expect(page.health.detail()).toBeNull();
-    expect(page.health.selectedId()).toBeNull();
-    expect(page.health.definitionPath).toBe('');
-    expect(page.health.automaticPath).toBe('');
-    expect(page.health.pending()).toBeNull();
+    expect(page.state.health.entries()).toBeNull();
+    expect(page.state.health.detail()).toBeNull();
+    expect(page.state.health.selectedId()).toBeNull();
+    expect(page.state.health.definitionPath).toBe('');
+    expect(page.state.health.automaticPath).toBe('');
+    expect(page.state.health.pending()).toBeNull();
     expect(fixture.nativeElement.querySelector('app-backup-health')).toBeNull();
   });
 });

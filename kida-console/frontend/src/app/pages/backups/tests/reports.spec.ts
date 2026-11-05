@@ -1,16 +1,16 @@
-import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
+import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
-import { appConfig } from '../../app.config';
-import { environment } from '../../../environments/environment';
-import { ThemeIdentity } from '../../../theme/integration';
-import { BackupsService } from './backups.service';
-import { Backups } from './backups';
-import { BackupReports } from './reports';
-import { HealthReport } from './reports.models';
+import { appConfig } from '../../../app.config';
+import { environment } from '../../../../environments/environment';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { BackupsService } from '../services/backups.service';
+import { Backups } from '../backups';
+import { BackupReports } from '../components/backup-reports/reports';
+import { HealthReport } from '../utils/reports.models';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/backup`;
@@ -92,7 +92,7 @@ describe('Health report state, confirmation and page integration', () => {
     http.expectOne(listUrl).flush(rows);
   }
   function select(page: Backups) {
-    page.reports.select(id);
+    page.state.reports.select(id);
     http.expectOne(getUrl()).flush(report);
   }
   function refreshed(rows = [id, 'second']) {
@@ -104,10 +104,10 @@ describe('Health report state, confirmation and page integration', () => {
     const page = entry().componentInstance;
     select(page);
     const fixture = TestBed.createComponent(BackupReports);
-    fixture.componentRef.setInput('state', page.reports);
+    fixture.componentRef.setInput('state', page.state.reports);
     fixture.autoDetectChanges();
     await fixture.whenStable();
-    return { page, reports: page.reports, fixture, component: fixture.componentInstance };
+    return { page, reports: page.state.reports, fixture, component: fixture.componentInstance };
   }
   it('uses the shared ARCA dialog for the exact report identifier', async () => {
     const { component, reports } = await reportView();
@@ -123,22 +123,22 @@ describe('Health report state, confirmation and page integration', () => {
       page = fixture.componentInstance;
     fixture.detectChanges();
     page.ionViewWillEnter();
-    page.reports.refresh();
+    page.state.reports.refresh();
     http.expectOne(`${base}/config`).flush({ backups: [] });
     http.expectOne(`${base}/health`).flush([]);
     http.expectOne(listUrl).flush({}, { status: 503, statusText: 'Unavailable' });
-    expect(page.reports.entries()).toBeNull();
-    expect(page.reports.updated()).toBeNull();
-    expect(page.reports.listError()).not.toBe('');
-    page.reports.refresh();
+    expect(page.state.reports.entries()).toBeNull();
+    expect(page.state.reports.updated()).toBeNull();
+    expect(page.state.reports.listError()).not.toBe('');
+    page.state.reports.refresh();
     http.expectOne(listUrl).flush([]);
-    expect(page.reports.entries()).toEqual([]);
-    expect(page.reports.listError()).toBe('');
+    expect(page.state.reports.entries()).toEqual([]);
+    expect(page.state.reports.listError()).toBe('');
     http.expectNone(listUrl);
   });
   it('retains stale reads on errors and clears selection only after successful disappearance', () => {
     const page = entry().componentInstance,
-      reports = page.reports;
+      reports = page.state.reports;
     select(page);
     reports.refresh();
     http.expectOne(listUrl).flush({}, { status: 503, statusText: 'Unavailable' });
@@ -156,7 +156,7 @@ describe('Health report state, confirmation and page integration', () => {
   });
   it('clears old detail on another selection and blocks overlapping detail reads', () => {
     const page = entry().componentInstance,
-      reports = page.reports;
+      reports = page.state.reports;
     select(page);
     reports.select('second');
     reports.select(id);
@@ -179,12 +179,12 @@ describe('Health report state, confirmation and page integration', () => {
     fixture.detectChanges();
     expect(Object.isFrozen(reports.pending())).toBe(true);
     expect(reports.pending()?.run_id).toBe(id);
-    expect(page.operationsBlocked()).toBe(true);
-    expect(page.health.disabled()).toBe(true);
-    page.refresh();
-    page.create();
-    page.health.create();
-    page.health.refresh();
+    expect(page.state.operationsBlocked()).toBe(true);
+    expect(page.state.health.disabled()).toBe(true);
+    page.state.configurations.refresh();
+    page.state.configurations.create();
+    page.state.health.create();
+    page.state.health.refresh();
     reports.refresh();
     reports.select('second');
     http.expectNone(`${base}/config`);
@@ -231,7 +231,7 @@ describe('Health report state, confirmation and page integration', () => {
     'shows deleted:%s literally and refreshes without optimistic changes',
     (wasDeleted) => {
       const page = entry().componentInstance,
-        reports = page.reports;
+        reports = page.state.reports;
       select(page);
       reports.prepare(id);
       reports.confirm();
@@ -248,7 +248,7 @@ describe('Health report state, confirmation and page integration', () => {
   );
   it('keeps deletion success independent from failed report and Health refreshes', () => {
     const page = entry().componentInstance,
-      reports = page.reports;
+      reports = page.state.reports;
     select(page);
     reports.prepare(id);
     reports.confirm();
@@ -257,30 +257,30 @@ describe('Health report state, confirmation and page integration', () => {
     http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
     expect(reports.result()).toEqual(deleted);
     expect(reports.listError()).not.toBe('');
-    expect(page.health.listError()).not.toBe('');
+    expect(page.state.health.listError()).not.toBe('');
     expect(reports.detail()).toEqual(report);
   });
   it('refreshes selected Health report status and path after report deletion', () => {
     const page = entry().componentInstance;
-    page.health.refresh();
+    page.state.health.refresh();
     http.expectOne(`${base}/health`).flush([{ run_id: 'health-id', report_status: 'READY' }]);
-    page.health.select('health-id');
+    page.state.health.select('health-id');
     http
       .expectOne(`${base}/health/get?run_id=health-id`)
       .flush({ run_id: 'health-id', report_path: '/old/report.md' });
-    page.reports.prepare(id);
-    page.reports.confirm();
+    page.state.reports.prepare(id);
+    page.state.reports.confirm();
     http.expectOne(deleteUrl).flush(deleted);
-    expect(page.health.occupied()).toBe(true);
+    expect(page.state.health.occupied()).toBe(true);
     http.expectOne(`${base}/health`).flush([{ run_id: 'health-id', report_status: 'MISSING' }]);
     http
       .expectOne(`${base}/health/get?run_id=health-id`)
       .flush({ run_id: 'health-id', report_path: null });
     http.expectOne(listUrl).flush([]);
-    expect(page.health.selectedHistory()?.report_status).toBe('MISSING');
-    expect(page.health.detail()?.report_path).toBeNull();
-    expect(page.reports.result()).toEqual(deleted);
-    expect(page.operationsBlocked()).toBe(false);
+    expect(page.state.health.selectedHistory()?.report_status).toBe('MISSING');
+    expect(page.state.health.detail()?.report_path).toBeNull();
+    expect(page.state.reports.result()).toEqual(deleted);
+    expect(page.state.operationsBlocked()).toBe(false);
   });
   it.each([
     [422, undefined, 'Validación'],
@@ -292,7 +292,7 @@ describe('Health report state, confirmation and page integration', () => {
     'handles rejection or uncertainty %s without retrying or clearing the target',
     (status, code, text) => {
       const page = entry().componentInstance,
-        reports = page.reports;
+        reports = page.state.reports;
       select(page);
       reports.prepare(id);
       reports.confirm();
@@ -310,7 +310,7 @@ describe('Health report state, confirmation and page integration', () => {
   );
   it('retains uncertain action and exact destination through refresh and a later successful deletion', () => {
     const page = entry().componentInstance,
-      reports = page.reports;
+      reports = page.state.reports;
     select(page);
     reports.prepare(id);
     reports.confirm();
@@ -331,8 +331,8 @@ describe('Health report state, confirmation and page integration', () => {
   });
   it('blocks Reports while configuration confirmation, write or refresh is active', () => {
     const page = entry().componentInstance,
-      reports = page.reports;
-    page.prepare('run', { id: 'b', name: 'name' } as never);
+      reports = page.state.reports;
+    page.state.configurations.prepare('run', { id: 'b', name: 'name' } as never);
     reports.refresh();
     reports.select(id);
     reports.prepare(id);
@@ -340,7 +340,7 @@ describe('Health report state, confirmation and page integration', () => {
     expect(reports.pending()).toBeNull();
     http.expectNone(listUrl);
     http.expectNone(getUrl());
-    page.confirm();
+    page.state.configurations.confirm();
     reports.refresh();
     http.expectOne(`${base}/run`).flush({ state: 'QUEUED', execution_id: 'e' });
     reports.refresh();
@@ -350,30 +350,30 @@ describe('Health report state, confirmation and page integration', () => {
   });
   it('blocks Reports while Health reads or writes, and blocks Health/config during report reads', () => {
     const page = entry().componentInstance,
-      reports = page.reports;
-    page.health.refresh();
+      reports = page.state.reports;
+    page.state.health.refresh();
     reports.refresh();
     reports.prepare(id);
     expect(reports.pending()).toBeNull();
     http.expectNone(listUrl);
     http.expectOne(`${base}/health`).flush([]);
-    page.health.create();
+    page.state.health.create();
     reports.refresh();
     http.expectNone(listUrl);
     http.expectOne(`${base}/health/create`).flush({}, { status: 422, statusText: 'Invalid' });
     reports.select(id);
-    page.refresh();
-    page.health.refresh();
-    page.health.create();
+    page.state.configurations.refresh();
+    page.state.health.refresh();
+    page.state.health.create();
     http.expectNone(`${base}/config`);
     http.expectNone(`${base}/health`);
     http.expectNone(`${base}/health/create`);
     http.expectOne(getUrl()).flush(report);
-    expect(page.operationsBlocked()).toBe(false);
+    expect(page.state.operationsBlocked()).toBe(false);
   });
   it.each(['list'])('ignores late %s on leave and isolates a fresh session', (operation) => {
     const page = entry().componentInstance,
-      reports = page.reports;
+      reports = page.state.reports;
     const send = () =>
       operation === 'list'
         ? reports.refresh()
@@ -486,9 +486,9 @@ describe('Health report state, confirmation and page integration', () => {
     fixture.changeDetectorRef.detach();
     TestBed.inject(ThemeIdentity).clear();
     await fixture.whenStable();
-    expect(page.reports.entries()).toBeNull();
-    expect(page.reports.detail()).toBeNull();
-    expect(page.reports.pending()).toBeNull();
+    expect(page.state.reports.entries()).toBeNull();
+    expect(page.state.reports.detail()).toBeNull();
+    expect(page.state.reports.pending()).toBeNull();
     expect(fixture.nativeElement.querySelector('app-backup-reports')).toBeNull();
   });
 });

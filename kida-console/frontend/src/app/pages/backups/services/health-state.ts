@@ -1,32 +1,20 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, Subscription, finalize } from 'rxjs';
-import { classifyCoreFailure, formatCoreFailure } from '../../services/core-failure';
+import { classifyCoreFailure } from '../../../services/core-failure';
 import { BackupsService } from './backups.service';
-import { validString } from './backups-form';
+import { healthBody, validString } from '../utils/backups-form';
+import { healthFailure } from '../utils/backups-presentation';
 import {
   CreateHealth,
+  HealthMode,
   HealthExecution,
   HealthHistoryRecord,
-  HealthMode,
   HealthAction,
   HealthQueued,
   PendingHealth,
-} from './health.models';
+} from '../utils/health.models';
 
-export function healthFailure(failure: unknown, writing = false): string {
-  return formatCoreFailure(failure, writing, {
-    uncertain:
-      'No se pudo confirmar la creación de Health. No se reenviará automáticamente. Actualizar el historial no resuelve esta incertidumbre.',
-    validation: 'Validación HTTP: datos rechazados por el servidor.',
-    rejected: 'core',
-  });
-}
-export function healthBody(path: string, mode: HealthMode): CreateHealth {
-  if (mode !== 'AUTOMATIC' && mode !== 'MANUAL') throw new Error('Selecciona un modo válido.');
-  return { definition_path: validString(path), mode };
-}
-
-/** Page-local Health state. The page owns entry, session invalidation and the write lock. */
+/** Page-local Health state. The facade owns entry, session invalidation and cross-panel coordination. */
 @Injectable()
 export class BackupHealthState {
   private readonly service = inject(BackupsService);

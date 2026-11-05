@@ -3,7 +3,7 @@ import { environment } from '../../environments/environment';
 import { systemActions } from '../pages/system/utils/system.actions';
 import { dockerActions } from '../pages/docker/utils/docker.actions';
 import { schedulerActions } from '../pages/scheduler/scheduler.actions';
-import { backupActions } from '../pages/backups/backups.actions';
+import { backupActions } from '../pages/backups/utils/backups.actions';
 
 export const appActions: IactionDefinition[] = [
   ...backupActions,

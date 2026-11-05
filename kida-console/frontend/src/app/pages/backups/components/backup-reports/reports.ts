@@ -10,25 +10,25 @@ import {
   viewChild,
 } from '@angular/core';
 import { DOCUMENT, DatePipe, JsonPipe } from '@angular/common';
-import { restoreDialogFocus } from '../../services/dialog-focus';
+import { restoreDialogFocus } from '../../../../services/dialog-focus';
 import { ArcaService } from 'arca';
 import { Subscription, filter, take } from 'rxjs';
-import { AppDialog } from '../../components/app-dialog/app-dialog';
+import { AppDialog } from '../../../../components/app-dialog/app-dialog';
 import {
   APP_DIALOG_CANCEL,
   APP_DIALOG_OPEN,
   AppDialogConfig,
   AppDialogResult,
   newDialogContext,
-} from '../../components/app-dialog/app-dialog.models';
-import { BackupReportsState } from './reports-state';
-import { limitedPrecision } from './backups-presentation';
+} from '../../../../components/app-dialog/app-dialog.models';
+import { BackupReportsState } from '../../services/reports-state';
+import { limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-reports',
   imports: [DatePipe, JsonPipe],
   templateUrl: './reports.html',
-  styleUrl: './backups.scss',
+  styleUrl: '../../backups.scss',
 })
 export class BackupReports implements OnDestroy {
   readonly state = input.required<BackupReportsState>();
