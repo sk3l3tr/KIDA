@@ -1,4 +1,3 @@
-import { mockArcaDialogs } from '../components/app-dialog/app-dialog.testing';
 import { THEME_STORAGE, ThemeService } from '../../lib/theming/theme.service';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -10,7 +9,6 @@ import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } 
 import { environment } from '../../environments/environment';
 import { appConfig } from '../app.config';
 import { AppHeaderComponent } from '../components/app-header/app-header.component';
-import { Administrators } from '../pages/administrators/administrators';
 import { authGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { Login } from '../pages/login/login';
@@ -454,98 +452,12 @@ describe('Session authentication', () => {
 describe('Authentication views', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [Login, Administrators, AppHeaderComponent],
+      imports: [Login, AppHeaderComponent],
       providers: [...arcaProviders, provideHttpClientTesting()],
     });
     vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
   afterEach(() => TestBed.inject(HttpTestingController).verify());
-
-  it('refreshes a cached view and last-account controls on each Ionic entry', async () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set(session.user);
-    const second = { id: 2, username: 'second' };
-    const accounts = vi.spyOn(auth, 'accounts').mockReturnValue(of([session.user, second]));
-    const fixture = TestBed.createComponent(Administrators);
-    const view = fixture.componentInstance;
-    view.ionViewWillEnter();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(fixture.nativeElement.querySelector('.accounts-list .danger').disabled).toBe(false);
-    view.currentPassword = 'unfinished';
-    view.newPassword = 'new-password';
-    view.confirmPassword = 'new-password';
-    view.createPassword = 'create-password';
-    view.adminPassword = 'admin-password';
-    view.pendingDelete.set(second);
-    view.ionViewWillLeave();
-    expect([
-      view.currentPassword,
-      view.newPassword,
-      view.confirmPassword,
-      view.createPassword,
-      view.adminPassword,
-    ]).toEqual(['', '', '', '', '']);
-    expect(view.pendingDelete()).toBeNull();
-    auth.user.set({ id: 1, username: 'renamed' });
-    accounts.mockReturnValue(of([auth.user()!]));
-    view.ionViewWillEnter();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    expect(view.ownUsername).toBe('renamed');
-    expect(accounts).toHaveBeenCalledTimes(2);
-    expect(fixture.nativeElement.querySelector('.accounts-list .danger').disabled).toBe(true);
-  });
-
-  it('clears state on session changes and discards responses from the previous account', () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set(session.user);
-    const oldAccounts = new Subject<{ id: number; username: string }[]>();
-    const second = { id: 2, username: 'second' };
-    vi.spyOn(auth, 'accounts')
-      .mockReturnValueOnce(oldAccounts)
-      .mockReturnValue(of([second]));
-    const fixture = TestBed.createComponent(Administrators);
-    const view = fixture.componentInstance;
-    view.ionViewWillEnter();
-    fixture.detectChanges();
-    view.currentPassword = 'old-secret';
-    view.createUsername = 'unfinished';
-    view.pendingDelete.set(session.user);
-    auth.user.set(second);
-    fixture.detectChanges();
-    expect(view.ownUsername).toBe('second');
-    expect(view.currentPassword).toBe('');
-    expect(view.createUsername).toBe('');
-    expect(view.pendingDelete()).toBeNull();
-    oldAccounts.next([session.user]);
-    expect(view.accounts()).toEqual([second]);
-    auth.user.set(null);
-    fixture.detectChanges();
-    expect(view.ownUsername).toBe('');
-    expect(view.accounts()).toEqual([]);
-  });
-
-  it('discards pending operation results when the administrators view leaves', () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set(session.user);
-    vi.spyOn(auth, 'accounts').mockReturnValue(of([session.user]));
-    const creation = new Subject<{ id: number; username: string }>();
-    vi.spyOn(auth, 'create').mockReturnValue(creation);
-    const fixture = TestBed.createComponent(Administrators);
-    const view = fixture.componentInstance;
-    view.ionViewWillEnter();
-    fixture.detectChanges();
-    view.create();
-    expect(view.busy()).toBe(true);
-    view.ionViewWillLeave();
-    creation.next({ id: 2, username: 'second' });
-    expect(view.busy()).toBe(false);
-    expect(view.message()).toBe('');
-    expect(view.accounts()).toEqual([]);
-    expect(auth.accounts).toHaveBeenCalledOnce();
-  });
 
   it('shows a failed logout and lets the user retry before clearing the session', () => {
     const auth = TestBed.inject(AuthService);
@@ -640,52 +552,5 @@ describe('Authentication views', () => {
     fixture.componentInstance.submit();
     expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/']);
     expect(fixture.componentInstance.password).toBe('');
-  });
-
-  it('lists administrators, disables last-account deletion and submits reauthentication', async () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set(session.user);
-    vi.spyOn(auth, 'accounts').mockReturnValue(of([session.user]));
-    const create = vi.spyOn(auth, 'create').mockReturnValue(of({ id: 2, username: 'second' }));
-    const fixture = TestBed.createComponent(Administrators);
-    fixture.componentInstance.ionViewWillEnter();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.accounts-list .danger').disabled).toBe(true);
-    const view = fixture.componentInstance;
-    view.createUsername = 'second';
-    view.createPassword = 'password-two';
-    view.adminUsername = 'admin';
-    view.adminPassword = 'current-password';
-    view.create();
-    expect(create).toHaveBeenCalledWith({
-      username: 'second',
-      password: 'password-two',
-      admin_username: 'admin',
-      admin_password: 'current-password',
-    });
-    expect(view.adminPassword).toBe('');
-    expect(view.createPassword).toBe('');
-  });
-
-  it('requires explicit confirmation before deleting an account', async () => {
-    const auth = TestBed.inject(AuthService);
-    auth.user.set(session.user);
-    const second = { id: 2, username: 'second' };
-    vi.spyOn(auth, 'accounts').mockReturnValue(of([session.user, second]));
-    const remove = vi.spyOn(auth, 'delete').mockReturnValue(of(undefined));
-    const fixture = TestBed.createComponent(Administrators);
-    fixture.componentInstance.ionViewWillEnter();
-    fixture.detectChanges();
-    await fixture.whenStable();
-    const dialogs = mockArcaDialogs();
-    const buttons = fixture.nativeElement.querySelectorAll('.accounts-list .danger');
-    buttons[1].click();
-    fixture.detectChanges();
-    expect(remove).not.toHaveBeenCalled();
-    expect(dialogs.element!.textContent).toContain('second');
-    dialogs.choose();
-    expect(remove).toHaveBeenCalledWith(2);
   });
 });

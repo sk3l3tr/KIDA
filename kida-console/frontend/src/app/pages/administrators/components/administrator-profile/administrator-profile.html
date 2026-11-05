@@ -1,0 +1,54 @@
+<form #renameForm="ngForm" (ngSubmit)="state.rename()">
+  <label for="own-username">Username</label>
+  <input
+    id="own-username"
+    name="ownUsername"
+    [(ngModel)]="state.ownUsername"
+    required
+    pattern="[a-zA-Z0-9_.-]{3,64}"
+    minlength="3"
+    maxlength="64"
+    autocomplete="username"
+  />
+  <small>3–64 caracteres: letras, números, punto, guion o guion bajo.</small>
+  <button [disabled]="renameForm.invalid || state.busy()">Guardar username</button>
+</form>
+<form #passwordForm="ngForm" (ngSubmit)="state.changePassword()">
+  <h3>Cambiar contraseña</h3>
+  <label for="current-password">Contraseña actual</label>
+  <input
+    id="current-password"
+    name="currentPassword"
+    type="password"
+    [(ngModel)]="state.currentPassword"
+    required
+    maxlength="128"
+    autocomplete="current-password"
+  />
+  <label for="new-password">Nueva contraseña</label>
+  <input
+    id="new-password"
+    name="newPassword"
+    type="password"
+    [(ngModel)]="state.newPassword"
+    required
+    minlength="12"
+    maxlength="128"
+    autocomplete="new-password"
+  />
+  <label for="confirm-password">Repetir nueva contraseña</label>
+  <input
+    id="confirm-password"
+    name="confirmPassword"
+    type="password"
+    [(ngModel)]="state.confirmPassword"
+    required
+    autocomplete="new-password"
+  />
+  <small>12–128 caracteres. Se cerrarán todas tus sesiones.</small>
+  <button
+    [disabled]="passwordForm.invalid || state.newPassword !== state.confirmPassword || state.busy()"
+  >
+    Cambiar contraseña
+  </button>
+</form>

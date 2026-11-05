@@ -1,0 +1,23 @@
+<ul class="accounts-list">
+  @for (account of state.accounts(); track account.id) {
+    <li>
+      <span
+        >{{ account.username }}
+        @if (account.id === state.auth.user()?.id) {
+          <small>(tú)</small>
+        }
+      </span>
+      <button
+        type="button"
+        class="danger"
+        [disabled]="state.busy() || state.accounts().length <= 1"
+        (click)="state.prepareDelete(account)"
+      >
+        Eliminar
+      </button>
+    </li>
+  }
+</ul>
+@if (state.accounts().length === 1) {
+  <p>Debe quedar al menos un administrador.</p>
+}
