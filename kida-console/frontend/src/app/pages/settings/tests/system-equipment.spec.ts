@@ -16,9 +16,9 @@ import {
   IonToolbar,
   provideIonicAngular,
 } from '@ionic/angular/standalone';
-import { equipmentGroup, equipmentGroups } from './equipment-data';
+import { equipmentGroup, equipmentGroups } from '../utils/equipment-data';
 import { displaySystemValue } from '../../system/utils/system-format';
-import { SystemEquipment } from './system-equipment';
+import { SystemEquipment } from '../components/system-equipment/system-equipment';
 
 const info = {
   hostname: 'core-server',

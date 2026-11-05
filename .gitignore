@@ -35,3 +35,4 @@ kida-console/**/*.sqlite3-shm
 .serena
 .agents
 .codex
+.impeccable/

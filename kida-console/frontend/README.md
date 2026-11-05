@@ -131,7 +131,7 @@ The component uses the Ionic module already loaded by ARCA to preserve lazy load
 
 Browser verification (all APIs simulated, no real power operations): with the
 frontend running at `http://127.0.0.1:4230`, run
-`node src/app/pages/settings/equipment/system-equipment.browser.cjs`. Set `SYSTEM_TEST_URL`,
+`node src/app/pages/settings/tests/system-equipment.browser.cjs`. Set `SYSTEM_TEST_URL`,
 `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH` or `SYSTEM_TEST_OUTPUT` if needed. It checks
 desktop/mobile across all seven theme/mode combinations, keyboard/focus, stale
 refreshes, navigation/session cleanup and reduced motion.

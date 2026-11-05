@@ -9,9 +9,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { IonicModule, IonModal } from '@ionic/angular';
-import { enterThemeModal, leaveThemeModal } from '../../../../theme/modal-motion';
-import { equipmentGroups, systemFields } from './equipment-data';
-import { SystemData } from '../../system/components/system-data/system-data';
+import { enterThemeModal, leaveThemeModal } from '../../../../../theme/modal-motion';
+import { equipmentGroups, systemFields } from '../../utils/equipment-data';
+import { SystemData } from '../../../system/components/system-data/system-data';
 
 @Component({
   selector: 'app-system-equipment',

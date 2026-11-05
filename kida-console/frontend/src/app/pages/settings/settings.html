@@ -1,0 +1,8 @@
+<ion-content class="console-content">
+  <main class="settings-layout">
+    <p class="eyebrow">KIDA CONSOLE</p>
+    <h1>Settings</h1>
+    <app-settings-appearance />
+    <app-system-equipment [value]="state.info()" [loading]="state.loading()" />
+  </main>
+</ion-content>
