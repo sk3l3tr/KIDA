@@ -1,4 +1,4 @@
-import { formatCoreFailure } from '../../services/core-failure';
+import { formatCoreFailure } from '../../../services/core-failure';
 import { OriginFilter, ScheduleRule } from './scheduler.models';
 
 export const originLabels: Record<OriginFilter, string> = {

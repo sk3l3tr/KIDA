@@ -1,0 +1,85 @@
+<section class="panel" aria-label="Programaciones" [attr.aria-busy]="state.loading()">
+  <div class="section-header">
+    <h2 #listHeading tabindex="-1">Programaciones</h2>
+    <button
+      class="secondary"
+      (click)="state.refresh()"
+      [disabled]="state.loading() || state.busy()"
+    >
+      Actualizar listado
+    </button>
+  </div>
+  <label for="scheduler-origin">Filtro de origen</label>
+  <select
+    class="console-control"
+    id="scheduler-origin"
+    [ngModel]="state.origin"
+    (ngModelChange)="state.selectOrigin($event)"
+    [attr.disabled]="state.loading() || state.busy() ? '' : null"
+  >
+    <option value="USER">Usuario</option>
+    <option value="INTERNAL">Interno</option>
+    <option value="ALL">Todos</option>
+  </select>
+  <div aria-live="polite">
+    @if (state.loading()) {
+      <p>Cargando…</p>
+    }
+    @if (state.updated()) {
+      <small
+        >Última actualización: {{ state.updated() | date: 'medium' }} ({{ state.zone }}).
+        Instantánea; puede estar desactualizada.</small
+      >
+    } @else {
+      <small>Sin actualización disponible.</small>
+    }
+    @if (state.listError()) {
+      <p class="error" role="alert">Error de actualización: {{ state.listError() }}</p>
+    }
+    @if (state.entries() !== null) {
+      <p>Origen de los datos visibles: {{ originLabels[state.visibleOrigin()!] }}.</p>
+      @if (state.listError() || state.loading()) {
+        <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
+      }
+      @if (state.entries()!.length === 0) {
+        <p>No hay programaciones para este filtro.</p>
+      }
+    }
+  </div>
+  <ul class="schedule-list">
+    @for (entry of state.entries(); track entry.id) {
+      <li>
+        <h3>{{ entry.command }}</h3>
+        <p>Identificador: {{ entry.id }}</p>
+        <p>
+          Origen:
+          {{
+            entry.origin === 'USER'
+              ? 'Usuario'
+              : entry.origin === 'INTERNAL'
+                ? 'Interno'
+                : entry.origin + ' (desconocido)'
+          }}
+        </p>
+        <p>{{ ruleSummary(entry.schedule) }}</p>
+        <p>
+          Próximo intento de admisión: {{ localDate(entry.next_enqueue_at) }} · {{ state.zone }}
+        </p>
+        <details>
+          <summary>Parámetros y datos originales</summary>
+          <pre>{{ entry | json }}</pre>
+        </details>
+        @if (entry.origin === 'USER') {
+          <button
+            class="danger"
+            (click)="state.prepareDelete(entry)"
+            [disabled]="state.busy() || state.loading()"
+            [attr.aria-label]="'Eliminar programación ' + entry.id"
+          >
+            Eliminar
+          </button>
+        }
+      </li>
+    }
+  </ul>
+</section>

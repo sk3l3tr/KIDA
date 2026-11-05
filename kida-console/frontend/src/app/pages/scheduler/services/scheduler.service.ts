@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { ArcaRequestService } from '../../services/arca-request.service';
-import { CreateSchedule, ListedSchedule, OriginFilter, Schedule } from './scheduler.models';
+import { ArcaRequestService } from '../../../services/arca-request.service';
+import { CreateSchedule, ListedSchedule, OriginFilter, Schedule } from '../utils/scheduler.models';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {

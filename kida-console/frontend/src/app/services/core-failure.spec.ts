@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { classifyCoreFailure } from './core-failure';
 import { systemFailure } from '../pages/system/utils/system.models';
-import { schedulerFailure } from '../pages/scheduler/scheduler-presentation';
+import { schedulerFailure } from '../pages/scheduler/utils/scheduler-presentation';
 import { dockerFailure } from '../pages/docker/utils/docker-presentation';
 
 const failure = (status: number, code?: string, message?: string) =>

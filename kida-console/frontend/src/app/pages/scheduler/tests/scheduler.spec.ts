@@ -1,19 +1,19 @@
-import { mockArcaDialogs } from '../../components/app-dialog/app-dialog.testing';
+import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
-import { appConfig } from '../../app.config';
-import { environment } from '../../../environments/environment';
-import { ThemeIdentity } from '../../../theme/integration';
-import { SchedulerService } from './scheduler.service';
-import { Scheduler } from './scheduler';
-import { ListedSchedule } from './scheduler.models';
-import { createBody, emptyForm, freezeSnapshot, localToUtc } from './scheduler-form';
-import { localDate, schedulerFailure, ruleSummary } from './scheduler-presentation';
-import { schedulerActions } from './scheduler.actions';
+import { appConfig } from '../../../app.config';
+import { environment } from '../../../../environments/environment';
+import { ThemeIdentity } from '../../../../theme/integration';
+import { SchedulerService } from '../services/scheduler.service';
+import { Scheduler } from '../scheduler';
+import { ListedSchedule } from '../utils/scheduler.models';
+import { createBody, emptyForm, freezeSnapshot, localToUtc } from '../utils/scheduler-form';
+import { localDate, schedulerFailure, ruleSummary } from '../utils/scheduler-presentation';
+import { schedulerActions } from '../utils/scheduler.actions';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
 const base = `${environment.apiBaseUrl}/scheduler`;
@@ -212,8 +212,8 @@ describe('Scheduler page', () => {
   function enter(data = [entry]) {
     const fixture = TestBed.createComponent(Scheduler);
     fixture.detectChanges();
-    const view = fixture.componentInstance;
-    view.ionViewWillEnter();
+    const view = fixture.componentInstance.state;
+    fixture.componentInstance.ionViewWillEnter();
     expect(view.loading()).toBe(true);
     http.expectOne(`${base}?origin=USER`).flush(data);
     fixture.detectChanges();
@@ -228,7 +228,7 @@ describe('Scheduler page', () => {
   }
   it('opens a common ARCA dialog with the frozen schedule summary', () => {
     const fixture = enter();
-    fixture.componentInstance.prepareAdd();
+    fixture.componentInstance.state.prepareAdd();
     expect(dialogs.config?.title).toBe('Confirmar programación');
     expect(dialogs.config?.text).toEqual(
       expect.arrayContaining([expect.stringContaining('system.info')]),
@@ -237,10 +237,47 @@ describe('Scheduler page', () => {
     http.expectOne(`${base}/add`).flush(entry);
     http.expectOne(`${base}?origin=USER`).flush([entry]);
   });
+  it('shares page state with the extracted form and list through their DOM actions', async () => {
+    const fixture = enter();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const command = fixture.nativeElement.querySelector('#scheduler-command') as HTMLInputElement;
+    command.value = 'system.health';
+    command.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.nativeElement
+      .querySelector('form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(dialogs.config?.text).toContain('Crear: system.health');
+    dialogs.choose();
+    const add = http.expectOne(`${base}/add`);
+    expect(add.request.body.command).toBe('system.health');
+    add.flush(entry);
+    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.schedule-list button').click();
+    expect(dialogs.config?.text).toContain(`Identificador: ${entry.id}`);
+    dialogs.choose();
+    const remove = http.expectOne(`${base}/delete`);
+    expect(remove.request.body).toEqual({ id: entry.id });
+    remove.flush(entry);
+    http.expectOne(`${base}?origin=USER`).flush([]);
+  });
+  it('invalidates the local facade and its pending confirmation when the page is destroyed', () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state;
+    state.prepareDelete(entry);
+    fixture.destroy();
+    expect(state.entries()).toBeNull();
+    expect(state.pending()).toBeNull();
+    state.confirm();
+    TestBed.inject(ThemeIdentity).clear();
+    http.expectNone(`${base}/delete`);
+    http.expectNone(`${base}?origin=USER`);
+  });
   it('renders empty states, safe HTML text, future fields and unknown origins without delete', () => {
     const fixture = enter([]);
     expect(fixture.nativeElement.textContent).toContain('No hay programaciones');
-    const view = fixture.componentInstance;
+    const view = fixture.componentInstance.state;
     view.refresh();
     const unsafe = '<img src=x onerror="alert(1)">';
     http
@@ -258,7 +295,7 @@ describe('Scheduler page', () => {
   });
   it('retains stale data with the original filter and timestamp when a different filter fails', async () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
+      view = fixture.componentInstance.state;
     const updated = view.updated();
     view.selectOrigin('ALL');
     view.selectOrigin('INTERNAL');
@@ -277,7 +314,7 @@ describe('Scheduler page', () => {
   });
   it('cancels without a request and freezes the exact summary/body, blocking double clicks', () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
+      view = fixture.componentInstance.state;
     view.prepareAdd();
     view.cancel();
     expect(view.form.params).toBe('{"nested":[1]}');
@@ -307,7 +344,7 @@ describe('Scheduler page', () => {
   });
   it('deletes only USER entries with an independent id and refreshes the current filter', () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
+      view = fixture.componentInstance.state;
     view.selectOrigin('ALL');
     http.expectOne(`${base}?origin=ALL`).flush([entry]);
     const selected = structuredClone(entry);
@@ -323,7 +360,7 @@ describe('Scheduler page', () => {
     expect(view.resultLabel()).toBe('Programación eliminada');
   });
   it('keeps action success separate from refresh failure', () => {
-    const view = enter().componentInstance;
+    const view = enter().componentInstance.state;
     view.prepareAdd();
     view.confirm();
     http.expectOne(`${base}/add`).flush(entry);
@@ -335,7 +372,7 @@ describe('Scheduler page', () => {
     expect(view.entries()).toEqual([entry]);
   });
   it('preserves form on rejection/uncertainty and never retries writes', () => {
-    const view = enter().componentInstance;
+    const view = enter().componentInstance.state;
     const form = structuredClone(view.form);
     for (const status of [422, 504, 0]) {
       view.prepareAdd();
@@ -354,7 +391,7 @@ describe('Scheduler page', () => {
   });
   it('blocks invalid forms and invalidates confirmations on leave or session change', () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
+      view = fixture.componentInstance.state;
     view.form.params = '{';
     view.prepareAdd();
     expect(view.pending()).toBeNull();
@@ -381,7 +418,7 @@ describe('Scheduler page', () => {
     'recovers if the %s confirmation cannot open, without sending',
     (action) => {
       const fixture = enter(),
-        view = fixture.componentInstance;
+        view = fixture.componentInstance.state;
       const form = structuredClone(view.form);
       dialogs.open.mockImplementationOnce(() => {
         throw new DOMException('Disconnected dialog', 'InvalidStateError');
@@ -404,7 +441,7 @@ describe('Scheduler page', () => {
   );
   it('restores creation focus after the refresh has enabled the trigger again', async () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
+      view = fixture.componentInstance.state;
     fixture.autoDetectChanges();
     await fixture.whenStable();
     const trigger = fixture.nativeElement.querySelector(
@@ -427,7 +464,7 @@ describe('Scheduler page', () => {
   });
   it('focuses the list heading if deleting removed the original trigger', async () => {
     const fixture = enter(),
-      view = fixture.componentInstance;
+      view = fixture.componentInstance.state;
     fixture.autoDetectChanges();
     await fixture.whenStable();
     const trigger = fixture.nativeElement.querySelector(
@@ -445,7 +482,7 @@ describe('Scheduler page', () => {
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector('h2[tabindex="-1"]'));
   });
   it('blocks a manual refresh while confirming or sending a write', () => {
-    const view = enter().componentInstance;
+    const view = enter().componentInstance.state;
     view.prepareAdd();
     view.refresh();
     http.expectNone(`${base}?origin=USER`);

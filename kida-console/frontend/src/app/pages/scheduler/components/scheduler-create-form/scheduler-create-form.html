@@ -1,0 +1,104 @@
+<section class="panel" aria-label="Crear programación">
+  <h2>Crear programación</h2>
+  <p>
+    CORE valida si el comando es programable, sus parámetros, cron, zonas y restricciones
+    temporales.
+  </p>
+  <form (ngSubmit)="state.prepareAdd()">
+    <fieldset [disabled]="state.busy()">
+      <legend>Comando y programación</legend>
+      <label for="scheduler-command">Comando</label>
+      <input id="scheduler-command" name="command" [(ngModel)]="state.form.command" required />
+      <label for="scheduler-params">Parámetros JSON</label>
+      <textarea
+        class="console-control"
+        id="scheduler-params"
+        name="params"
+        [(ngModel)]="state.form.params"
+        rows="6"
+        required
+        spellcheck="false"
+        aria-describedby="json-help"
+      ></textarea>
+      <small id="json-help"
+        >Objetos, arrays, escalares o null. Números JavaScript: se rechazan valores no finitos y
+        enteros no seguros; los decimales pueden redondearse.</small
+      >
+      <label for="scheduler-mode">Modalidad</label>
+      <select class="console-control" id="scheduler-mode" name="mode" [(ngModel)]="state.form.mode">
+        <option value="once">Puntual</option>
+        <option value="interval">Intervalo</option>
+        <option value="cron">Cron</option>
+      </select>
+      @switch (state.form.mode) {
+        @case ('once') {
+          <label for="scheduler-local">Fecha y hora local ({{ state.zone }})</label>
+          <input
+            id="scheduler-local"
+            name="local"
+            type="datetime-local"
+            step="1"
+            [(ngModel)]="state.form.local"
+            required
+            aria-describedby="date-help"
+          />
+          <small id="date-help"
+            >Se envía en UTC. En horas repetidas se usa la primera ocurrencia; verás el offset antes
+            de confirmar. Las horas inexistentes por cambio horario se rechazan.</small
+          >
+        }
+        @case ('interval') {
+          <label for="scheduler-seconds">Intervalo en segundos</label>
+          <input
+            id="scheduler-seconds"
+            name="seconds"
+            [(ngModel)]="state.form.seconds"
+            inputmode="numeric"
+            required
+            aria-describedby="seconds-help"
+          />
+          <small id="seconds-help"
+            >Entero entre 1 y 9007199254740991. Esta página admite enteros seguros de JavaScript; el
+            backend acepta u64.</small
+          >
+        }
+        @case ('cron') {
+          <label for="scheduler-expression">Expresión cron</label>
+          <input
+            id="scheduler-expression"
+            name="expression"
+            [(ngModel)]="state.form.expression"
+            required
+          />
+          <label for="scheduler-timezone">Zona IANA</label>
+          <input
+            id="scheduler-timezone"
+            name="timezone"
+            [(ngModel)]="state.form.timezone"
+            required
+          />
+        }
+      }
+    </fieldset>
+    <button type="submit" [disabled]="state.busy() || state.loading()">Crear programación</button>
+  </form>
+  <p>
+    Salir o cambiar de sesión descarta el formulario y las confirmaciones. Una petición enviada
+    puede seguir ejecutándose.
+  </p>
+  <div aria-live="polite">
+    @if (state.busy()) {
+      <p>Confirmación o acción pendiente…</p>
+    }
+    @if (state.error()) {
+      <p class="error" role="alert">{{ state.error() }}</p>
+    }
+    @if (state.result() !== null) {
+      <h3 class="success">{{ state.resultLabel() }}</h3>
+      <details>
+        <summary>Resultado de CORE</summary>
+        <pre>{{ state.result() | json }}</pre>
+      </details>
+    }
+  </div>
+</section>
