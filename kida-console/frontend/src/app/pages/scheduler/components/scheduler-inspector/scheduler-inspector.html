@@ -98,7 +98,7 @@
   @if (state.inspectedId() !== null) {
     <ng-container [ngTemplateOutlet]="operationStatus()" />
   }
-  <div panel-actions>
+  <ng-container panel-actions>
     @if (state.inspectedSchedule(); as entry) {
       @if (entry.origin === 'USER') {
         <button
@@ -111,5 +111,5 @@
         </button>
       }
     }
-  </div>
+  </ng-container>
 </app-side-panel>

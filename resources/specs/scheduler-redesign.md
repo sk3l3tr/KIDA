@@ -1,13 +1,13 @@
 # Rediseño de Scheduler
 
-Estado: especificación para revisión. No autoriza implementar código.
+Estado: SCH-01 a SCH-07 completadas. Producción conserva el bloqueo previo por presupuesto inicial, detallado en SCH-07.
 
 Referencia: `resources/mockups/scheduler-mockup.html`.
 Módulo: `kida-console/frontend/src/app/pages/scheduler`.
 
 ## 1. Diagnóstico
 
-### Arquitectura actual
+### Arquitectura al iniciar la especificación
 
 - Angular standalone, Ionic, signals, formularios con `ngModel` y transporte ARCA.
 - La página compone `SchedulerList` y `SchedulerCreateForm`; `SchedulerFacade` concentra estado, ciclo de vida, consultas y confirmaciones.
@@ -173,7 +173,29 @@ Validación: 139 pruebas de Scheduler, SidePanel, AppDialog, rutas y errores com
 - Éxito y fallo posterior de refresco permanecen diferenciados.
 - Sin paneles huérfanos ni pérdida de foco tras borrar.
 
-### SCH-07 — Validación visual y regresiones
+### SCH-07 — Validación visual y regresiones — Completada
+
+Verificación realizada el 2026-11-06, sin Playwright por instrucción del usuario:
+
+- Suite completa del frontend: 598 pruebas correctas en 28 archivos, incluidas 85 de Scheduler, rutas, errores, foco, componentes reutilizados y motor/integración de temas.
+- Build de desarrollo, formato de Scheduler y `git diff --check` correctos.
+- Build de producción ejecutado: mantiene el exceso previo de 19,21 kB sobre el presupuesto inicial de 1 MB. También permanece el aviso de estilos de Docker (4,51 kB frente a 4 kB); no se modificaron presupuestos ni estilos ajenos.
+- Comparación estática con el mockup: cabecera/CTA, cuatro indicadores, inventario de seis columnas, filtros/búsqueda y paneles presentes. CSS define cuatro/dos columnas, scroll horizontal de tabla y panel móvil de ancho completo. Los estilos reutilizan tokens del tema; estas comprobaciones no acreditan su apariencia renderizada.
+- Añadida regresión de movimiento reducido para entrada/salida de ambos paneles: duración mínima y ausencia de desplazamiento, con entorno simulado.
+- Revisión independiente detectó un pie vacío en el inspector sin acciones. Corregido mediante proyección sin elemento contenedor; pruebas para orígenes protegidos y definición ausente. Segunda revisión sin hallazgos pendientes.
+
+Verificación visual completada el 2026-11-06 tras autorización expresa del usuario para usar Playwright:
+
+- Chromium real contra el frontend de desarrollo, con todas las respuestas `/api/**` interceptadas mediante fixtures. Sin escrituras en CORE, cuentas ni bases de datos reales.
+- 28 combinaciones correctas: siete apariencias (Professional, Neobrutalism y Sakura en claro/oscuro; Tokyo oscuro), escritorio 1440×1000 y móvil 390×844, modos Ionic MD/iOS. Inventario, inspector, formulario y confirmación superpuesta capturados; sin errores JavaScript ni desbordamiento de página. Panel móvil a ancho completo y tabla con scroll horizontal contenido.
+- Comparación con el mockup renderizado y revisión independiente de capturas representativas de los cuatro temas. Capturas desplazadas adicionales comprueban los extremos del inventario móvil y el final del formulario, que `fullPage` no incluye al existir scroll interno de Ionic. Sin hallazgos visuales pendientes.
+- Contraste medido sobre elementos renderizados de inventario/inspector en las siete apariencias: 67 muestras por apariencia, mínimo observado 4,62:1. Comprobaciones adicionales de texto/botones del formulario y confirmación cumplen el umbral correspondiente. Es evidencia de elementos concretos, no una certificación completa de accesibilidad.
+- Con movimiento reducido: apertura del inspector mediante Enter, foco confinado por Tab en la confirmación, cancelación sin envío, Escape y retorno al botón de inspección; formulario de intervalo conserva unidades/borrador tras rechazo HTTP.
+- Con animaciones normales, en las siete apariencias: Tab/Shift+Tab dentro del panel, borrado correcto seguido de fallo de refresco con resultado diferenciado y recuperación de foco fuera del panel. Comprobado cambio de tema desde otra pestaña con el inspector abierto. Ionic puede devolver foco al botón de origen si permanece disponible o al encabezado del listado.
+- Comprobaciones adicionales en móvil para las siete apariencias: origen desconocido protegido y sin pie vacío, ausencia de coincidencias, fecha puntual con segundos, cron con zona IANA libre, cancelación sin envío y alta correcta que cierra el formulario.
+- Evidencia local temporal: `/tmp/kida-scheduler-visual/`, con 136 capturas y `results.json`, `extra-results.json`, `flows-results.json`. Scripts específicos de validación en `/tmp/kida-scheduler-{visual,extra,flows}.cjs`; no se añadieron dependencias ni artefactos generados al repositorio.
+
+Límites: pruebas de navegador con datos HTTP simulados; no validan integración con CORE real, Safari/WebKit ni dispositivos físicos. El build de producción sigue bloqueado por el presupuesto inicial previo; no se modificaron sus límites para cerrar la historia.
 
 **Objetivo:** cerrar la fidelidad visual y la compatibilidad.
 
@@ -193,8 +215,8 @@ Validación: 139 pruebas de Scheduler, SidePanel, AppDialog, rutas y errores com
 
 - Decisión confirmada por el usuario: una lectura `ALL` y filtros locales para reproducir los contadores globales.
 - Sin anclaje editable ni historial: son límites del contrato, resueltos mediante las adaptaciones indicadas.
-- La convivencia de `SidePanel` y `AppDialog` requiere comprobar foco y cierre en Ionic real durante la implementación.
+- La convivencia de `SidePanel` y `AppDialog` quedó comprobada con Ionic real en Chromium, con los límites de entorno indicados en SCH-07.
 
-## Estado de verificación de la exploración
+## Estado de verificación de la exploración inicial (histórico)
 
 No se implementó código ni se ejecutaron suites durante la exploración. El intento de abrir el mockup con Playwright quedó bloqueado por el protocolo `file:`; la apariencia renderizada permanece sin verificar.

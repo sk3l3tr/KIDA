@@ -512,6 +512,7 @@ describe('Scheduler page', () => {
     );
     expect(root.textContent).toContain('Cron: 0 3 * * * · Europe/Madrid');
     expect(root.querySelector('button.danger')).toBeNull();
+    expect(root.querySelector('.panel-actions')?.children).toHaveLength(0);
     expect(fixture.nativeElement.querySelector('tbody button.danger')).toBeNull();
     state.prepareDelete(state.inspectedSchedule()!);
     state.confirm();
@@ -570,6 +571,7 @@ describe('Scheduler page', () => {
     expect(state.inspectedSchedule()).toBeNull();
     expect(root.textContent).toContain('Programación no disponible en esta lectura');
     expect(root.querySelector('pre')).toBeNull();
+    expect(root.querySelector('.panel-actions')?.children).toHaveLength(0);
   });
   it('invalidates inspection on leave and identity changes without reopening it on a new entry', () => {
     const fixture = enter(),
@@ -1048,6 +1050,34 @@ describe('Scheduler page', () => {
     fixture.detectChanges();
     expect(trigger.isConnected).toBe(false);
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector('h2[tabindex="-1"]'));
+  });
+  it('removes panel movement for reduced motion in creation and inspection', () => {
+    const fixture = enter();
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: () => ({ matches: true }),
+    });
+    const base = document.createElement('div');
+    base.attachShadow({ mode: 'open' }).innerHTML =
+      '<div part="content"></div><ion-backdrop></ion-backdrop>';
+    document.body.appendChild(base);
+    try {
+      const panels = fixture.debugElement.queryAll(By.directive(SidePanel));
+      expect(panels).toHaveLength(2);
+      for (const element of panels) {
+        const panel = element.componentInstance as SidePanel;
+        for (const animation of [panel.enterAnimation(base), panel.leaveAnimation(base)]) {
+          expect(animation.getDuration()).toBe(1);
+          expect(animation.childAnimations[0].getKeyframes()[0]['transform']).toBe('none');
+          animation.destroy();
+        }
+      }
+    } finally {
+      base.remove();
+      if (descriptor) Object.defineProperty(window, 'matchMedia', descriptor);
+      else Reflect.deleteProperty(window, 'matchMedia');
+    }
   });
   it('blocks a manual refresh while confirming or sending a write', () => {
     const view = enter().componentInstance.state;
