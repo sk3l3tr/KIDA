@@ -1,9 +1,16 @@
 <ion-content class="console-content">
   @if (backups.active()) {
     <div class="console-layout backups-layout">
-      <section class="panel" aria-labelledby="backup-health-heading">
+      <section class="health-history" aria-labelledby="backup-health-heading">
         <div class="section-header">
-          <h1 id="backup-health-heading">Backup Health</h1>
+          <div>
+            <h1 id="backup-health-heading" #listHeading tabindex="-1">
+              Comprobaciones de recuperación
+            </h1>
+            <p class="health-subtitle">
+              Historial de Backup Health · Estado operativo y diagnóstico por separado.
+            </p>
+          </div>
           <div class="row-actions">
             <button
               type="button"
@@ -15,6 +22,13 @@
             <button
               type="button"
               class="secondary"
+              (click)="state.refresh()"
+              [disabled]="state.disabled()"
+            >
+              Actualizar historial
+            </button>
+            <button
+              type="button"
               (click)="backups.openHealthForm('health-run')"
               [disabled]="state.disabled()"
             >
@@ -22,9 +36,7 @@
             </button>
           </div>
         </div>
-        <p>Consulta y gestiona las comprobaciones de recuperación de las copias de seguridad.</p>
         @let health = state;
-        <p>El diagnóstico técnico requiere validación funcional del administrador.</p>
         <ng-template #operationFeedback>
           @if (health.result() || health.error() || health.uncertainties().length) {
             <p>Resultados y avisos de Health. Pueden corresponder a otra ejecución de Health.</p>
@@ -66,18 +78,7 @@
         </ng-template>
         <ng-container [ngTemplateOutlet]="operationFeedback" />
         <section aria-labelledby="health-history-heading" [attr.aria-busy]="health.loading()">
-          <div class="section-header">
-            <h3 id="health-history-heading" #listHeading tabindex="-1">Historial de Health</h3>
-            <button
-              type="button"
-              class="secondary"
-              (click)="health.refresh()"
-              [disabled]="health.disabled()"
-            >
-              Actualizar historial Health
-            </button>
-          </div>
-          <div aria-live="polite">
+          <div class="health-reading" aria-live="polite">
             @if (health.loading()) {
               <p>Cargando historial Health…</p>
             }
@@ -95,11 +96,7 @@
             @if (health.entries() !== null && (health.loading() || health.listError())) {
               <p>Historial anterior, desactualizado; pendiente de actualizar.</p>
             }
-            @if (health.entries()?.length === 0) {
-              <p>No hay ejecuciones de Health.</p>
-            }
           </div>
-          <p>Fechas en la hora local del navegador.</p>
           <div
             class="table-wrap"
             role="region"
@@ -107,8 +104,8 @@
             tabindex="0"
           >
             <table>
-              <caption class="health-caption">
-                Comprobaciones de recuperación
+              <caption class="health-caption" id="health-history-heading">
+                Historial de Backup Health
               </caption>
               <thead>
                 <tr>
@@ -116,7 +113,7 @@
                   <th scope="col">Modo</th>
                   <th scope="col">Estado</th>
                   <th scope="col">Diagnóstico</th>
-                  <th scope="col">Creación</th>
+                  <th scope="col">Creado</th>
                   <th scope="col">Detalle</th>
                 </tr>
               </thead>
@@ -125,37 +122,77 @@
                   <tr>
                     <th scope="row">
                       <strong>{{ row.definition.name }}</strong>
-                      <p>
-                        Backup: {{ row.definition.backup.reference }} ·
-                        {{ row.definition.backup.version }}
-                      </p>
-                      <p>run_id: {{ row.run_id }}</p>
+                      <p>{{ row.definition.backup.reference }}</p>
                     </th>
-                    <td>{{ row.mode }}</td>
-                    <td>{{ row.state }}</td>
                     <td>
-                      {{ row.diagnosis.result }}
-                      <p>Completo: {{ row.diagnosis.complete ? 'Sí' : 'No' }}</p>
+                      @switch (row.mode) {
+                        @case ('MANUAL') {
+                          Manual
+                        }
+                        @case ('AUTOMATIC') {
+                          Automático
+                        }
+                        @default {
+                          {{ row.mode }}
+                        }
+                      }
                     </td>
-                    <td>{{ healthDate(row.created_at) }}</td>
+                    <td>
+                      <span
+                        class="health-badge"
+                        [class.health-badge-danger]="row.state === 'ERROR'"
+                        >{{ row.state }}</span
+                      >
+                    </td>
+                    <td>
+                      <span
+                        class="health-badge"
+                        [class.health-badge-success]="row.diagnosis.result === 'HEALTHY'"
+                        [class.health-badge-danger]="
+                          row.diagnosis.result === 'FAILED' || row.diagnosis.result === 'UNHEALTHY'
+                        "
+                        [class.health-badge-warning]="
+                          row.diagnosis.result === 'UNKNOWN' || row.diagnosis.result === 'DEGRADED'
+                        "
+                        >{{ row.diagnosis.result }}</span
+                      >
+                      <p>{{ row.diagnosis.complete ? 'Completo' : 'Pendiente' }}</p>
+                    </td>
+                    <td>
+                      {{ healthDate(row.created_at) }}
+                      <p>{{ zone }}</p>
+                    </td>
                     <td>
                       <button
                         type="button"
-                        class="secondary"
+                        class="secondary icon-only"
                         (click)="backups.openHealthDetail(row.run_id)"
                         [attr.aria-label]="'Ver Health ' + row.run_id"
                         [attr.aria-pressed]="health.selectedId() === row.run_id"
                         [disabled]="health.disabled()"
                       >
-                        <span class="i i-eye" aria-hidden="true"></span>Ver detalle Health
+                        <span class="i i-eye" aria-hidden="true"></span>
                       </button>
                     </td>
                   </tr>
+                } @empty {
+                  @if (health.entries()?.length === 0 && !health.loading() && !health.listError()) {
+                    <tr>
+                      <td colspan="6" class="health-empty">
+                        <span role="status">No hay ejecuciones de Health.</span>
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
           </div>
         </section>
+        <p class="health-note">
+          El diagnóstico técnico requiere validación funcional del administrador. Las lecturas
+          muestran una instantánea, sin seguimiento en tiempo real. Fechas en la hora local del
+          navegador.
+        </p>
       </section>
     </div>
     <app-side-panel

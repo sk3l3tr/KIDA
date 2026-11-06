@@ -882,18 +882,14 @@ describe('Health basic state and page integration', () => {
     const table = fixture.nativeElement.querySelector('table') as HTMLTableElement;
     const row = table.querySelector('tbody tr')!;
     expect(table.querySelectorAll('thead th[scope="col"]')).toHaveLength(6);
-    expect(row.querySelector('th[scope="row"]')?.textContent).toContain(run.run_id);
-    for (const value of [
-      'daily',
-      'latest',
-      'FUTURE_MODE',
-      'FUTURE_STATE',
-      'FUTURE_RESULT',
-      'Completo: No',
-    ])
+    expect(row.querySelector('th[scope="row"]')?.textContent).toContain(run.definition.name);
+    for (const value of ['daily', 'FUTURE_MODE', 'FUTURE_STATE', 'FUTURE_RESULT', 'Pendiente'])
       expect(row.textContent).toContain(value);
     expect(row.textContent).toContain(new Date(run.created_at).toLocaleString('es-ES'));
-    expect(row.querySelector('.success, .danger, .warning')).toBeNull();
+    expect(row.textContent).toContain(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    expect(
+      row.querySelector('.health-badge-success, .health-badge-danger, .health-badge-warning'),
+    ).toBeNull();
     expect(table.closest('[role="region"]')?.getAttribute('tabindex')).toBe('0');
     expect(fixture.nativeElement.textContent).toContain('hora local del navegador');
     expect(fixture.nativeElement.querySelector('app-backup-health-detail')).toBeNull();
@@ -903,6 +899,9 @@ describe('Health basic state and page integration', () => {
     const panel = fixture.debugElement.query(By.directive(SidePanel))
       .componentInstance as SidePanel;
     expect(panel.open()).toBe(true);
+    const detail = fixture.nativeElement.querySelector('app-backup-health-detail');
+    expect(detail.textContent).toContain(run.run_id);
+    expect(detail.textContent).toContain(run.definition.backup.version);
     expect(fixture.nativeElement.querySelectorAll('[panel-actions] button')).toHaveLength(3);
     expect(fixture.nativeElement.querySelector('#health-definition')).toBeNull();
     expect(fixture.nativeElement.querySelector('#health-automatic-definition')).toBeNull();
@@ -911,6 +910,63 @@ describe('Health basic state and page integration', () => {
         (button: any) => button.textContent.trim() === 'Crear Health',
       ),
     ).toBe(true);
+  });
+
+  it.each([
+    ['RUNNING', 'UNKNOWN', 'warning', false, 'MANUAL', 'Manual'],
+    ['ERROR', 'HEALTHY', 'success', true, 'AUTOMATIC', 'Automático'],
+    ['STOPPED', 'UNHEALTHY', 'danger', true, 'MANUAL', 'Manual'],
+    ['RUNNING', 'FAILED', 'danger', false, 'AUTOMATIC', 'Automático'],
+    ['STOPPED', 'DEGRADED', 'warning', false, 'MANUAL', 'Manual'],
+  ] as const)(
+    'separates state %s from diagnosis %s',
+    (state, result, tone, complete, mode, label) => {
+      const fixture = enter([
+        { ...record, state, mode, diagnosis: { ...record.diagnosis, result, complete } },
+      ]);
+      fixture.detectChanges();
+      const row = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
+      const badges = row.querySelectorAll('.health-badge');
+      expect(row.cells[1].textContent?.trim()).toBe(label);
+      expect(badges[0].textContent?.trim()).toBe(state);
+      expect(badges[0].classList.contains('health-badge-danger')).toBe(state === 'ERROR');
+      expect(badges[1].textContent?.trim()).toBe(result);
+      expect(badges[1].classList.contains(`health-badge-${tone}`)).toBe(true);
+      expect(row.cells[3].querySelector('p')?.textContent?.trim()).toBe(
+        complete ? 'Completo' : 'Pendiente',
+      );
+    },
+  );
+
+  it('distinguishes the empty table from loading and errors, retaining stale rows', () => {
+    const fixture = enter([]);
+    const health = fixture.componentInstance.state.health;
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody td[colspan="6"]')?.textContent).toContain(
+      'No hay ejecuciones de Health',
+    );
+    health.refresh();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.health-empty')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Cargando historial Health');
+    http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.health-empty')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Error de actualización del historial');
+    health.refresh();
+    http.expectOne(`${base}/health`).flush([record]);
+    health.refresh();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody th')?.textContent).toContain(
+      record.definition.name,
+    );
+    expect(fixture.nativeElement.textContent).toContain('Historial anterior, desactualizado');
+    http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody th')?.textContent).toContain(
+      record.definition.name,
+    );
+    expect(fixture.nativeElement.textContent).toContain('Historial anterior, desactualizado');
   });
 
   it('suspends the panel trap during confirmation and restores it with focus on cancellation', async () => {

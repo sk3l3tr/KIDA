@@ -58,6 +58,7 @@ export class BackupHealth implements OnDestroy {
   });
   readonly limitedPrecision = limitedPrecision;
   readonly healthDate = healthDate;
+  readonly zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly arca = inject(ArcaService);
