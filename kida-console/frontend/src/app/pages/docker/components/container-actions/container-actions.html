@@ -3,6 +3,7 @@
   @for (action of actions(); track action) {
     <button
       type="button"
+      [class.secondary]="compact()"
       [disabled]="state.actionLocked(action, containerId())"
       [attr.aria-label]="labels[action] + ' contenedor ' + (current?.name ?? containerId())"
       (click)="current && state.prepare(action, current)"

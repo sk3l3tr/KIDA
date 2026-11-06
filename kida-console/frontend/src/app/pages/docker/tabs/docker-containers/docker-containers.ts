@@ -19,7 +19,7 @@ import { ContainerActions } from '../../components/container-actions/container-a
     ContainerActions,
   ],
   templateUrl: './docker-containers.html',
-  styleUrl: '../../docker.scss',
+  styleUrls: ['../../docker.scss', './docker-containers.scss'],
 })
 export class DockerContainers {
   readonly state = inject(DockerFacade);

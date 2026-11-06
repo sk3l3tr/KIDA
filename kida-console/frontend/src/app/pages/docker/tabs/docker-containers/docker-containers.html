@@ -3,22 +3,39 @@
     <app-docker-indicators />
     <app-docker-operation-status [showDetails]="true" />
     <section aria-labelledby="docker-containers-title" [attr.aria-busy]="state.inventory.loading()">
-      <div class="section-header">
+      <div class="section-header containers-header">
         <div>
+          <p class="containers-eyebrow">Inventario / Contenedores</p>
           <h2 id="docker-containers-title" #listHeading data-docker-heading tabindex="-1">
             Contenedores Docker
           </h2>
+          <p class="containers-description">
+            Consulta, filtra e inspecciona el inventario del servidor
+          </p>
         </div>
         <button
           type="button"
+          class="secondary"
           (click)="state.refreshContainers()"
           [disabled]="state.inventory.loading() || state.busy() || state.pending() !== null"
         >
+          <span class="i i-refresh" aria-hidden="true"></span>
           Actualizar contenedores
         </button>
       </div>
       <div class="panel inventory-panel">
-        <h3>Inventario de contenedores</h3>
+        <header class="inventory-header">
+          <div>
+            <h3><span class="i i-cube" aria-hidden="true"></span>Inventario de contenedores</h3>
+            <p>Nombre, imagen, estado y operaciones disponibles</p>
+          </div>
+          @if (state.inventory.data(); as data) {
+            <span class="inventory-count">
+              {{ data.containers.length }}
+              {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}
+            </span>
+          }
+        </header>
         <app-docker-section-status
           [state]="state.inventory"
           loadingText="Cargando contenedores…"
@@ -26,25 +43,20 @@
           staleText="Datos anteriores, desactualizados; actualiza contenedores."
         />
         @if (state.inventory.data(); as data) {
-          <p>
-            {{ data.containers.length }}
-            {{ data.containers.length === 1 ? 'contenedor recibido' : 'contenedores recibidos' }}
-          </p>
-          <p>
-            Total: {{ state.counter(data.total) }} · En ejecución:
-            {{ state.counter(data.running) }}
-          </p>
           <div class="inventory-tools">
-            <label for="docker-search">Buscar contenedores</label>
-            <input
-              id="docker-search"
-              class="console-control"
-              type="search"
-              placeholder="Nombre, ID, imagen, proyecto o servicio"
-              [value]="state.search()"
-              (input)="state.search.set($any($event.target).value)"
-            />
-            <label for="docker-activity">Actividad</label>
+            <div class="inventory-search">
+              <label class="visually-hidden" for="docker-search">Buscar contenedores</label>
+              <span class="i i-search" aria-hidden="true"></span>
+              <input
+                id="docker-search"
+                class="console-control"
+                type="search"
+                placeholder="Nombre, ID, imagen, proyecto o servicio"
+                [value]="state.search()"
+                (input)="state.search.set($any($event.target).value)"
+              />
+            </div>
+            <label class="visually-hidden" for="docker-activity">Actividad</label>
             <select
               id="docker-activity"
               class="console-control"
@@ -55,7 +67,7 @@
               <option value="online">En ejecución</option>
               <option value="offline">Fuera de línea</option>
             </select>
-            <span aria-live="polite"
+            <span class="inventory-results" aria-live="polite"
               >{{ state.visibleContainers().length }}
               {{ state.visibleContainers().length === 1 ? 'resultado' : 'resultados' }}</span
             >
@@ -93,18 +105,28 @@
                     <td>
                       <span class="mobile-label">Contenedor</span>
                       <button
+                        class="container-name"
+                        [title]="container.name"
                         type="button"
                         [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
                         (click)="state.openContainer(container.id, 'inventory')"
                       >
-                        {{ container.name }}
+                        <span class="truncated">{{ container.name }}</span>
+                        <small class="container-id truncated" [title]="container.id">{{
+                          container.id
+                        }}</small>
                       </button>
                     </td>
                     <td>
-                      <span class="mobile-label">Estado</span
-                      >{{ container.online ? 'En ejecución' : 'Fuera de línea' }}
+                      <span class="mobile-label">Estado</span>
+                      <span class="container-state" [class.online]="container.online">
+                        {{ container.online ? 'En ejecución' : 'Fuera de línea' }}
+                      </span>
                     </td>
-                    <td><span class="mobile-label">Imagen</span>{{ container.image }}</td>
+                    <td>
+                      <span class="mobile-label">Imagen</span
+                      ><span class="container-image">{{ container.image }}</span>
+                    </td>
                     <td>
                       <span class="mobile-label">Servicio / Proyecto</span>
                       @if (state.associations(); as associations) {
@@ -112,8 +134,12 @@
                         @if (association === 'ambiguous') {
                           Asociación ambigua
                         } @else if (association) {
-                          {{ association.service === null ? 'Sin nombre' : association.service }}
-                          / {{ association.project }}
+                          <span class="compose-service">{{
+                            association.service === null ? 'Sin nombre' : association.service
+                          }}</span>
+                          <small class="compose-project truncated" [title]="association.project">{{
+                            association.project
+                          }}</small>
                         } @else {
                           Sin asociación Compose observada
                         }
@@ -140,6 +166,10 @@
               </tbody>
             </table>
           </div>
+          <p class="inventory-summary">
+            Total: {{ state.counter(data.total) }} · En ejecución:
+            {{ state.counter(data.running) }}
+          </p>
           @if (!data.containers.length) {
             <p>No hay contenedores.</p>
           } @else if (!state.visibleContainers().length) {
