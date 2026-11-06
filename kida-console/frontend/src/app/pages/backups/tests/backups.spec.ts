@@ -603,7 +603,9 @@ describe('Backups page', () => {
       const facade = fixture.componentInstance.state;
       facade.openConfigurationDetail(job.id);
       fixture.detectChanges();
-      fixture.nativeElement.querySelector('[panel-actions] button').click();
+      fixture.nativeElement
+        .querySelector('[panel-actions] button[aria-label^="Solicitar backup "]')
+        .click();
       dialogs.choose();
       http.expectOne(`${base}/run`).flush({}, { status, statusText: 'Failure' });
       fixture.detectChanges();
@@ -621,7 +623,9 @@ describe('Backups page', () => {
       facade.openConfigurationDetail('second');
       fixture.detectChanges();
       const inspector = fixture.nativeElement.querySelector('app-side-panel');
-      expect(inspector.textContent).toContain('Detalles: Second');
+      expect(fixture.debugElement.query(By.directive(SidePanel)).componentInstance.title()).toBe(
+        'Second',
+      );
       expect(inspector.textContent).toContain('Pueden corresponder a otra configuración');
       expect(inspector.querySelector('[role="alert"]')?.textContent).toContain(message);
     },
@@ -632,7 +636,9 @@ describe('Backups page', () => {
     const facade = fixture.componentInstance.state;
     facade.openConfigurationDetail(job.id);
     fixture.detectChanges();
-    fixture.nativeElement.querySelector('[panel-actions] button').click();
+    fixture.nativeElement
+      .querySelector('[panel-actions] button[aria-label^="Solicitar backup "]')
+      .click();
     dialogs.choose();
     http
       .expectOne(`${base}/run`)

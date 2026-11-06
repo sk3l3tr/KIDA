@@ -175,13 +175,17 @@
         (backups.panel() === 'configuration-detail' && state.selected() !== null)
       "
       [focusTrap]="state.pending() === null"
-      context="BACKUPS / CONFIGURACIÓN"
+      [context]="backups.panel() === 'configuration-create' ? 'BACKUPS / CONFIGURACIÓN' : undefined"
       [title]="
         backups.panel() === 'configuration-create'
           ? 'Nueva configuración'
           : (state.selected()?.name ?? 'Configuración de backup')
       "
-      [subtitle]="state.selected()?.id"
+      [subtitle]="
+        backups.panel() === 'configuration-create'
+          ? state.selected()?.id
+          : 'Configuración de backup · Rutas en el servidor CORE'
+      "
       [fallbackFocus]="this.listHeading()?.nativeElement ?? null"
       (closed)="backups.closeConfigurationPanel()"
     >
@@ -189,9 +193,8 @@
         <app-backup-create-form [state]="state" (created)="backups.closeConfigurationPanel()" />
       } @else if (state.selected(); as job) {
         <ng-container [ngTemplateOutlet]="operationFeedback" />
-        <section aria-labelledby="backup-detail-heading" [attr.aria-busy]="state.loading()">
-          <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
-          <div aria-live="polite">
+        <div class="configuration-detail" [attr.aria-busy]="state.loading()">
+          <div class="configuration-reading" aria-live="polite">
             @if (state.updated()) {
               <p>
                 Última lectura: {{ state.updated() | date: 'medium' }} (hora local del navegador).
@@ -207,46 +210,95 @@
               <p>Configuración anterior, desactualizada; pendiente de actualizar.</p>
             }
           </div>
-          <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
-          <h4>Orígenes</h4>
-          <ul>
-            @for (source of job.sources; track $index) {
-              <li>{{ source }}</li>
-            }
-          </ul>
-          <h4>Destinos</h4>
-          <ul>
+          <section aria-labelledby="backup-detail-heading">
+            <h3 id="backup-detail-heading">Identificación</h3>
+            <dl class="configuration-fields">
+              <div>
+                <dt>ID</dt>
+                <dd>{{ job.id }}</dd>
+              </div>
+              <div>
+                <dt>Compresión</dt>
+                <dd>{{ job.compression }}</dd>
+              </div>
+            </dl>
+          </section>
+          <section aria-labelledby="backup-sources-heading">
+            <h3 id="backup-sources-heading">Orígenes</h3>
+            <dl class="configuration-fields">
+              @for (source of job.sources; track $index) {
+                <div>
+                  <dt>Ruta</dt>
+                  <dd>{{ source }}</dd>
+                </div>
+              }
+            </dl>
+          </section>
+          <section aria-labelledby="backup-targets-heading">
+            <h3 id="backup-targets-heading">Destinos</h3>
             @for (target of job.targets; track $index) {
-              <li>
-                {{ target.path }} · Obligatorio: {{ target.required ? 'Sí' : 'No' }} · UUID:
-                @if (target.filesystem_uuid === undefined) {
-                  Omitido
-                } @else if (target.filesystem_uuid === null) {
-                  null
-                } @else {
-                  {{ target.filesystem_uuid }}
-                }
-              </li>
+              <dl class="configuration-fields">
+                <div>
+                  <dt>Ruta</dt>
+                  <dd>{{ target.path }}</dd>
+                </div>
+                <div>
+                  <dt>Obligatoriedad</dt>
+                  <dd>{{ target.required ? 'Obligatorio' : 'Opcional' }}</dd>
+                </div>
+                <div>
+                  <dt>UUID</dt>
+                  <dd>
+                    @if (target.filesystem_uuid === undefined) {
+                      Omitido
+                    } @else if (target.filesystem_uuid === null) {
+                      null
+                    } @else {
+                      {{ target.filesystem_uuid }}
+                    }
+                  </dd>
+                </div>
+              </dl>
             }
-          </ul>
-          <h4>Lifecycle</h4>
-          <pre>{{ job.lifecycle | json }}</pre>
-          <h4>Schedule</h4>
-          <pre>{{ job.schedule === undefined ? 'Omitido' : (job.schedule | json) }}</pre>
-          <h4>Retention</h4>
-          <pre>{{ job.retention === undefined ? 'Omitido' : (job.retention | json) }}</pre>
-          <p>Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.</p>
+          </section>
+          <section aria-labelledby="backup-lifecycle-heading">
+            <h3 id="backup-lifecycle-heading">Comandos de Lifecycle</h3>
+            <pre class="configuration-json">{{ job.lifecycle | json }}</pre>
+          </section>
+          <section aria-labelledby="backup-metadata-heading">
+            <h3 id="backup-metadata-heading">Metadatos</h3>
+            <dl class="configuration-fields">
+              <div>
+                <dt>Schedule</dt>
+                <dd>
+                  <pre>{{ job.schedule === undefined ? 'Omitido' : (job.schedule | json) }}</pre>
+                </dd>
+              </div>
+              <div>
+                <dt>Retention</dt>
+                <dd>
+                  <pre>{{ job.retention === undefined ? 'Omitido' : (job.retention | json) }}</pre>
+                </dd>
+              </div>
+            </dl>
+            <p class="configuration-note">
+              Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.
+            </p>
+          </section>
           @if (limitedPrecision(job)) {
             <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
           }
           <details>
             <summary>Configuración completa (JSON)</summary>
-            <pre>{{ job | json }}</pre>
+            <pre class="configuration-json">{{ job | json }}</pre>
           </details>
-        </section>
+        </div>
       }
 
-      <div panel-actions>
+      <div
+        panel-actions
+        [class.configuration-detail-actions]="backups.panel() === 'configuration-detail'"
+      >
         @if (backups.panel() === 'configuration-create') {
           <button class="secondary" type="button" (click)="backups.closeConfigurationPanel()">
             Cancelar
@@ -260,19 +312,19 @@
           </button>
         } @else if (state.selected(); as job) {
           <button
-            (click)="state.prepare('run', job)"
-            [disabled]="state.operationsBlocked()"
-            [attr.aria-label]="'Solicitar backup ' + job.name"
-          >
-            <span class="i i-play" aria-hidden="true"></span>Solicitar backup
-          </button>
-          <button
             class="danger"
             (click)="state.prepare('delete', job)"
             [disabled]="state.operationsBlocked()"
             [attr.aria-label]="'Eliminar configuración ' + job.name"
           >
             <span class="i i-trash" aria-hidden="true"></span>Eliminar configuración
+          </button>
+          <button
+            (click)="state.prepare('run', job)"
+            [disabled]="state.operationsBlocked()"
+            [attr.aria-label]="'Solicitar backup ' + job.name"
+          >
+            <span class="i i-play" aria-hidden="true"></span>Solicitar backup
           </button>
         }
       </div>

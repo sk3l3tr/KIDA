@@ -141,8 +141,76 @@
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-app-side-panel li {
+.configuration-detail {
+  min-width: 0;
   overflow-wrap: anywhere;
+
+  h3 {
+    margin: 0 0 1rem;
+    color: var(--kida-muted);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  section + section,
+  details {
+    margin-top: 2rem;
+  }
+
+  pre {
+    margin: 0;
+    max-height: none;
+    white-space: pre-wrap;
+  }
+
+  details {
+    border-top: var(--kida-border-width) solid var(--ion-border-color);
+  }
+}
+.configuration-reading,
+.configuration-note {
+  color: var(--kida-muted);
+  line-height: 1.6;
+}
+.configuration-reading p {
+  margin: 0 0 1rem;
+}
+.configuration-fields {
+  margin: 0;
+
+  > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    gap: 1rem;
+    padding-block: 0.75rem;
+    border-bottom: var(--kida-border-width) solid var(--ion-border-color);
+  }
+
+  dt {
+    color: var(--kida-muted);
+  }
+
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+.configuration-json {
+  padding: 1rem;
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  background: var(--ion-background-color);
+}
+.configuration-detail-actions {
+  justify-content: flex-end;
+}
+@media (max-width: 380px) {
+  .configuration-fields > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+  }
 }
 .backups-layout {
   container-type: inline-size;
