@@ -179,6 +179,25 @@ describe('Scheduler validation', () => {
       expect(() => createBody({ ...form, ...patch })).toThrow();
   });
   it.each([
+    ['seconds', 1],
+    ['minutes', 60],
+    ['hours', 3600],
+    ['days', 86400],
+  ] as const)('converts %s and rejects overflow after multiplication', (intervalUnit, factor) => {
+    expect(createBody({ ...form, seconds: '2', intervalUnit }).schedule).toEqual({
+      type: 'interval',
+      seconds: 2 * factor,
+    });
+    const limit = Math.floor(Number.MAX_SAFE_INTEGER / factor);
+    expect(createBody({ ...form, seconds: String(limit), intervalUnit }).schedule).toEqual({
+      type: 'interval',
+      seconds: limit * factor,
+    });
+    expect(() => createBody({ ...form, seconds: String(limit + 1), intervalUnit })).toThrow(
+      'intervalo',
+    );
+  });
+  it.each([
     '2030-02-30T12:00:00',
     '2030-13-01T12:00:00',
     '2030-01-01T24:00:00',
@@ -298,6 +317,46 @@ describe('Scheduler page', () => {
     expect(remove.request.body).toEqual({ id: entry.id });
     remove.flush(entry);
     http.expectOne(`${base}?origin=ALL`).flush([]);
+  });
+  it('previews converted units and escaped parameters, then confirms a frozen body without sending on cancel', async () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state;
+    state.openCreate();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const mode = root.querySelector('#scheduler-mode') as HTMLSelectElement;
+    mode.value = 'interval';
+    mode.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const unit = root.querySelector('#scheduler-unit') as HTMLSelectElement;
+    unit.value = 'hours';
+    unit.dispatchEvent(new Event('change', { bubbles: true }));
+    const amount = root.querySelector('#scheduler-seconds') as HTMLInputElement;
+    amount.value = '2';
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    state.form.params = '"<img src=x>"';
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const preview = root.querySelector('.schedule-preview')!;
+    expect(preview.textContent).toContain('7200 segundos');
+    expect(preview.textContent).toContain('<img src=x>');
+    expect(preview.querySelector('img')).toBeNull();
+    root
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(state.pending()).toMatchObject({ action: 'add', body: { schedule: { seconds: 7200 } } });
+    expect(dialogs.config?.text).toContain('Intervalo: cada 7200 segundos');
+    state.form.seconds = '3';
+    expect(state.pending()).toMatchObject({ body: { schedule: { seconds: 7200 } } });
+    dialogs.choose('cancel');
+    http.expectNone(`${base}/add`);
+    expect(state.form.seconds).toBe('3');
+    state.form.params = '{';
+    fixture.detectChanges();
+    expect(preview.textContent).toContain('revisa el JSON');
+    expect(preview.querySelector('dl')).toBeNull();
   });
   it('opens the existing form only from the header CTA and preserves its draft on dismissal', async () => {
     const fixture = enter();

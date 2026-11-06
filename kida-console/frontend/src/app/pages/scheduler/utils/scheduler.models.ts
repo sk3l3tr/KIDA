@@ -25,6 +25,7 @@ export interface ScheduleForm {
   mode: ScheduleRule['type'];
   local: string;
   seconds: string;
+  intervalUnit: 'seconds' | 'minutes' | 'hours' | 'days';
   expression: string;
   timezone: string;
 }

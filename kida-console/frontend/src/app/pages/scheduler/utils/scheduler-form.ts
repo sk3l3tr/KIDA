@@ -7,6 +7,7 @@ export function emptyForm(): ScheduleForm {
     mode: 'once',
     local: '',
     seconds: '',
+    intervalUnit: 'seconds',
     expression: '',
     timezone: 'UTC',
   };
@@ -55,7 +56,9 @@ export function createBody(form: ScheduleForm): CreateSchedule {
       schedule = { type: 'once', at: localToUtc(form.local) };
       break;
     case 'interval': {
-      const seconds = Number(form.seconds);
+      const factors = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
+      const factor = Object.hasOwn(factors, form.intervalUnit) ? factors[form.intervalUnit] : NaN;
+      const seconds = Number(form.seconds) * factor;
       if (!/^[0-9]+$/.test(form.seconds) || !Number.isSafeInteger(seconds) || seconds < 1)
         throw new Error('El intervalo debe ser un entero entre 1 y 9007199254740991 segundos.');
       schedule = { type: 'interval', seconds };

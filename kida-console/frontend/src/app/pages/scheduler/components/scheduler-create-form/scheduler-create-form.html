@@ -5,7 +5,7 @@
   </p>
   <form (ngSubmit)="state.prepareAdd()">
     <fieldset [disabled]="state.busy()">
-      <legend>Comando y programación</legend>
+      <legend>Comando y parámetros</legend>
       <label for="scheduler-command">Comando</label>
       <input id="scheduler-command" name="command" [(ngModel)]="state.form.command" required />
       <label for="scheduler-params">Parámetros JSON</label>
@@ -23,6 +23,9 @@
         >Objetos, arrays, escalares o null. Números JavaScript: se rechazan valores no finitos y
         enteros no seguros; los decimales pueden redondearse.</small
       >
+    </fieldset>
+    <fieldset [disabled]="state.busy()">
+      <legend>Regla temporal</legend>
       <label for="scheduler-mode">Modalidad</label>
       <select class="console-control" id="scheduler-mode" name="mode" [(ngModel)]="state.form.mode">
         <option value="once">Puntual</option>
@@ -47,28 +50,51 @@
           >
         }
         @case ('interval') {
-          <label for="scheduler-seconds">Intervalo en segundos</label>
-          <input
-            id="scheduler-seconds"
-            name="seconds"
-            [(ngModel)]="state.form.seconds"
-            inputmode="numeric"
-            required
-            aria-describedby="seconds-help"
-          />
+          <div class="interval-fields">
+            <div>
+              <label for="scheduler-seconds">Cada</label>
+              <input
+                id="scheduler-seconds"
+                name="seconds"
+                [(ngModel)]="state.form.seconds"
+                inputmode="numeric"
+                required
+                aria-describedby="seconds-help"
+              />
+            </div>
+            <div>
+              <label for="scheduler-unit">Unidad</label>
+              <select
+                class="console-control"
+                id="scheduler-unit"
+                name="intervalUnit"
+                [(ngModel)]="state.form.intervalUnit"
+              >
+                <option value="seconds">Segundos</option>
+                <option value="minutes">Minutos</option>
+                <option value="hours">Horas</option>
+                <option value="days">Días</option>
+              </select>
+            </div>
+          </div>
           <small id="seconds-help"
-            >Entero entre 1 y 9007199254740991. Esta página admite enteros seguros de JavaScript; el
-            backend acepta u64.</small
+            >Entero positivo. El total convertido a segundos debe ser un entero seguro de
+            JavaScript, como máximo 9007199254740991. CORE fija el inicio del intervalo al crear la
+            programación.</small
           >
         }
         @case ('cron') {
-          <label for="scheduler-expression">Expresión cron</label>
+          <label for="scheduler-expression">Expresión cron · 5 campos</label>
           <input
             id="scheduler-expression"
             name="expression"
             [(ngModel)]="state.form.expression"
             required
+            aria-describedby="cron-help"
           />
+          <small id="cron-help"
+            >Minuto · hora · día del mes · mes · día de la semana. CORE valida la expresión.</small
+          >
           <label for="scheduler-timezone">Zona IANA</label>
           <input
             id="scheduler-timezone"
@@ -79,7 +105,32 @@
         }
       }
     </fieldset>
-    <button type="submit" [disabled]="state.busy() || state.loading()">Crear programación</button>
+    <section class="schedule-preview" aria-labelledby="scheduler-preview-title">
+      <h3 id="scheduler-preview-title">Resumen previo</h3>
+      @if (preview; as body) {
+        <dl>
+          <dt>Comando</dt>
+          <dd>{{ body.command }}</dd>
+          <dt>Regla temporal</dt>
+          <dd>{{ ruleSummary(body.schedule) }}</dd>
+          <dt>Parámetros</dt>
+          <dd>
+            <pre>{{ body.params | json }}</pre>
+          </dd>
+        </dl>
+      } @else {
+        <p>
+          Introduce el comando, revisa el JSON y completa la regla temporal para ver el resumen.
+        </p>
+      }
+      <p>
+        CORE realizará la validación definitiva. La admisión en cola no garantiza la ejecución del
+        comando.
+      </p>
+    </section>
+    <button class="primary" type="submit" [disabled]="state.busy() || state.loading()">
+      Revisar programación
+    </button>
   </form>
   <p>
     Salir o cambiar de sesión descarta el formulario y las confirmaciones. Una petición enviada

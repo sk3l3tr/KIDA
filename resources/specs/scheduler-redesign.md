@@ -132,7 +132,11 @@ Validación: 128 pruebas y build de desarrollo correctos; revisión independient
 - Cierre y retorno de foco correctos; selección invalidada al abandonar la página o cambiar de sesión.
 - Verificación visual del panel y prueba de campos adicionales.
 
-### SCH-05 — Formulario por modalidad
+### SCH-05 — Formulario por modalidad — Completada
+
+Implementación realizada: bloques de comando/JSON, regla temporal y resumen previo construido con la misma validación que el envío. Intervalos en segundos/minutos/horas/días con multiplicación segura y anclaje gestionado por CORE; ayuda cron de cinco campos y zona IANA libre. Se conservan segundos, conversión local→UTC y confirmación congelada mediante `AppDialog`.
+
+Validación: 92 pruebas de Scheduler, SidePanel y AppDialog correctas, más build de desarrollo; revisión independiente sin hallazgos. Verificación visual/Ionic real pendiente, sin usar Playwright por instrucción del usuario. Producción mantiene el exceso previo de 19,21 kB sobre el presupuesto inicial de 1 MB.
 
 **Objetivo:** trasladar la organización del formulario del mockup conservando validaciones.
 

@@ -1,0 +1,38 @@
+.scheduler-create-form fieldset {
+  margin-bottom: 1.5rem;
+}
+.interval-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.interval-fields > div {
+  min-width: 0;
+}
+.schedule-preview {
+  margin-block: 1.5rem;
+  padding-block: 1rem;
+  border-block: var(--kida-border-width) solid var(--ion-border-color);
+}
+.schedule-preview h3 {
+  margin: 0 0 1rem;
+  font-family: var(--kida-heading-font);
+}
+.schedule-preview p,
+dt {
+  color: var(--kida-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+dd {
+  margin: 0.25rem 0 1rem;
+  overflow-wrap: anywhere;
+}
+dd pre {
+  margin: 0;
+}
+@media (max-width: 420px) {
+  .interval-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
