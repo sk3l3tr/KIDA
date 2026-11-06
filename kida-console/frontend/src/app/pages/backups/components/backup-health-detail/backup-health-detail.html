@@ -32,66 +32,15 @@
         Backup: {{ run.definition.backup.reference }} · Versión: {{ run.definition.backup.version }}
       </p>
       <p>
-        Creado: {{ run.created_at }} · Inicio:
-        {{ run.started_at === null ? 'null' : run.started_at }} · Fin:
-        {{ run.finished_at === null ? 'null' : run.finished_at }}
+        Creado: {{ healthDate(run.created_at) }} · Inicio: {{ healthDate(run.started_at) }} · Fin:
+        {{ healthDate(run.finished_at) }}
       </p>
-      <div class="row-actions">
-        <button type="button" (click)="prepare.emit('start')" [disabled]="health.disabled()">
-          Iniciar Health
-        </button>
-        <button
-          type="button"
-          class="secondary"
-          (click)="prepare.emit('stop')"
-          [disabled]="health.disabled()"
-        >
-          Detener Health
-        </button>
-        <button
-          type="button"
-          class="danger"
-          (click)="prepare.emit('delete')"
-          [disabled]="health.disabled()"
-        >
-          Eliminar Health
-        </button>
-      </div>
       <p>CORE decide si la operación es válida para esta ejecución.</p>
       <h4>Diagnóstico</h4>
       <p>
         Resultado: {{ run.diagnosis.result }} · Completo: {{ run.diagnosis.complete ? 'Sí' : 'No' }}
       </p>
       <p>{{ run.diagnosis.summary }}</p>
-      <h5>Diagnóstico por servicio</h5>
-      <pre>{{ run.diagnosis.services | json }}</pre>
-      <h5>Anomalías</h5>
-      <pre>{{ run.diagnosis.anomalies | json }}</pre>
-      <h4>Evidencias</h4>
-      @if (run.diagnosis.evidence.length === 0) {
-        <p>Sin evidencias registradas.</p>
-      }
-      @for (evidence of run.diagnosis.evidence; track $index) {
-        <p>
-          {{ evidence.observed_at }} · Servicio:
-          {{ evidence.service === null ? 'null' : evidence.service }} · Contenedor:
-          {{ evidence.container_id === null ? 'null' : evidence.container_id }}
-        </p>
-        <p>{{ evidence.description }}</p>
-        <pre>{{ evidence.logs === null ? 'null' : evidence.logs }}</pre>
-      }
-      <h4>Artefacto</h4>
-      <pre>{{ run.artifact | json }}</pre>
-      <h4>Servicios y recursos registrados</h4>
-      <pre>{{ run.services | json }}</pre>
-      <pre>{{ run.resources | json }}</pre>
-      <h4>Proyecto y restauración</h4>
-      <p>
-        Compose: {{ run.compose_path }} · Checksum:
-        {{ run.compose_checksum === null ? 'null' : run.compose_checksum }}
-      </p>
-      <p>Directorio restaurado: {{ run.restore_dir }}</p>
-      <pre>{{ run.project | json }}</pre>
       <h4>Limpieza</h4>
       <p>Estado de limpieza: {{ run.cleanup.state }}</p>
       <pre>{{ run.cleanup.errors | json }}</pre>
@@ -100,6 +49,45 @@
         demuestra que se hayan eliminado.
       </p>
       <p>Ruta de informe: {{ run.report_path === null ? 'null' : run.report_path }}</p>
+      <details>
+        <summary>Diagnóstico por servicio y anomalías</summary>
+        <h5>Diagnóstico por servicio</h5>
+        <pre>{{ run.diagnosis.services | json }}</pre>
+        <h5>Anomalías</h5>
+        <pre>{{ run.diagnosis.anomalies | json }}</pre>
+      </details>
+      <details>
+        <summary>Evidencias y logs</summary>
+        @if (run.diagnosis.evidence.length === 0) {
+          <p>Sin evidencias registradas.</p>
+        }
+        @for (evidence of run.diagnosis.evidence; track $index) {
+          <p>
+            {{ healthDate(evidence.observed_at) }} · Servicio:
+            {{ evidence.service === null ? 'null' : evidence.service }} · Contenedor:
+            {{ evidence.container_id === null ? 'null' : evidence.container_id }}
+          </p>
+          <p>{{ evidence.description }}</p>
+          <pre>{{ evidence.logs === null ? 'null' : evidence.logs }}</pre>
+        }
+      </details>
+      <details>
+        <summary>Artefacto, servicios y recursos</summary>
+        <h4>Artefacto</h4>
+        <pre>{{ run.artifact | json }}</pre>
+        <h4>Servicios y recursos registrados</h4>
+        <pre>{{ run.services | json }}</pre>
+        <pre>{{ run.resources | json }}</pre>
+      </details>
+      <details>
+        <summary>Proyecto y restauración</summary>
+        <p>
+          Compose: {{ run.compose_path }} · Checksum:
+          {{ run.compose_checksum === null ? 'null' : run.compose_checksum }}
+        </p>
+        <p>Directorio restaurado: {{ run.restore_dir }}</p>
+        <pre>{{ run.project | json }}</pre>
+      </details>
       @if (limitedPrecision(run)) {
         <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
       }

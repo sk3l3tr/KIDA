@@ -27,13 +27,14 @@ import { BackupHealthState } from '../../services/health-state';
 import { HealthAction } from '../../utils/health.models';
 import { IonContent } from '@ionic/angular/standalone';
 import { BackupsFacade } from '../../services/backups.facade';
-import { limitedPrecision } from '../../utils/backups-presentation';
+import { SidePanel } from '../../../../components/side-panel/side-panel';
+import { healthDate, limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-health',
-  imports: [IonContent, DatePipe, JsonPipe, FormsModule, BackupHealthDetail],
+  imports: [IonContent, DatePipe, JsonPipe, FormsModule, BackupHealthDetail, SidePanel],
   templateUrl: './health.html',
-  styleUrl: '../../backups.scss',
+  styleUrls: ['../../backups.scss', './health.scss'],
 })
 export class BackupHealth implements OnDestroy {
   readonly state = inject(BackupHealthState);
@@ -47,11 +48,14 @@ export class BackupHealth implements OnDestroy {
     this.changeDetector.detectChanges();
   });
   readonly limitedPrecision = limitedPrecision;
+  readonly healthDate = healthDate;
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
   private readonly arca = inject(ArcaService);
   private dialogContext?: string;
   private dialogSubscription?: Subscription;
+  readonly detailHeading = viewChild<ElementRef<HTMLElement>>('detailHeading');
+  readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
   private readonly createButton = viewChild<ElementRef<HTMLButtonElement>>('createButton');
   private readonly restoreRequested = signal(false);
   private trigger: Element | null = null;
@@ -66,7 +70,10 @@ export class BackupHealth implements OnDestroy {
       restoreDialogFocus(
         this.injector,
         this.trigger,
-        () => this.createButton()?.nativeElement,
+        () => {
+          if (this.backups.panel() === 'health-detail') return this.detailHeading()?.nativeElement;
+          return this.createButton()?.nativeElement;
+        },
         () =>
           viewRevision === this.viewRevision &&
           !state.disabled() &&
@@ -161,6 +168,9 @@ export class BackupHealth implements OnDestroy {
     if (state.disabled()) return;
     this.trigger = this.document.activeElement;
     this.restoreRequested.set(true);
-    state.create();
+    state.create(() => {
+      this.trigger = null;
+      this.backups.panel.set('health-detail');
+    });
   }
 }

@@ -30,6 +30,8 @@ export class BackupsFacade {
     effect(() => {
       if (this.panel() === 'configuration-detail' && !this.configurations.selected())
         this.closeConfigurationDetail();
+      if (this.panel() === 'health-detail' && this.health.selectedId() === null)
+        this.closeHealthDetail();
     });
   }
 
@@ -55,6 +57,20 @@ export class BackupsFacade {
     if (this.panel() !== 'configuration-detail' && this.panel() !== 'configuration-create') return;
     this.panel.set(null);
     this.configurations.leaveTab();
+  }
+
+  openHealthDetail(id: string): void {
+    if (!this.active() || this.health.disabled()) return;
+    if (!this.health.entries()?.some((row) => row.run_id === id)) return;
+    this.health.select(id);
+    this.panel.set('health-detail');
+  }
+
+  closeHealthDetail(): void {
+    if (this.panel() !== 'health-detail') return;
+    this.panel.set(null);
+    this.health.leaveTab();
+    this.closed.next();
   }
 
   ionViewWillEnter(): void {

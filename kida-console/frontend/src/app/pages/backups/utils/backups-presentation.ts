@@ -7,6 +7,13 @@ export function limitedPrecision(value: unknown): boolean {
   return value !== null && typeof value === 'object' && Object.values(value).some(limitedPrecision);
 }
 
+export function healthDate(value: string | null): string {
+  if (value === null) return 'null';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return date.toLocaleString('es-ES');
+}
+
 export function backupFailure(failure: unknown, writing = false): string {
   return formatCoreFailure(failure, writing, {
     uncertain:

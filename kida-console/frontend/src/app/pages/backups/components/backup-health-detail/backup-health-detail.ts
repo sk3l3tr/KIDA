@@ -1,8 +1,7 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { DatePipe, JsonPipe } from '@angular/common';
 import { BackupHealthState } from '../../services/health-state';
-import { limitedPrecision } from '../../utils/backups-presentation';
-import { HealthAction } from '../../utils/health.models';
+import { healthDate, limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-health-detail',
@@ -12,6 +11,6 @@ import { HealthAction } from '../../utils/health.models';
 })
 export class BackupHealthDetail {
   readonly state = input.required<BackupHealthState>();
-  readonly prepare = output<HealthAction>();
   readonly limitedPrecision = limitedPrecision;
+  readonly healthDate = healthDate;
 }

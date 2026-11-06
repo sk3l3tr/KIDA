@@ -42,7 +42,7 @@
         }
         <section aria-labelledby="health-history-heading" [attr.aria-busy]="health.loading()">
           <div class="section-header">
-            <h3 id="health-history-heading">Historial de Health</h3>
+            <h3 id="health-history-heading" #listHeading tabindex="-1">Historial de Health</h3>
             <button
               type="button"
               class="secondary"
@@ -74,31 +74,63 @@
               <p>No hay ejecuciones de Health.</p>
             }
           </div>
-          <ul class="backup-list health-list">
-            @for (row of health.entries(); track row.run_id) {
-              <li>
-                <h4>{{ row.definition.name }}</h4>
-                <p>run_id: {{ row.run_id }}</p>
-                <p>
-                  Modo: {{ row.mode }} · Estado: {{ row.state }} · Diagnóstico:
-                  {{ row.diagnosis.result }}
-                </p>
-                <p>Creado: {{ row.created_at }}</p>
-                <button
-                  type="button"
-                  class="secondary"
-                  (click)="health.select(row.run_id)"
-                  [attr.aria-label]="'Ver Health ' + row.run_id"
-                  [attr.aria-pressed]="health.selectedId() === row.run_id"
-                  [disabled]="health.disabled()"
-                >
-                  Ver detalle Health
-                </button>
-              </li>
-            }
-          </ul>
+          <p>Fechas en la hora local del navegador.</p>
+          <div
+            class="table-wrap"
+            role="region"
+            aria-labelledby="health-history-heading"
+            tabindex="0"
+          >
+            <table>
+              <caption class="health-caption">
+                Comprobaciones de recuperación
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Definición / backup</th>
+                  <th scope="col">Modo</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Diagnóstico</th>
+                  <th scope="col">Creación</th>
+                  <th scope="col">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of health.entries(); track row.run_id) {
+                  <tr>
+                    <th scope="row">
+                      <strong>{{ row.definition.name }}</strong>
+                      <p>
+                        Backup: {{ row.definition.backup.reference }} ·
+                        {{ row.definition.backup.version }}
+                      </p>
+                      <p>run_id: {{ row.run_id }}</p>
+                    </th>
+                    <td>{{ row.mode }}</td>
+                    <td>{{ row.state }}</td>
+                    <td>
+                      {{ row.diagnosis.result }}
+                      <p>Completo: {{ row.diagnosis.complete ? 'Sí' : 'No' }}</p>
+                    </td>
+                    <td>{{ healthDate(row.created_at) }}</td>
+                    <td>
+                      <button
+                        type="button"
+                        class="secondary"
+                        (click)="backups.openHealthDetail(row.run_id)"
+                        [attr.aria-label]="'Ver Health ' + row.run_id"
+                        [attr.aria-pressed]="health.selectedId() === row.run_id"
+                        [disabled]="health.disabled()"
+                      >
+                        <span class="i i-eye" aria-hidden="true"></span>Ver detalle Health
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </section>
-        <app-backup-health-detail [state]="health" (prepare)="prepare($event)" />
         <section aria-labelledby="health-create-heading">
           <h3 id="health-create-heading">Crear Health</h3>
           <p>
@@ -150,5 +182,42 @@
         </section>
       </section>
     </div>
+    <app-side-panel
+      [open]="backups.panel() === 'health-detail' && state.selectedId() !== null"
+      [focusTrap]="state.pending() === null"
+      context="BACKUPS / HEALTH"
+      title="Detalle de Backup Health"
+      [subtitle]="state.selectedId() ?? undefined"
+      [fallbackFocus]="this.listHeading()?.nativeElement ?? null"
+      (closed)="backups.closeHealthDetail()"
+    >
+      @if (backups.panel() === 'health-detail') {
+        <h2 #detailHeading tabindex="-1">Comprobación de recuperación</h2>
+        <app-backup-health-detail [state]="state" />
+      }
+      <div panel-actions>
+        @if (state.detail()) {
+          <button type="button" (click)="prepare('start')" [disabled]="state.disabled()">
+            Iniciar Health
+          </button>
+          <button
+            type="button"
+            class="secondary"
+            (click)="prepare('stop')"
+            [disabled]="state.disabled()"
+          >
+            Detener Health
+          </button>
+          <button
+            type="button"
+            class="danger"
+            (click)="prepare('delete')"
+            [disabled]="state.disabled()"
+          >
+            Eliminar Health
+          </button>
+        }
+      </div>
+    </app-side-panel>
   }
 </ion-content>

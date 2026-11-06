@@ -1,4 +1,6 @@
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
+import { SidePanel } from '../../../components/side-panel/side-panel';
+import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -11,7 +13,7 @@ import { ThemeIdentity } from '../../../../theme/integration';
 import { Backups } from '../backups';
 import { BackupHealth } from '../tabs/backup-health/health';
 import { healthBody } from '../utils/backups-form';
-import { healthFailure } from '../utils/backups-presentation';
+import { healthDate, healthFailure } from '../utils/backups-presentation';
 import { HealthAction, HealthExecution, HealthHistoryRecord } from '../utils/health.models';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
@@ -103,6 +105,9 @@ function setup() {
       template: '@if (state.active()) { <app-backup-health /> }',
     },
   });
+  TestBed.overrideComponent(SidePanel, {
+    set: { template: '@if (open()) { <ng-content /><ng-content select="[panel-actions]" /> }' },
+  });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
   return TestBed.inject(HttpTestingController);
@@ -148,7 +153,7 @@ describe('Health basic state and page integration', () => {
     return fixture;
   }
   function selection(page: Backups) {
-    page.state.health.select(run.run_id);
+    page.state.openHealthDetail(run.run_id);
     http.expectOne(getUrl()).flush(run);
   }
   it('loads once on entry, without polling, and distinguishes initial error from empty', () => {
@@ -364,9 +369,9 @@ describe('Health basic state and page integration', () => {
     ['Iniciar Health', 'start'],
     ['Detener Health', 'stop'],
     ['Eliminar Health', 'delete'],
-  ] as const)('opens confirmation from the extracted detail action %s', async (label, action) => {
+  ] as const)('opens confirmation from the inspector action %s', async (label, action) => {
     const { health, fixture } = await healthView();
-    const detail = fixture.nativeElement.querySelector('app-backup-health-detail') as HTMLElement;
+    const detail = fixture.nativeElement.querySelector('[panel-actions]') as HTMLElement;
     const button = [...detail.querySelectorAll('button')].find(
       (candidate) => candidate.textContent?.trim() === label,
     )!;
@@ -637,7 +642,7 @@ describe('Health basic state and page integration', () => {
       TestBed.tick();
       await fixture.whenStable();
       expect(document.activeElement).toBe(
-        status === 200 ? fixture.nativeElement.querySelector('button[type="submit"]') : trigger,
+        status === 200 ? component.detailHeading()?.nativeElement : trigger,
       );
       expect(health.disabled()).toBe(false);
     },
@@ -699,7 +704,12 @@ describe('Health basic state and page integration', () => {
       TestBed.tick();
       await fixture.whenStable();
       expect(trigger.matches(':disabled')).toBe(false);
-      expect(document.activeElement).toBe(trigger);
+      expect(document.activeElement).toBe(
+        status === 200
+          ? fixture.debugElement.query(By.directive(BackupHealth)).componentInstance.detailHeading()
+              ?.nativeElement
+          : trigger,
+      );
     },
   );
   it('clears Health data and cached form DOM after a detached page session change', async () => {
@@ -835,5 +845,203 @@ describe('Health basic state and page integration', () => {
     await fixture.whenStable();
     expect(document.activeElement).toBe(document.body);
     document.body.removeAttribute('tabindex');
+  });
+  it('renders the exact history in a labelled table with local dates and neutral future values', async () => {
+    const fixture = enter();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const table = fixture.nativeElement.querySelector('table') as HTMLTableElement;
+    const row = table.querySelector('tbody tr')!;
+    expect(table.querySelectorAll('thead th[scope="col"]')).toHaveLength(6);
+    expect(row.querySelector('th[scope="row"]')?.textContent).toContain(run.run_id);
+    for (const value of [
+      'daily',
+      'latest',
+      'FUTURE_MODE',
+      'FUTURE_STATE',
+      'FUTURE_RESULT',
+      'Completo: No',
+    ])
+      expect(row.textContent).toContain(value);
+    expect(row.textContent).toContain(new Date(run.created_at).toLocaleString('es-ES'));
+    expect(row.querySelector('.success, .danger, .warning')).toBeNull();
+    expect(table.closest('[role="region"]')?.getAttribute('tabindex')).toBe('0');
+    expect(fixture.nativeElement.textContent).toContain('hora local del navegador');
+    expect(fixture.nativeElement.querySelector('app-backup-health-detail')).toBeNull();
+    (row.querySelector('button') as HTMLButtonElement).click();
+    http.expectOne(getUrl()).flush(run);
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    expect(panel.open()).toBe(true);
+    expect(fixture.nativeElement.querySelectorAll('[panel-actions] button')).toHaveLength(3);
+    expect(fixture.nativeElement.querySelector('#health-definition')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('#health-automatic-definition')).not.toBeNull();
+  });
+
+  it('suspends the panel trap during confirmation and restores it with focus on cancellation', async () => {
+    const { component, fixture, health } = await healthView();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    const trigger = fixture.nativeElement.querySelector(
+      '[panel-actions] button',
+    ) as HTMLButtonElement;
+    trigger.focus();
+    component.prepare('start');
+    fixture.detectChanges();
+    expect(panel.focusTrap()).toBe(false);
+    expect(health.pending()?.value).toBe(run.run_id);
+    component.cancel();
+    TestBed.tick();
+    await fixture.whenStable();
+    expect(panel.focusTrap()).toBe(true);
+    expect(document.activeElement).toBe(trigger);
+    http.expectNone(`${base}/health/start`);
+  });
+
+  it('closes the inspector and invalidates its correlated confirmation without losing drafts', async () => {
+    const { component, fixture, page, health } = await healthView();
+    health.definitionPath = '/draft';
+    component.prepare('delete');
+    const context = dialogs.config!.context;
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    panel.closed.emit();
+    fixture.detectChanges();
+    expect(panel.open()).toBe(false);
+    expect(dialogs.element).toBeNull();
+    expect(health.pending()).toBeNull();
+    expect(health.detail()).toBeNull();
+    expect(health.selectedId()).toBeNull();
+    expect(health.definitionPath).toBe('/draft');
+    expect(health.entries()).toEqual([record]);
+    expect(page.state.active()).toBe(true);
+    TestBed.inject(ArcaActionsService).dispatchAction('HEALTH_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    component.confirm();
+    http.expectNone(`${base}/health/delete`);
+  });
+
+  it('closes a reading inspector, opens another and rejects the previous detail', async () => {
+    const fixture = enter([record, { ...record, run_id: 'second' }]);
+    const facade = fixture.componentInstance.state;
+    facade.openHealthDetail(run.run_id);
+    const old = http.expectOne(getUrl());
+    facade.closeHealthDetail();
+    expect(facade.health.detailLoading()).toBe(false);
+    facade.openHealthDetail('second');
+    http.expectNone(getUrl('second'));
+    old.flush(run);
+    const fresh = http.expectOne(getUrl('second'));
+    expect(facade.health.detail()).toBeNull();
+    expect(facade.health.detailLoading()).toBe(true);
+    fresh.flush({ ...run, run_id: 'second' });
+    fixture.detectChanges();
+    expect(facade.health.detail()?.run_id).toBe('second');
+    expect(facade.panel()).toBe('health-detail');
+    expect(facade.health.detailLoading()).toBe(false);
+    facade.closeHealthDetail();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-backup-health-detail')).toBeNull();
+  });
+
+  it('closes a vanished selection and exposes the list heading as panel focus fallback', async () => {
+    const { fixture, health, page, component } = await healthView();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    expect(panel.fallbackFocus()).toBe(component.listHeading()?.nativeElement);
+    expect(panel.fallbackFocus()?.tabIndex).toBe(-1);
+    health.refresh();
+    http.expectOne(`${base}/health`).flush([]);
+    TestBed.tick();
+    await fixture.whenStable();
+    expect(panel.open()).toBe(false);
+    expect(page.state.panel()).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('No hay ejecuciones de Health');
+  });
+
+  it.each(operations)(
+    'keeps a sent %s result outside a closed inspector without reopening it',
+    async (action) => {
+      const { component, fixture, page, health } = await healthView();
+      component.prepare(action);
+      component.confirm();
+      const request = http.expectOne(`${base}/health/${action}`);
+      page.state.closeHealthDetail();
+      expect(health.writing()).toBe(true);
+      request.flush(operationResponse(action));
+      http.expectOne(`${base}/health`).flush([record]);
+      http.expectNone(getUrl());
+      fixture.detectChanges();
+      expect(page.state.panel()).toBeNull();
+      expect(health.selectedId()).toBeNull();
+      expect(health.result()).toEqual(operationResponse(action));
+      expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(run.run_id);
+      expect(fixture.nativeElement.querySelector('app-backup-health-detail')).toBeNull();
+    },
+  );
+  it('keeps unrecognized dates and nulls without breaking history or detail', async () => {
+    expect(healthDate(null)).toBe('null');
+    expect(healthDate('')).toBe('');
+    expect(healthDate('unknown-date')).toBe('unknown-date');
+    const fixture = enter([{ ...record, created_at: 'future-calendar' }]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody')?.textContent).toContain('future-calendar');
+    fixture.componentInstance.state.openHealthDetail(run.run_id);
+    http.expectOne(getUrl()).flush({
+      ...run,
+      created_at: 'future-calendar',
+      started_at: null,
+      finished_at: 'unknown-end',
+      diagnosis: {
+        ...run.diagnosis,
+        evidence: [{ ...run.diagnosis.evidence[0], observed_at: 'unknown-evidence' }],
+      },
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.querySelector('app-backup-health-detail')?.textContent;
+    for (const value of ['future-calendar', 'null', 'unknown-end', 'unknown-evidence'])
+      expect(text).toContain(value);
+  });
+
+  it('keeps a confirmed creation operable in its inspector when history refresh fails', async () => {
+    const fixture = enter([]);
+    fixture.detectChanges();
+    const component = fixture.debugElement.query(By.directive(BackupHealth))
+      .componentInstance as BackupHealth;
+    component.create();
+    http.expectOne(`${base}/health/create`).flush(run);
+    http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.state.panel()).toBe('health-detail');
+    expect(fixture.nativeElement.querySelector('app-backup-health-detail')?.textContent).toContain(
+      run.run_id,
+    );
+    const trigger = fixture.nativeElement.querySelector(
+      '[panel-actions] button',
+    ) as HTMLButtonElement;
+    expect(trigger.disabled).toBe(false);
+    trigger.click();
+    expect(component.state.pending()?.value).toBe(run.run_id);
+    component.cancel();
+    http.expectNone(`${base}/health/start`);
+  });
+
+  it('does not reopen the inspector for a creation confirmed after tab leave', () => {
+    const fixture = enter();
+    fixture.detectChanges();
+    const component = fixture.debugElement.query(By.directive(BackupHealth))
+      .componentInstance as BackupHealth;
+    component.create();
+    const request = http.expectOne(`${base}/health/create`);
+    component.ionViewWillLeave();
+    request.flush(run);
+    http.expectOne(`${base}/health`).flush([record]);
+    http.expectNone(getUrl());
+    expect(fixture.componentInstance.state.panel()).toBeNull();
+    expect(component.state.result()).toEqual(run);
+    expect(component.state.selectedId()).toBeNull();
   });
 });

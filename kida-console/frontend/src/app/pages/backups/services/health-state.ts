@@ -168,7 +168,7 @@ export class BackupHealthState {
         }),
     );
   }
-  create(): void {
+  create(onCreated?: () => void): void {
     if (this.disabled()) return;
     this.error.set('');
     let body: CreateHealth;
@@ -194,6 +194,7 @@ export class BackupHealthState {
           this.detail.set(result as HealthExecution);
           this.detailUpdated.set(new Date());
           this.detailError.set('');
+          onCreated?.();
         }
       },
     );
