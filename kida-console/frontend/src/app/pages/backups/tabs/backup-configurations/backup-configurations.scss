@@ -1,0 +1,80 @@
+.configuration-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kida-space);
+}
+.configuration-grid > .configuration-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--kida-space);
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+}
+.configuration-card h3 {
+  margin: 0 0 1rem;
+}
+.configuration-routes {
+  flex: 1;
+}
+.configuration-routes h4 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.875rem;
+}
+.configuration-routes p {
+  margin: 0.5rem 0;
+}
+.configuration-target {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.configuration-target > span {
+  min-width: 0;
+}
+.route-extra,
+.route-requirement {
+  color: var(--kida-muted);
+  font-size: 0.8125rem;
+}
+.configuration-card .row-actions {
+  justify-content: flex-start;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: var(--kida-border-width) solid var(--ion-border-color);
+}
+.configuration-card .icon-only {
+  margin-inline-start: auto;
+}
+.configuration-search {
+  max-width: 32rem;
+  margin-block: 1rem;
+}
+.configuration-search label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+[panel-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+app-side-panel li {
+  overflow-wrap: anywhere;
+}
+.backups-layout {
+  container-type: inline-size;
+}
+@container (min-width: 42rem) {
+  .configuration-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 68rem) {
+  .configuration-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

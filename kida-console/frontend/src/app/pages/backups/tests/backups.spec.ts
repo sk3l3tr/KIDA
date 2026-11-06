@@ -1,6 +1,8 @@
 import { BackupConfigurations } from '../tabs/backup-configurations/backup-configurations';
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { SidePanel } from '../../../components/side-panel/side-panel';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
@@ -51,6 +53,9 @@ function setup() {
       imports: [BackupConfigurations],
       template: '@if (state.active()) { <app-backup-configurations /> }',
     },
+  });
+  TestBed.overrideComponent(SidePanel, {
+    set: { template: '@if (open()) { <ng-content /><ng-content select="[panel-actions]" /> }' },
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
@@ -278,6 +283,252 @@ describe('Backups page', () => {
     view.state.configurations.form = validForm();
     return fixture;
   }
+  it('filters names and every source/target locally without changing server order or data', () => {
+    const second = {
+      ...job,
+      id: 'second',
+      name: 'Documentos',
+      sources: ['/srv/segundo', '/etc/oculto'],
+      targets: [
+        { path: '/mnt/uno', required: true },
+        { path: '/mnt/dos', required: false },
+        { path: '/usb/último', required: true },
+      ],
+    };
+    const fixture = enter([job, second]);
+    const original = structuredClone(fixture.componentInstance.state.configurations.entries());
+    const search = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
+    expect(search).not.toBeNull();
+    for (const query of ['DOCUMENTOS', '/ETC/OCULTO', '/USB/ÚLTIMO']) {
+      search.value = query;
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+      const cards = fixture.nativeElement.querySelectorAll('.backup-list > li');
+      expect(cards.length).toBe(1);
+      expect(cards[0].textContent).toContain('Documentos');
+    }
+    search.value = 'sin coincidencias';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No hay coincidencias');
+    expect(fixture.nativeElement.textContent).not.toContain('No hay configuraciones de backup.');
+    search.value = '';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    const cards = fixture.nativeElement.querySelectorAll('.backup-list > li');
+    expect(cards.length).toBe(2);
+    expect(cards[0].textContent).toContain(job.name);
+    expect(cards[1].textContent).toContain(second.name);
+    expect(fixture.componentInstance.state.configurations.entries()).toEqual(original);
+    http.expectNone(`${base}/config`);
+  });
+  it('summarizes multiple routes and exposes the complete original configuration in the inspector', () => {
+    const multiple = {
+      ...job,
+      sources: ['/a', '/b', '/c'],
+      targets: [
+        { path: '/one', required: true },
+        { path: '/two', required: false, filesystem_uuid: null },
+        { path: '/three', required: true, filesystem_uuid: ' UUID exacto ' },
+      ],
+      schedule: undefined,
+      retention: { keep_last: 0, protected_restore_points: ['exact'] },
+    };
+    const fixture = enter([multiple]);
+    const card = fixture.nativeElement.querySelector('.backup-list > li') as HTMLElement;
+    expect(card.textContent).toContain('/a');
+    expect(card.textContent).not.toContain('/b');
+    expect(card.textContent).toContain('+2 orígenes');
+    expect(card.textContent).toContain('/one');
+    expect(card.textContent).toContain('/two');
+    expect(card.textContent).not.toContain('/three');
+    expect(card.textContent).toContain('+1 destino');
+    expect(card.textContent).toContain('Obligatorio');
+    expect(card.textContent).toContain('Opcional');
+    card.querySelector<HTMLButtonElement>('button')!.click();
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    expect(panel.open()).toBe(true);
+    const detail = fixture.nativeElement.querySelector('app-side-panel') as HTMLElement;
+    for (const text of [
+      job.id,
+      '/a',
+      '/b',
+      '/c',
+      '/one',
+      '/two',
+      '/three',
+      ' UUID exacto ',
+      'Omitido',
+      'null',
+      'future-compression',
+      'Lifecycle',
+      'Schedule',
+      'Retention',
+      'keep_last',
+      'protected_restore_points',
+      'Precisión limitada',
+      'future',
+    ]) {
+      expect(detail.textContent).toContain(text);
+    }
+    expect(detail.querySelector('img')).toBeNull();
+    expect(detail.textContent).toContain('Solicitar backup');
+    expect(detail.textContent).toContain('Eliminar configuración');
+  });
+  it.each(['run', 'delete'] as const)(
+    'confirms %s from the inspector, restores its trap on cancel and blocks duplicates',
+    async (action) => {
+      const fixture = enter();
+      fixture.nativeElement.querySelector('.backup-list button').click();
+      fixture.detectChanges();
+      const panel = fixture.debugElement.query(By.directive(SidePanel))
+        .componentInstance as SidePanel;
+      const button = Array.from(
+        fixture.nativeElement.querySelectorAll(
+          'app-side-panel button',
+        ) as NodeListOf<HTMLButtonElement>,
+      ).find(
+        (item) =>
+          item.textContent?.trim() ===
+          (action === 'run' ? 'Solicitar backup' : 'Eliminar configuración'),
+      )!;
+      expect(button).toBeDefined();
+      button.focus();
+      button.click();
+      fixture.detectChanges();
+      expect(panel.focusTrap()).toBe(false);
+      expect(button.disabled).toBe(true);
+      expect(String(dialogs.config?.text)).toContain(job.id);
+      dialogs.choose('cancel');
+      fixture.detectChanges();
+      expect(panel.open()).toBe(true);
+      expect(panel.focusTrap()).toBe(true);
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(button);
+      http.expectNone(`${base}/${action === 'run' ? 'run' : 'config/delete'}`);
+      button.click();
+      dialogs.choose();
+      fixture.componentInstance.state.configurations.confirm();
+      const request = http.expectOne(`${base}/${action === 'run' ? 'run' : 'config/delete'}`);
+      expect(request.request.body).toEqual({ id: job.id });
+      request.flush(action === 'run' ? { state: 'QUEUED', execution_id: 'queued' } : job);
+      http.expectOne(`${base}/config`).flush({ backups: action === 'delete' ? [] : [job] });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(
+        action === 'run' ? 'no confirma inicio ni finalización' : 'archivos se conservan',
+      );
+    },
+  );
+  it('returns focus to the inspector trigger, falling back to the list heading if it disappeared', async () => {
+    const fixture = enter();
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    let trigger = fixture.nativeElement.querySelector('.backup-list button') as HTMLButtonElement;
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+    trigger.click();
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    panel.didDismiss();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement).toBe(trigger);
+    trigger = fixture.nativeElement.querySelector('.backup-list button');
+    trigger.focus();
+    trigger.click();
+    fixture.detectChanges();
+    const state = fixture.componentInstance.state.configurations;
+    state.refresh();
+    http.expectOne(`${base}/config`).flush({ backups: [] });
+    fixture.detectChanges();
+    panel.didDismiss();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement?.id).toBe('backup-configurations-heading');
+  });
+  it('closes the inspector and invalidates its confirmation without losing draft, search or messages', () => {
+    const fixture = enter();
+    const facade = fixture.componentInstance.state;
+    facade.search.set('/srv');
+    facade.configurations.uncertainties.set(['incertidumbre anterior']);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.backup-list button').click();
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    facade.configurations.prepare('delete', job);
+    const draft = structuredClone(facade.configurations.form);
+    panel.closed.emit();
+    fixture.detectChanges();
+    dialogs.choose();
+    expect(panel.open()).toBe(false);
+    expect(facade.panel()).toBeNull();
+    expect(facade.configurations.selected()).toBeNull();
+    expect(facade.configurations.pending()).toBeNull();
+    expect(facade.configurations.form).toEqual(draft);
+    expect(facade.search()).toBe('/srv');
+    expect(fixture.nativeElement.textContent).toContain('incertidumbre anterior');
+    http.expectNone(`${base}/config/delete`);
+  });
+  it('does not reopen an inspector after a sent operation completes and closes a vanished selection', () => {
+    const fixture = enter();
+    const facade = fixture.componentInstance.state;
+    fixture.nativeElement.querySelector('.backup-list button').click();
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    facade.configurations.prepare('run', job);
+    dialogs.choose();
+    const sent = http.expectOne(`${base}/run`);
+    panel.closed.emit();
+    fixture.detectChanges();
+    sent.flush({ state: 'QUEUED', execution_id: 'late' });
+    http.expectOne(`${base}/config`).flush({ backups: [job] });
+    fixture.detectChanges();
+    expect(panel.open()).toBe(false);
+    expect(facade.configurations.selected()).toBeNull();
+    expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain('late');
+    fixture.nativeElement.querySelector('.backup-list button').click();
+    fixture.detectChanges();
+    facade.configurations.refresh();
+    http.expectOne(`${base}/config`).flush({ backups: [] });
+    fixture.detectChanges();
+    expect(panel.open()).toBe(false);
+    expect(facade.panel()).toBeNull();
+    expect(facade.configurations.selected()).toBeNull();
+  });
+  it('opens another configuration without stale details and focuses the existing creation draft', async () => {
+    const fixture = enter([
+      job,
+      { ...job, id: 'other', name: 'Otra configuración', sources: ['/otra'] },
+    ]);
+    const buttons = fixture.nativeElement.querySelectorAll('.backup-list > li');
+    buttons[0].querySelector('button').click();
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    panel.closed.emit();
+    fixture.detectChanges();
+    buttons[1].querySelector('button').click();
+    fixture.detectChanges();
+    expect(panel.title()).toContain('Otra configuración');
+    expect(fixture.nativeElement.querySelector('app-side-panel').textContent).not.toContain(job.id);
+    panel.closed.emit();
+    fixture.detectChanges();
+    const create = Array.from(
+      fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.textContent?.trim() === 'Nueva configuración')!;
+    expect(create).toBeDefined();
+    create.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.activeElement?.id).toBe('backup-name');
+    expect(fixture.componentInstance.state.configurations.form).toEqual(validForm());
+    expect(panel.open()).toBe(false);
+  });
   it('confirms a backup operation through the shared ARCA action protocol', () => {
     const view = enter().componentInstance;
     view.state.configurations.prepare('run', job);

@@ -2,7 +2,6 @@
   @if (backups.active()) {
     <div class="console-layout backups-layout">
       <div>
-        <span class="eyebrow">COPIAS DE SEGURIDAD DE CORE</span>
         <h1>Backups</h1>
         <p>Consulta, crea y elimina configuraciones y solicita copias de seguridad en CORE.</p>
         <p>Una solicitud admitida no confirma el inicio ni la finalización del backup.</p>
@@ -35,13 +34,28 @@
       >
         <div class="section-header">
           <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
-          <button
-            class="secondary"
-            (click)="state.refresh()"
-            [disabled]="state.operationsBlocked()"
-          >
-            Actualizar configuraciones
-          </button>
+          <div class="row-actions">
+            <button (click)="focusCreateForm()" [disabled]="state.operationsBlocked()">
+              <span class="i i-box" aria-hidden="true"></span>Nueva configuración
+            </button>
+            <button
+              class="secondary"
+              (click)="state.refresh()"
+              [disabled]="state.operationsBlocked()"
+            >
+              <span class="i i-refresh" aria-hidden="true"></span>Actualizar configuraciones
+            </button>
+          </div>
+        </div>
+        <div class="configuration-search">
+          <label for="backup-search">Buscar por nombre o rutas</label>
+          <input
+            id="backup-search"
+            type="search"
+            class="console-control"
+            [value]="backups.search()"
+            (input)="backups.search.set($any($event.target).value)"
+          />
         </div>
         <div aria-live="polite">
           @if (state.loading()) {
@@ -63,83 +77,134 @@
             <p>No hay configuraciones de backup.</p>
           }
         </div>
-        <ul class="backup-list">
-          @for (job of state.entries(); track job.id) {
-            <li>
+        @if (state.entries() && state.entries()!.length > 0 && filteredEntries().length === 0) {
+          <p role="status">No hay coincidencias para esta búsqueda.</p>
+        }
+        <ul class="backup-list configuration-grid">
+          @for (job of filteredEntries(); track job.id) {
+            <li class="panel configuration-card">
               <h3>{{ job.name }}</h3>
-              <p>ID: {{ job.id }}</p>
+              <div class="configuration-routes">
+                <h4>Orígenes</h4>
+                <p>{{ job.sources[0] }}</p>
+                @if (job.sources.length > 1) {
+                  <p class="route-extra">+{{ job.sources.length - 1 }} orígenes adicionales</p>
+                }
+                <h4>Destinos</h4>
+                @for (target of job.targets.slice(0, 2); track $index) {
+                  <div class="configuration-target">
+                    <span>{{ target.path }}</span>
+                    <span class="route-requirement">{{
+                      target.required ? 'Obligatorio' : 'Opcional'
+                    }}</span>
+                  </div>
+                }
+                @if (job.targets.length > 2) {
+                  <p class="route-extra">+{{ job.targets.length - 2 }} destinos adicionales</p>
+                }
+              </div>
               <div class="row-actions">
                 <button
                   class="secondary"
-                  (click)="state.select(job.id)"
+                  (click)="backups.openConfigurationDetail(job.id)"
                   [attr.aria-pressed]="state.selectedId() === job.id"
                   [disabled]="state.operationsBlocked()"
                   [attr.aria-label]="'Ver configuración ' + job.name"
                 >
-                  Ver detalles
+                  <span class="i i-eye" aria-hidden="true"></span>Ver detalles
                 </button>
                 <button
                   (click)="state.prepare('run', job)"
                   [disabled]="state.operationsBlocked()"
                   [attr.aria-label]="'Solicitar backup ' + job.name"
                 >
-                  Solicitar backup
+                  <span class="i i-play" aria-hidden="true"></span>Solicitar backup
                 </button>
                 <button
-                  class="danger"
+                  class="danger icon-only"
                   (click)="state.prepare('delete', job)"
                   [disabled]="state.operationsBlocked()"
                   [attr.aria-label]="'Eliminar configuración ' + job.name"
                 >
-                  Eliminar
+                  <span class="i i-trash" aria-hidden="true"></span>
                 </button>
               </div>
             </li>
           }
         </ul>
-        @if (state.selected(); as job) {
-          <section aria-labelledby="backup-detail-heading">
-            <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
-            <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
-            <h4>Orígenes</h4>
-            <ul>
-              @for (source of job.sources; track $index) {
-                <li>{{ source }}</li>
-              }
-            </ul>
-            <h4>Destinos</h4>
-            <ul>
-              @for (target of job.targets; track $index) {
-                <li>
-                  {{ target.path }} · Obligatorio: {{ target.required ? 'Sí' : 'No' }} · UUID:
-                  {{
-                    target.filesystem_uuid === null
-                      ? 'null'
-                      : target.filesystem_uuid === undefined
-                        ? 'Omitido'
-                        : target.filesystem_uuid
-                  }}
-                </li>
-              }
-            </ul>
-            <h4>Lifecycle</h4>
-            <pre>{{ job.lifecycle | json }}</pre>
-            <h4>Schedule</h4>
-            <pre>{{ job.schedule === undefined ? 'Omitido' : (job.schedule | json) }}</pre>
-            <h4>Retention</h4>
-            <pre>{{ job.retention === undefined ? 'Omitido' : (job.retention | json) }}</pre>
-            <p>Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.</p>
-            @if (limitedPrecision(job)) {
-              <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
-            }
-            <details>
-              <summary>Configuración completa (JSON)</summary>
-              <pre>{{ job | json }}</pre>
-            </details>
-          </section>
-        }
       </section>
-      <app-backup-create-form [state]="state" />
+      <app-backup-create-form #createForm [state]="state" />
     </div>
+    <app-side-panel
+      [open]="backups.panel() === 'configuration-detail' && state.selected() !== null"
+      [focusTrap]="state.pending() === null"
+      context="BACKUPS / CONFIGURACIÓN"
+      [title]="state.selected()?.name ?? 'Configuración de backup'"
+      [subtitle]="state.selected()?.id"
+      [fallbackFocus]="this.listHeading()?.nativeElement ?? null"
+      (closed)="backups.closeConfigurationDetail()"
+    >
+      @if (state.selected(); as job) {
+        <section aria-labelledby="backup-detail-heading">
+          <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
+          <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
+          <h4>Orígenes</h4>
+          <ul>
+            @for (source of job.sources; track $index) {
+              <li>{{ source }}</li>
+            }
+          </ul>
+          <h4>Destinos</h4>
+          <ul>
+            @for (target of job.targets; track $index) {
+              <li>
+                {{ target.path }} · Obligatorio: {{ target.required ? 'Sí' : 'No' }} · UUID:
+                @if (target.filesystem_uuid === undefined) {
+                  Omitido
+                } @else if (target.filesystem_uuid === null) {
+                  null
+                } @else {
+                  {{ target.filesystem_uuid }}
+                }
+              </li>
+            }
+          </ul>
+          <h4>Lifecycle</h4>
+          <pre>{{ job.lifecycle | json }}</pre>
+          <h4>Schedule</h4>
+          <pre>{{ job.schedule === undefined ? 'Omitido' : (job.schedule | json) }}</pre>
+          <h4>Retention</h4>
+          <pre>{{ job.retention === undefined ? 'Omitido' : (job.retention | json) }}</pre>
+          <p>Schedule y retention son metadatos: no crean programaciones ni ejecutan limpieza.</p>
+          @if (limitedPrecision(job)) {
+            <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+          }
+          <details>
+            <summary>Configuración completa (JSON)</summary>
+            <pre>{{ job | json }}</pre>
+          </details>
+        </section>
+      }
+
+      <div panel-actions>
+        @if (state.selected(); as job) {
+          <button
+            (click)="state.prepare('run', job)"
+            [disabled]="state.operationsBlocked()"
+            [attr.aria-label]="'Solicitar backup ' + job.name"
+          >
+            <span class="i i-play" aria-hidden="true"></span>Solicitar backup
+          </button>
+          <button
+            class="danger"
+            (click)="state.prepare('delete', job)"
+            [disabled]="state.operationsBlocked()"
+            [attr.aria-label]="'Eliminar configuración ' + job.name"
+          >
+            <span class="i i-trash" aria-hidden="true"></span>Eliminar configuración
+          </button>
+        }
+      </div>
+    </app-side-panel>
   }
 </ion-content>

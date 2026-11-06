@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { BackupConfigurationsState } from './configurations-state';
 import { BackupHealthState } from './health-state';
@@ -25,6 +25,26 @@ export class BackupsFacade {
   readonly operationsBlocked = computed(
     () => this.configurations.occupied() || this.health.occupied() || this.reports.occupied(),
   );
+
+  constructor() {
+    effect(() => {
+      if (this.panel() === 'configuration-detail' && !this.configurations.selected())
+        this.closeConfigurationDetail();
+    });
+  }
+
+  openConfigurationDetail(id: string): void {
+    if (!this.active() || this.configurations.operationsBlocked()) return;
+    if (!this.configurations.entries()?.some((job) => job.id === id)) return;
+    this.configurations.select(id);
+    this.panel.set('configuration-detail');
+  }
+
+  closeConfigurationDetail(): void {
+    if (this.panel() !== 'configuration-detail') return;
+    this.panel.set(null);
+    this.configurations.leaveTab();
+  }
 
   ionViewWillEnter(): void {
     if (this.active()) return;
