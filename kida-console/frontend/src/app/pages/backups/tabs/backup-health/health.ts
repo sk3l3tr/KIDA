@@ -1,11 +1,11 @@
 import {
   Component,
+  ChangeDetectorRef,
   ElementRef,
   Injector,
   OnDestroy,
   effect,
   inject,
-  input,
   signal,
   viewChild,
 } from '@angular/core';
@@ -22,19 +22,30 @@ import {
   AppDialogResult,
   newDialogContext,
 } from '../../../../components/app-dialog/app-dialog.models';
-import { BackupHealthDetail } from '../backup-health-detail/backup-health-detail';
+import { BackupHealthDetail } from '../../components/backup-health-detail/backup-health-detail';
 import { BackupHealthState } from '../../services/health-state';
 import { HealthAction } from '../../utils/health.models';
+import { IonContent } from '@ionic/angular/standalone';
+import { BackupsFacade } from '../../services/backups.facade';
 import { limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-health',
-  imports: [DatePipe, JsonPipe, FormsModule, BackupHealthDetail],
+  imports: [IonContent, DatePipe, JsonPipe, FormsModule, BackupHealthDetail],
   templateUrl: './health.html',
   styleUrl: '../../backups.scss',
 })
 export class BackupHealth implements OnDestroy {
-  readonly state = input.required<BackupHealthState>();
+  readonly state = inject(BackupHealthState);
+  readonly backups = inject(BackupsFacade);
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private viewRevision = 0;
+  private readonly uiClosed = this.backups.uiClosed.subscribe(() => {
+    ++this.viewRevision;
+    this.restoreRequested.set(false);
+    this.closeConfirmation();
+    this.changeDetector.detectChanges();
+  });
   readonly limitedPrecision = limitedPrecision;
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
@@ -47,24 +58,37 @@ export class BackupHealth implements OnDestroy {
 
   constructor() {
     effect(() => {
-      const state = this.state();
+      const state = this.state;
       if (!state.pending()) this.closeConfirmation();
       if (!this.restoreRequested() || state.disabled()) return;
       this.restoreRequested.set(false);
+      const viewRevision = this.viewRevision;
       restoreDialogFocus(
         this.injector,
         this.trigger,
         () => this.createButton()?.nativeElement,
-        () => !state.disabled() && !!this.createButton()?.nativeElement.isConnected,
+        () =>
+          viewRevision === this.viewRevision &&
+          !state.disabled() &&
+          !!this.createButton()?.nativeElement.isConnected,
       );
     });
   }
+  ionViewWillEnter(): void {
+    this.backups.ionViewWillEnter();
+    this.changeDetector.detectChanges();
+  }
+  ionViewWillLeave(): void {
+    this.backups.leaveTab();
+  }
   ngOnDestroy(): void {
+    ++this.viewRevision;
+    this.uiClosed.unsubscribe();
     this.restoreRequested.set(false);
     this.closeConfirmation();
   }
   prepare(action: HealthAction): void {
-    const state = this.state();
+    const state = this.state;
     if (state.disabled() || this.arca.modals.modalOpen) return;
     this.trigger = this.document.activeElement;
     if (!state.prepare(action)) return;
@@ -116,16 +140,16 @@ export class BackupHealth implements OnDestroy {
     }
   }
   cancel(): void {
-    if (!this.state().pending()) return;
+    if (!this.state.pending()) return;
     this.closeConfirmation();
-    this.state().cancel();
+    this.state.cancel();
     this.restoreRequested.set(true);
   }
   confirm(): void {
-    if (!this.state().pending()) return;
+    if (!this.state.pending()) return;
     this.closeConfirmation();
     this.restoreRequested.set(true);
-    this.state().confirm();
+    this.state.confirm();
   }
   private closeConfirmation(): void {
     this.dialogSubscription?.unsubscribe();
@@ -133,7 +157,7 @@ export class BackupHealth implements OnDestroy {
     this.dialogContext = undefined;
   }
   create(): void {
-    const state = this.state();
+    const state = this.state;
     if (state.disabled()) return;
     this.trigger = this.document.activeElement;
     this.restoreRequested.set(true);

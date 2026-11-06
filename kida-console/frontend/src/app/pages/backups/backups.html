@@ -1,41 +1,13 @@
-<ion-content class="console-content">
-  <div class="console-layout">
-    <div>
-      <span class="eyebrow">COPIAS DE SEGURIDAD DE CORE</span>
-      <h1>Backups</h1>
-      <p>Consulta, crea y elimina configuraciones y solicita copias de seguridad en CORE.</p>
-      <p>Una solicitud admitida no confirma el inicio ni la finalización del backup.</p>
-    </div>
-    <app-backup-configurations />
-    <section class="panel" aria-labelledby="backup-health-heading">
-      <h2 id="backup-health-heading">Backup Health</h2>
-      <p>Consulta y gestiona las comprobaciones de recuperación de las copias de seguridad.</p>
-      @if (state.active()) {
-        @defer (on immediate) {
-          <app-backup-health [state]="state.health" />
-        } @placeholder {
-          <p>Cargando interfaz de Health…</p>
-        } @error {
-          <p class="error" role="alert">
-            No se pudo cargar la interfaz de Health. Vuelve a entrar en Backups.
-          </p>
-        }
-      }
-    </section>
-    <section class="panel" aria-labelledby="backup-reports-heading">
-      <h2 id="backup-reports-heading">Informes</h2>
-      <p>Consulta los informes de las comprobaciones de Backup Health.</p>
-      @if (state.active()) {
-        @defer (on immediate) {
-          <app-backup-reports [state]="state.reports" />
-        } @placeholder {
-          <p>Cargando interfaz de Informes…</p>
-        } @error {
-          <p class="error" role="alert">
-            No se pudo cargar la interfaz de Informes. Vuelve a entrar en Backups.
-          </p>
-        }
-      }
-    </section>
-  </div>
-</ion-content>
+<ion-tabs (ionTabsWillChange)="state.leaveTab()">
+  <ion-tab-bar slot="top" aria-label="Backups">
+    <ion-tab-button tab="configurations" href="/backups/configurations">
+      <ion-label>Configuraciones ({{ state.configurations.entries()?.length ?? '—' }})</ion-label>
+    </ion-tab-button>
+    <ion-tab-button tab="health" href="/backups/health">
+      <ion-label>Backup Health ({{ state.health.entries()?.length ?? '—' }})</ion-label>
+    </ion-tab-button>
+    <ion-tab-button tab="reports" href="/backups/reports">
+      <ion-label>Informes ({{ state.reports.entries()?.length ?? '—' }})</ion-label>
+    </ion-tab-button>
+  </ion-tab-bar>
+</ion-tabs>

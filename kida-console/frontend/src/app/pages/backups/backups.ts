@@ -1,20 +1,17 @@
 import { Component, ChangeDetectorRef, OnDestroy, inject } from '@angular/core';
-import { IonContent } from '@ionic/angular/standalone';
+import { IonicModule } from '@ionic/angular';
 import { ThemeIdentity } from '../../../theme/integration';
 import { BackupsFacade } from './services/backups.facade';
 import { BackupConfigurationsState } from './services/configurations-state';
 import { BackupHealthState } from './services/health-state';
 import { BackupReportsState } from './services/reports-state';
-import { BackupConfigurations } from './components/backup-configurations/backup-configurations';
-import { BackupHealth } from './components/backup-health/health';
-import { BackupReports } from './components/backup-reports/reports';
 
 @Component({
   selector: 'app-backups',
-  imports: [IonContent, BackupConfigurations, BackupHealth, BackupReports],
+  imports: [IonicModule],
   providers: [BackupsFacade, BackupConfigurationsState, BackupHealthState, BackupReportsState],
   templateUrl: './backups.html',
-  styleUrl: './backups.scss',
+  styleUrl: './backups-tabs.scss',
 })
 export class Backups implements OnDestroy {
   readonly state = inject(BackupsFacade);

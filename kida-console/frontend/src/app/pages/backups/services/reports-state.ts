@@ -33,6 +33,7 @@ export class BackupReportsState {
   private blocked: () => boolean = () => false;
   private onDeleted: () => void = () => {};
   private generation = 0;
+  private viewRevision = 0;
   private subscriptions = new Subscription();
 
   enter(blocked: () => boolean, onDeleted: () => void): void {
@@ -64,6 +65,13 @@ export class BackupReportsState {
     this.detail.set(null);
     this.detailUpdated.set(null);
     this.detailError.set('');
+  }
+  leaveTab(): void {
+    ++this.viewRevision;
+    this.cancel();
+    this.selectedId.set(null);
+    this.clearDetail();
+    this.detailLoading.set(false);
   }
   refresh(): void {
     if (!this.disabled()) this.loadList();
@@ -101,14 +109,19 @@ export class BackupReportsState {
   }
   select(id: string): void {
     if (this.disabled()) return;
+    ++this.viewRevision;
     if (this.selectedId() !== id) this.clearDetail();
     this.selectedId.set(id);
     this.loadDetail(id);
   }
   private loadDetail(id: string): void {
     const generation = this.generation;
+    const viewRevision = this.viewRevision;
     const current = () =>
-      this.active() && generation === this.generation && this.selectedId() === id;
+      this.active() &&
+      generation === this.generation &&
+      viewRevision === this.viewRevision &&
+      this.selectedId() === id;
     this.detailLoading.set(true);
     this.detailError.set('');
     this.subscriptions.add(

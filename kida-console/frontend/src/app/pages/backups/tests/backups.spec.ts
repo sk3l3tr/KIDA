@@ -1,3 +1,4 @@
+import { BackupConfigurations } from '../tabs/backup-configurations/backup-configurations';
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -44,6 +45,12 @@ function setup() {
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
+  });
+  TestBed.overrideComponent(Backups, {
+    set: {
+      imports: [BackupConfigurations],
+      template: '@if (state.active()) { <app-backup-configurations /> }',
+    },
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
@@ -181,6 +188,42 @@ describe('Backups through real ARCA transport', () => {
   afterEach(() => {
     dialogs.dismiss();
     http.verify();
+  });
+  it('drains a sent read, discards cancelled queued work and leaves other channels independent', () => {
+    const service = TestBed.inject(BackupsService);
+    const first = service.reportGet('first').subscribe();
+    const old = http.expectOne(`${base}/health/reports/get?run_id=first`);
+    first.unsubscribe();
+    const cancelled = service.reportGet('cancelled').subscribe();
+    cancelled.unsubscribe();
+    const next = vi.fn();
+    service.reportGet('latest').subscribe(next);
+    service.healthList().subscribe();
+    http.expectOne(`${base}/health`).flush([]);
+    http.expectNone(`${base}/health/reports/get?run_id=latest`);
+    old.flush({ run_id: 'first', markdown: 'old' });
+    expect(next).not.toHaveBeenCalled();
+    http.expectNone(`${base}/health/reports/get?run_id=cancelled`);
+    const current = { run_id: 'latest', markdown: 'new' };
+    http.expectOne(`${base}/health/reports/get?run_id=latest`).flush(current);
+    expect(next).toHaveBeenCalledExactlyOnceWith(current);
+  });
+  it('keeps a channel usable after failure and never dispatches a cancelled queued write', () => {
+    const service = TestBed.inject(BackupsService);
+    const error = vi.fn();
+    service.run('first').subscribe({ error });
+    const old = http.expectOne(`${base}/run`);
+    const cancelled = service.run('cancelled').subscribe();
+    cancelled.unsubscribe();
+    const next = vi.fn();
+    service.run('latest').subscribe(next);
+    old.flush({}, { status: 504, statusText: 'Timeout' });
+    expect(error).toHaveBeenCalledOnce();
+    const current = http.expectOne(`${base}/run`);
+    expect(current.request.body).toEqual({ id: 'latest' });
+    current.flush({ state: 'QUEUED', execution_id: 'new' });
+    expect(next).toHaveBeenCalledExactlyOnceWith({ state: 'QUEUED', execution_id: 'new' });
+    http.expectNone(`${base}/run`);
   });
   it('registers fourteen independent channels and preserves open read responses', () => {
     expect(backupActions.map((a) => a.actionName)).toEqual([
@@ -500,5 +543,108 @@ describe('Backups page', () => {
     fixture.changeDetectorRef.detectChanges();
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('#backup-name').value).toBe('');
+  });
+  it('cancels a tab confirmation without clearing drafts, results or search', () => {
+    const fixture = enter();
+    const page = fixture.componentInstance;
+    const configurations = page.state.configurations;
+    configurations.select(job.id);
+    configurations.resultLabel.set('previous result');
+    configurations.uncertainties.set(['previous uncertainty']);
+    page.state.search.set('local search');
+    configurations.prepare('run', job);
+    const context = dialogs.config!.context;
+    page.state.leaveTab();
+    expect(dialogs.element).toBeNull();
+    expect(configurations.pending()).toBeNull();
+    expect(configurations.busy()).toBe(false);
+    expect(configurations.selectedId()).toBeNull();
+    expect(configurations.form).toEqual(validForm());
+    expect(configurations.entries()).toEqual([job]);
+    expect(configurations.resultLabel()).toBe('previous result');
+    expect(configurations.uncertainties()).toEqual(['previous uncertainty']);
+    expect(page.state.search()).toBe('local search');
+    TestBed.inject(ArcaActionsService).dispatchAction('BACKUP_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    configurations.confirm();
+    http.expectNone(`${base}/run`);
+  });
+  it('keeps a configuration creation in flight across tabs without reselecting or stealing focus', async () => {
+    const fixture = enter();
+    const page = fixture.componentInstance;
+    const configurations = page.state.configurations;
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const trigger = fixture.nativeElement.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    trigger.focus();
+    configurations.create();
+    const request = http.expectOne(`${base}/config/create`);
+    page.state.leaveTab();
+    document.body.tabIndex = -1;
+    document.body.focus();
+    expect(configurations.busy()).toBe(true);
+    request.flush(job);
+    http.expectOne(`${base}/config`).flush({ backups: [job] });
+    await fixture.whenStable();
+    expect(configurations.result()).toEqual(job);
+    expect(configurations.selectedId()).toBeNull();
+    expect(configurations.form).toEqual(emptyForm());
+    expect(document.activeElement).toBe(document.body);
+    document.body.removeAttribute('tabindex');
+  });
+  it.each(['configurations', 'health', 'reports'] as const)(
+    'drains old %s list responses before loading a fresh module session',
+    (section) => {
+      const page = enter().componentInstance;
+      const state = page.state[section];
+      const path =
+        section === 'configurations'
+          ? '/config'
+          : section === 'health'
+            ? '/health'
+            : '/health/reports';
+      state.refresh();
+      const old = http.expectOne(`${base}${path}`);
+      page.ionViewWillLeave();
+      page.ionViewWillEnter();
+      for (const other of ['/config', '/health', '/health/reports'].filter(
+        (value) => value !== path,
+      )) {
+        http.expectOne(`${base}${other}`).flush(other === '/config' ? { backups: [] } : []);
+      }
+      http.expectNone(`${base}${path}`);
+      old.flush(section === 'configurations' ? { backups: [job] } : []);
+      expect(state.entries()).toBeNull();
+      http.expectOne(`${base}${path}`).flush(section === 'configurations' ? { backups: [] } : []);
+      expect(state.entries()).toEqual([]);
+    },
+  );
+  it('does not restore configuration focus after leaving during the post-write refresh', async () => {
+    const fixture = enter();
+    const page = fixture.componentInstance;
+    const configurations = page.state.configurations;
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const trigger = fixture.nativeElement.querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+    trigger.focus();
+    configurations.create();
+    http.expectOne(`${base}/config/create`).flush(job);
+    const refresh = http.expectOne(`${base}/config`);
+    page.state.leaveTab();
+    document.body.tabIndex = -1;
+    document.body.focus();
+    refresh.flush({ backups: [job] });
+    TestBed.tick();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(document.body);
+    expect(configurations.result()).toEqual(job);
+    expect(configurations.selectedId()).toBeNull();
+    document.body.removeAttribute('tabindex');
   });
 });

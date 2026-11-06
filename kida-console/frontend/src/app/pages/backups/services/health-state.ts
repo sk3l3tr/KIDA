@@ -48,6 +48,7 @@ export class BackupHealthState {
   private readonly active = signal(false);
   private blocked: () => boolean = () => false;
   private generation = 0;
+  private viewRevision = 0;
   private subscriptions = new Subscription();
 
   enter(blocked: () => boolean): void {
@@ -83,6 +84,13 @@ export class BackupHealthState {
     this.detail.set(null);
     this.detailUpdated.set(null);
     this.detailError.set('');
+  }
+  leaveTab(): void {
+    ++this.viewRevision;
+    this.cancel();
+    this.selectedId.set(null);
+    this.clearDetail();
+    this.detailLoading.set(false);
   }
   refresh(): void {
     if (!this.disabled()) this.loadHistory();
@@ -124,6 +132,7 @@ export class BackupHealthState {
   }
   select(id: string): void {
     if (this.disabled()) return;
+    ++this.viewRevision;
     // A new selection must never display the preceding run's detail.
     if (this.selectedId() !== id) this.clearDetail();
     this.selectedId.set(id);
@@ -131,8 +140,12 @@ export class BackupHealthState {
   }
   private loadDetail(id: string): void {
     const generation = this.generation;
+    const viewRevision = this.viewRevision;
     const current = () =>
-      this.active() && this.generation === generation && this.selectedId() === id;
+      this.active() &&
+      this.generation === generation &&
+      this.viewRevision === viewRevision &&
+      this.selectedId() === id;
     this.detailLoading.set(true);
     this.detailError.set('');
     this.subscriptions.add(
@@ -169,17 +182,19 @@ export class BackupHealthState {
       this.service.healthCreate(body),
       'Crear Health',
       `${body.definition_path} (${body.mode})`,
-      (result) => {
+      (result, currentView) => {
         this.cleanupResult.set(result as HealthExecution);
         this.definitionPath = '';
         this.mode = 'MANUAL';
         this.resultLabel.set(
           'Health creado. Crear no inicia la ejecución, tampoco en modo AUTOMATIC.',
         );
-        this.selectedId.set(result.run_id);
-        this.detail.set(result as HealthExecution);
-        this.detailUpdated.set(new Date());
-        this.detailError.set('');
+        if (currentView) {
+          this.selectedId.set(result.run_id);
+          this.detail.set(result as HealthExecution);
+          this.detailUpdated.set(new Date());
+          this.detailError.set('');
+        }
       },
     );
   }
@@ -226,19 +241,21 @@ export class BackupHealthState {
           : action === 'stop'
             ? this.service.healthStop(value)
             : this.service.healthDelete(value);
-    this.write(request, label, target, (result) => {
+    this.write(request, label, target, (result, currentView) => {
       if (action === 'start' || action === 'run') {
         this.queuedResult.set(result as HealthQueued);
         this.resultLabel.set(`${label}: solicitud admitida; no confirma inicio ni finalización.`);
         if (action === 'run') this.automaticPath = '';
-        this.selectedId.set(result.run_id);
-        this.clearDetail();
+        if (currentView) {
+          this.selectedId.set(result.run_id);
+          this.clearDetail();
+        }
       } else {
         this.cleanupResult.set(result as HealthExecution);
         this.resultLabel.set(
           `${label}: respuesta de CORE. Revisa cleanup, errores y recursos registrados.`,
         );
-        this.selectedId.set(value);
+        if (currentView) this.selectedId.set(value);
       }
     });
   }
@@ -246,9 +263,10 @@ export class BackupHealthState {
     request: Observable<HealthExecution | HealthQueued>,
     action: string,
     target: string,
-    onSuccess: (result: HealthExecution | HealthQueued) => void,
+    onSuccess: (result: HealthExecution | HealthQueued, currentView: boolean) => void,
   ): void {
     const generation = this.generation;
+    const viewRevision = this.viewRevision;
     const current = () => this.active() && this.generation === generation;
     this.writing.set(true);
     this.error.set('');
@@ -267,7 +285,7 @@ export class BackupHealthState {
           next: (result) => {
             if (!current()) return;
             this.result.set(result);
-            onSuccess(result);
+            onSuccess(result, viewRevision === this.viewRevision);
             this.loadHistory();
           },
           error: (failure) => {

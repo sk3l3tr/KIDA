@@ -46,6 +46,7 @@ export class BackupConfigurationsState {
   form = emptyForm();
   readonly active = signal(false);
   private generation = 0;
+  private viewRevision = 0;
   private subscriptions = new Subscription();
   private trigger: Element | null = null;
   enter(blocked: () => boolean): void {
@@ -72,6 +73,13 @@ export class BackupConfigurationsState {
     this.form = emptyForm();
     this.trigger = null;
   }
+  leaveTab(): void {
+    ++this.viewRevision;
+    if (this.pending()) this.busy.set(false);
+    this.closeConfirmation();
+    this.selectedId.set(null);
+    this.trigger = null;
+  }
   private available(): boolean {
     return this.active() && !this.operationsBlocked();
   }
@@ -84,6 +92,7 @@ export class BackupConfigurationsState {
   private load(restoreFocus = false): void {
     if (!this.active() || this.loading()) return;
     const generation = this.generation;
+    const viewRevision = this.viewRevision;
     const current = () => this.active() && generation === this.generation;
     this.loading.set(true);
     this.listError.set('');
@@ -94,7 +103,7 @@ export class BackupConfigurationsState {
           finalize(() => {
             if (!current()) return;
             this.loading.set(false);
-            if (restoreFocus) this.restoreFocus();
+            if (restoreFocus && viewRevision === this.viewRevision) this.restoreFocus();
           }),
         )
         .subscribe({
@@ -117,11 +126,16 @@ export class BackupConfigurationsState {
     this.error.set('');
     try {
       const body = createBody(this.form);
-      this.write(this.service.create(body), 'Crear configuración', body.name, (result) => {
-        this.form = emptyForm();
-        this.selectedId.set((result as BackupJob).id);
-        this.resultLabel.set('Configuración creada');
-      });
+      this.write(
+        this.service.create(body),
+        'Crear configuración',
+        body.name,
+        (result, currentView) => {
+          this.form = emptyForm();
+          if (currentView) this.selectedId.set((result as BackupJob).id);
+          this.resultLabel.set('Configuración creada');
+        },
+      );
     } catch (failure) {
       this.error.set(failure instanceof Error ? failure.message : 'Formulario no válido.');
     }
@@ -196,11 +210,12 @@ export class BackupConfigurationsState {
   private restoreFocus(): void {
     if (!this.active()) return;
     const generation = this.generation;
+    const viewRevision = this.viewRevision;
     restoreDialogFocus(
       this.injector,
       this.trigger,
       this.focusFallback,
-      () => this.active() && generation === this.generation,
+      () => this.active() && generation === this.generation && viewRevision === this.viewRevision,
     );
   }
   confirm(): void {
@@ -227,9 +242,10 @@ export class BackupConfigurationsState {
     request: Observable<BackupJob | Queued>,
     action: string,
     target: string,
-    onSuccess: (result: BackupJob | Queued) => void,
+    onSuccess: (result: BackupJob | Queued, currentView: boolean) => void,
   ): void {
     const generation = this.generation;
+    const viewRevision = this.viewRevision;
     const current = () => this.active() && generation === this.generation;
     this.busy.set(true);
     this.error.set('');
@@ -242,7 +258,7 @@ export class BackupConfigurationsState {
           finalize(() => {
             if (!current()) return;
             this.busy.set(false);
-            if (!succeeded) this.restoreFocus();
+            if (!succeeded && viewRevision === this.viewRevision) this.restoreFocus();
           }),
         )
         .subscribe({
@@ -250,8 +266,8 @@ export class BackupConfigurationsState {
             if (!current()) return;
             succeeded = true;
             this.result.set(result);
-            onSuccess(result);
-            this.load(true);
+            onSuccess(result, viewRevision === this.viewRevision);
+            this.load(viewRevision === this.viewRevision);
           },
           error: (failure) => {
             if (!current()) return;

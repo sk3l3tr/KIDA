@@ -1,7 +1,7 @@
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
-import { DeferBlockState, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { inject } from '@angular/core';
+import { afterNextRender, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../../app.config';
@@ -9,7 +9,7 @@ import { environment } from '../../../../environments/environment';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { BackupsService } from '../services/backups.service';
 import { Backups } from '../backups';
-import { BackupReports } from '../components/backup-reports/reports';
+import { BackupReports } from '../tabs/backup-reports/reports';
 import { HealthReport } from '../utils/reports.models';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
@@ -41,6 +41,12 @@ function setup() {
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
+  });
+  TestBed.overrideComponent(Backups, {
+    set: {
+      imports: [BackupReports],
+      template: '@if (state.active()) { <app-backup-reports /> }',
+    },
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
@@ -101,13 +107,19 @@ describe('Health report state, confirmation and page integration', () => {
     if (rows.includes(id)) http.expectOne(getUrl()).flush(report);
   }
   async function reportView() {
-    const page = entry().componentInstance;
+    const fixture = entry();
+    const page = fixture.componentInstance;
     select(page);
-    const fixture = TestBed.createComponent(BackupReports);
-    fixture.componentRef.setInput('state', page.state.reports);
     fixture.autoDetectChanges();
     await fixture.whenStable();
-    return { page, reports: page.state.reports, fixture, component: fixture.componentInstance };
+    return {
+      page,
+      reports: page.state.reports,
+      fixture,
+      component: fixture.debugElement.query(
+        (element) => element.componentInstance instanceof BackupReports,
+      ).componentInstance as BackupReports,
+    };
   }
   it('uses the shared ARCA dialog for the exact report identifier', async () => {
     const { component, reports } = await reportView();
@@ -388,10 +400,12 @@ describe('Health report state, confirmation and page integration', () => {
     expect(reports.pending()).toBeNull();
     TestBed.inject(ThemeIdentity).begin();
     page.ionViewWillEnter();
-    initial();
-    send();
-    const fresh = http.expectOne(url);
+    http.expectOne(`${base}/config`).flush({ backups: [] });
+    http.expectOne(`${base}/health`).flush([]);
+    http.expectNone(url);
     old.flush(operation === 'list' ? [id] : operation === 'get' ? report : deleted);
+    const fresh = http.expectOne(url);
+    expect(reports.entries()).toBeNull();
     expect(reports.result()).toBeNull();
     expect(reports.detail()).toBeNull();
     fresh.flush(operation === 'list' ? [id] : operation === 'get' ? report : deleted);
@@ -473,9 +487,6 @@ describe('Health report state, confirmation and page integration', () => {
       page = fixture.componentInstance;
     select(page);
     fixture.detectChanges();
-    const blocks = await fixture.getDeferBlocks();
-    await blocks[1].render(DeferBlockState.Complete);
-    fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.debugElement.query(
       (element) => element.componentInstance instanceof BackupReports,
@@ -490,5 +501,86 @@ describe('Health report state, confirmation and page integration', () => {
     expect(page.state.reports.detail()).toBeNull();
     expect(page.state.reports.pending()).toBeNull();
     expect(fixture.nativeElement.querySelector('app-backup-reports')).toBeNull();
+  });
+  it('cancels a report confirmation synchronously on tab leave and rejects its late action', async () => {
+    const { page, component, reports } = await reportView();
+    component.prepare(id);
+    const context = dialogs.config!.context;
+    component.ionViewWillLeave();
+    expect(dialogs.element).toBeNull();
+    expect(reports.pending()).toBeNull();
+    expect(reports.detail()).toBeNull();
+    expect(page.state.active()).toBe(true);
+    TestBed.inject(ArcaActionsService).dispatchAction('REPORT_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    component.confirm();
+    http.expectNone(deleteUrl);
+  });
+  it('invalidates pending report detail without leaving loading stuck on tab leave', () => {
+    const page = entry().componentInstance;
+    const reports = page.state.reports;
+    reports.select(id);
+    const old = http.expectOne(getUrl());
+    page.state.leaveTab();
+    expect(reports.detailLoading()).toBe(false);
+    old.flush(report);
+    expect(reports.detail()).toBeNull();
+    expect(reports.disabled()).toBe(false);
+    reports.select(id);
+    http.expectOne(getUrl()).flush(report);
+    expect(reports.detail()).toEqual(report);
+  });
+  it('finishes a sent report deletion and refreshes Health across tabs without restoring selection', async () => {
+    const { component, reports } = await reportView();
+    component.prepare(id);
+    component.confirm();
+    const request = http.expectOne(deleteUrl);
+    component.ionViewWillLeave();
+    expect(reports.writing()).toBe(true);
+    request.flush(deleted);
+    http.expectOne(`${base}/health`).flush([]);
+    http.expectOne(listUrl).flush([id, 'second']);
+    http.expectNone(getUrl());
+    expect(reports.result()).toEqual(deleted);
+    expect(reports.selectedId()).toBeNull();
+    expect(reports.detail()).toBeNull();
+  });
+
+  it('rejects a late reports detail after closing and reopening the same selection', () => {
+    const page = entry().componentInstance;
+    const state = page.state.reports;
+    state.select(id);
+    const old = http.expectOne(getUrl());
+    page.state.leaveTab();
+    state.select(id);
+    http.expectNone(getUrl());
+    old.flush(report);
+    const fresh = http.expectOne(getUrl());
+    expect(state.detail()).toBeNull();
+    expect(state.detailLoading()).toBe(true);
+    fresh.flush(report);
+    expect(state.detail()).toEqual(report);
+    expect(state.detailLoading()).toBe(false);
+  });
+  it('invalidates focus restoration queued before the tab leaves', async () => {
+    const { fixture, component } = await reportView();
+    component.prepare(id);
+    component.cancel();
+    afterNextRender(
+      {
+        earlyRead: () => {
+          component.ionViewWillLeave();
+          document.body.tabIndex = -1;
+          document.body.focus();
+        },
+      },
+      { injector: fixture.debugElement.injector },
+    );
+    TestBed.tick();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(document.body);
+    document.body.removeAttribute('tabindex');
   });
 });

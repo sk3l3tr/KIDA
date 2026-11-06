@@ -1,11 +1,11 @@
 import {
   Component,
+  ChangeDetectorRef,
   ElementRef,
   Injector,
   OnDestroy,
   effect,
   inject,
-  input,
   signal,
   viewChild,
 } from '@angular/core';
@@ -22,16 +22,27 @@ import {
   newDialogContext,
 } from '../../../../components/app-dialog/app-dialog.models';
 import { BackupReportsState } from '../../services/reports-state';
+import { IonContent } from '@ionic/angular/standalone';
+import { BackupsFacade } from '../../services/backups.facade';
 import { limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-reports',
-  imports: [DatePipe, JsonPipe],
+  imports: [IonContent, DatePipe, JsonPipe],
   templateUrl: './reports.html',
   styleUrl: '../../backups.scss',
 })
 export class BackupReports implements OnDestroy {
-  readonly state = input.required<BackupReportsState>();
+  readonly state = inject(BackupReportsState);
+  readonly backups = inject(BackupsFacade);
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private viewRevision = 0;
+  private readonly uiClosed = this.backups.uiClosed.subscribe(() => {
+    ++this.viewRevision;
+    this.restoreRequested.set(false);
+    this.closeConfirmation();
+    this.changeDetector.detectChanges();
+  });
   readonly limitedPrecision = limitedPrecision;
   private readonly document = inject(DOCUMENT);
   private readonly injector = inject(Injector);
@@ -44,24 +55,37 @@ export class BackupReports implements OnDestroy {
 
   constructor() {
     effect(() => {
-      const state = this.state();
+      const state = this.state;
       if (!state.pending()) this.closeConfirmation();
       if (!this.restoreRequested() || state.disabled()) return;
       this.restoreRequested.set(false);
+      const viewRevision = this.viewRevision;
       restoreDialogFocus(
         this.injector,
         this.trigger,
         () => this.listHeading()?.nativeElement,
-        () => !state.disabled() && !!this.listHeading()?.nativeElement.isConnected,
+        () =>
+          viewRevision === this.viewRevision &&
+          !state.disabled() &&
+          !!this.listHeading()?.nativeElement.isConnected,
       );
     });
   }
+  ionViewWillEnter(): void {
+    this.backups.ionViewWillEnter();
+    this.changeDetector.detectChanges();
+  }
+  ionViewWillLeave(): void {
+    this.backups.leaveTab();
+  }
   ngOnDestroy(): void {
+    ++this.viewRevision;
+    this.uiClosed.unsubscribe();
     this.restoreRequested.set(false);
     this.closeConfirmation();
   }
   prepare(id: string): void {
-    const state = this.state();
+    const state = this.state;
     if (state.disabled() || this.arca.modals.modalOpen) return;
     this.trigger = this.document.activeElement;
     if (!state.prepare(id)) return;
@@ -111,16 +135,16 @@ export class BackupReports implements OnDestroy {
     }
   }
   cancel(): void {
-    if (!this.state().pending()) return;
+    if (!this.state.pending()) return;
     this.closeConfirmation();
-    this.state().cancel();
+    this.state.cancel();
     this.restoreRequested.set(true);
   }
   confirm(): void {
-    if (!this.state().pending()) return;
+    if (!this.state.pending()) return;
     this.closeConfirmation();
     this.restoreRequested.set(true);
-    this.state().confirm();
+    this.state.confirm();
   }
   private closeConfirmation(): void {
     this.dialogSubscription?.unsubscribe();

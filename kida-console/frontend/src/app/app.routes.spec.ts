@@ -51,7 +51,13 @@ describe('Console navigation', () => {
     const page = await harness.navigateByUrl(path);
     expect(page).toBeInstanceOf(component);
     expect(TestBed.inject(Router).url).toBe(
-      path === '/system' ? '/system/overview' : path === '/docker' ? '/docker/projects' : path,
+      path === '/system'
+        ? '/system/overview'
+        : path === '/docker'
+          ? '/docker/projects'
+          : path === '/backups'
+            ? '/backups/configurations'
+            : path,
     );
     expect(auth.restore).toHaveBeenCalledOnce();
     if (component === Settings) {
@@ -60,14 +66,37 @@ describe('Console navigation', () => {
       expect(auth.accounts).not.toHaveBeenCalled();
     } else if (component === System) {
       expect(harness.routeNativeElement?.querySelectorAll('ion-tab-button').length).toBe(3);
-      expect(harness.routeNativeElement?.querySelector('ion-tab-button[tab="sensors"]')?.textContent).toContain('Todos los sensores');
+      expect(
+        harness.routeNativeElement?.querySelector('ion-tab-button[tab="sensors"]')?.textContent,
+      ).toContain('Todos los sensores');
       expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe(
         'top',
       );
     } else if (component === Docker) {
       expect(auth.accounts).not.toHaveBeenCalled();
       expect(harness.routeNativeElement?.querySelectorAll('ion-tab-button').length).toBe(2);
-      expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe('top');
+      expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe(
+        'top',
+      );
+    } else if (component === Backups) {
+      expect(harness.routeNativeElement?.querySelectorAll('ion-tab-button').length).toBe(3);
+      expect(harness.routeNativeElement?.querySelector('ion-tab-bar')?.getAttribute('slot')).toBe(
+        'top',
+      );
+      expect(harness.routeNativeElement?.textContent).toContain('Configuraciones (—)');
+      const state = (page as Backups).state;
+      state.configurations.entries.set([]);
+      state.health.entries.set([]);
+      state.reports.entries.set(['report']);
+      harness.detectChanges();
+      expect(harness.routeNativeElement?.textContent).toContain('Configuraciones (0)');
+      expect(harness.routeNativeElement?.textContent).toContain('Informes (1)');
+      const leaveTab = vi.spyOn(state, 'leaveTab');
+      harness.routeNativeElement
+        ?.querySelector('ion-tabs')
+        ?.dispatchEvent(new CustomEvent('ionTabsWillChange'));
+      expect(leaveTab).toHaveBeenCalledOnce();
+      expect(auth.accounts).not.toHaveBeenCalled();
     } else if (component !== Administrators) {
       expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe(title);
       expect(auth.accounts).not.toHaveBeenCalled();
@@ -82,19 +111,24 @@ describe('Console navigation', () => {
     expect(auth.accounts).not.toHaveBeenCalled();
   });
 
-  it.each(['/system/overview', '/system/energy', '/system/sensors'])(
-    'protects and resolves direct System child route %s',
-    async (path) => {
-      const harness = await RouterTestingHarness.create();
-      await harness.navigateByUrl(path, System);
-      expect(TestBed.inject(Router).url).toBe(path);
-      expect(auth.restore).toHaveBeenCalledOnce();
-      auth.restore.mockReturnValue(of(false));
-      await harness.navigateByUrl('/login');
-      await harness.navigateByUrl(path, Login);
-      expect(TestBed.inject(Router).url).toBe('/login');
-    },
-  );
+  it.each([
+    '/system/overview',
+    '/system/energy',
+    '/system/sensors',
+    '/backups/configurations',
+    '/backups/health',
+    '/backups/reports',
+  ])('protects and resolves direct child route %s', async (path) => {
+    const harness = await RouterTestingHarness.create();
+    if (path.startsWith('/backups')) await harness.navigateByUrl(path, Backups);
+    else await harness.navigateByUrl(path, System);
+    expect(TestBed.inject(Router).url).toBe(path);
+    expect(auth.restore).toHaveBeenCalledOnce();
+    auth.restore.mockReturnValue(of(false));
+    await harness.navigateByUrl('/login');
+    await harness.navigateByUrl(path, Login);
+    expect(TestBed.inject(Router).url).toBe('/login');
+  });
 
   it.each(['/', '/unknown', '/unknown/nested'])('redirects %s to Dashboard', async (path) => {
     const harness = await RouterTestingHarness.create();

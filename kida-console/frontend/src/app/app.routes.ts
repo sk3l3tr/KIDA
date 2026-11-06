@@ -24,7 +24,7 @@ export const routes: Routes = [
   {
     path: 'backups',
     canActivate: [authGuard],
-    loadComponent: () => import('./pages/backups/backups').then((module) => module.Backups),
+    loadChildren: () => import('./pages/backups/backups.routes').then((m) => m.backupsRoutes),
   },
   {
     path: 'scheduler',

@@ -1,15 +1,15 @@
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
-import { DeferBlockState, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { afterNextRender, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../../app.config';
 import { environment } from '../../../../environments/environment';
 import { ThemeIdentity } from '../../../../theme/integration';
 import { Backups } from '../backups';
-import { BackupHealth } from '../components/backup-health/health';
+import { BackupHealth } from '../tabs/backup-health/health';
 import { healthBody } from '../utils/backups-form';
 import { healthFailure } from '../utils/backups-presentation';
 import { HealthAction, HealthExecution, HealthHistoryRecord } from '../utils/health.models';
@@ -96,6 +96,12 @@ function setup() {
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
+  });
+  TestBed.overrideComponent(Backups, {
+    set: {
+      imports: [BackupHealth],
+      template: '@if (state.active()) { <app-backup-health /> }',
+    },
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
@@ -330,13 +336,19 @@ describe('Health basic state and page integration', () => {
   });
 
   async function healthView() {
-    const page = enter().componentInstance;
+    const fixture = enter();
+    const page = fixture.componentInstance;
     selection(page);
-    const fixture = TestBed.createComponent(BackupHealth);
-    fixture.componentRef.setInput('state', page.state.health);
     fixture.autoDetectChanges();
     await fixture.whenStable();
-    return { page, health: page.state.health, fixture, component: fixture.componentInstance };
+    return {
+      page,
+      health: page.state.health,
+      fixture,
+      component: fixture.debugElement.query(
+        (element) => element.componentInstance instanceof BackupHealth,
+      ).componentInstance as BackupHealth,
+    };
   }
   it('uses the shared dialog for Health with its exact target and warning', async () => {
     const { component, health } = await healthView();
@@ -631,10 +643,9 @@ describe('Health basic state and page integration', () => {
     },
   );
   it('renders safe details, cleanup, provenance and full JSON including future fields', async () => {
-    const page = enter().componentInstance;
+    const fixture = enter();
+    const page = fixture.componentInstance;
     selection(page);
-    const fixture = TestBed.createComponent(BackupHealth);
-    fixture.componentRef.setInput('state', page.state.health);
     fixture.detectChanges();
     await fixture.whenStable();
     const text = fixture.nativeElement.textContent;
@@ -661,16 +672,17 @@ describe('Health basic state and page integration', () => {
   it.each([200, 502, 504])(
     'restores create focus after response %s and all dependent reads',
     async (status) => {
-      const page = enter().componentInstance;
-      const fixture = TestBed.createComponent(BackupHealth);
-      fixture.componentRef.setInput('state', page.state.health);
+      const fixture = enter();
+      const page = fixture.componentInstance;
       fixture.autoDetectChanges();
       await fixture.whenStable();
       const trigger = fixture.nativeElement.querySelector(
         'button[type="submit"]',
       ) as HTMLButtonElement;
       trigger.focus();
-      fixture.componentInstance.create();
+      fixture.debugElement
+        .query((element) => element.componentInstance instanceof BackupHealth)
+        .componentInstance.create();
       fixture.detectChanges();
       expect(trigger.matches(':disabled')).toBe(true);
       const request = http.expectOne(`${base}/health/create`);
@@ -696,9 +708,6 @@ describe('Health basic state and page integration', () => {
       page = fixture.componentInstance;
     selection(page);
     fixture.detectChanges();
-    const blocks = await fixture.getDeferBlocks();
-    await blocks[0].render(DeferBlockState.Complete);
-    fixture.detectChanges();
     await fixture.whenStable();
     const input = fixture.nativeElement.querySelector('#health-definition') as HTMLInputElement;
     input.value = ' cached health ';
@@ -722,5 +731,110 @@ describe('Health basic state and page integration', () => {
     expect(page.state.health.automaticPath).toBe('');
     expect(page.state.health.pending()).toBeNull();
     expect(fixture.nativeElement.querySelector('app-backup-health')).toBeNull();
+  });
+  it('cancels a Health confirmation synchronously on tab leave and rejects its late action', async () => {
+    const { page, component, health } = await healthView();
+    health.automaticPath = ' /private/automatic ';
+    component.prepare('run');
+    const context = dialogs.config!.context;
+    component.ionViewWillLeave();
+    expect(dialogs.element).toBeNull();
+    expect(health.pending()).toBeNull();
+    expect(health.selectedId()).toBeNull();
+    expect(health.detail()).toBeNull();
+    expect(health.automaticPath).toBe(' /private/automatic ');
+    expect(page.state.active()).toBe(true);
+    TestBed.inject(ArcaActionsService).dispatchAction('HEALTH_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    component.confirm();
+    http.expectNone(`${base}/health/run`);
+  });
+  it('invalidates a pending Health detail on tab leave without leaving loading stuck', () => {
+    const page = enter().componentInstance;
+    const health = page.state.health;
+    health.select(run.run_id);
+    const old = http.expectOne(getUrl());
+    page.state.leaveTab();
+    expect(health.detailLoading()).toBe(false);
+    old.flush(run);
+    expect(health.detail()).toBeNull();
+    expect(health.selectedId()).toBeNull();
+    expect(health.disabled()).toBe(false);
+    health.select(run.run_id);
+    http.expectOne(getUrl()).flush(run);
+    expect(health.detail()).toEqual(run);
+  });
+  it.each(operations)(
+    'retains sent Health %s results after changing tabs without reopening details',
+    async (action) => {
+      const { page, component, health } = await healthView();
+      health.automaticPath = ' /automatic ';
+      component.prepare(action);
+      component.confirm();
+      const request = http.expectOne(`${base}/health/${action}`);
+      component.ionViewWillLeave();
+      expect(health.writing()).toBe(true);
+      expect(page.state.configurations.operationsBlocked()).toBe(true);
+      request.flush(operationResponse(action));
+      http.expectOne(`${base}/health`).flush([record]);
+      http.expectNone(getUrl());
+      expect(health.result()).toEqual(operationResponse(action));
+      expect(health.selectedId()).toBeNull();
+      expect(health.detail()).toBeNull();
+      expect(health.writing()).toBe(false);
+    },
+  );
+  it('retains a sent Health creation after tab leave without selecting its response', () => {
+    const page = enter().componentInstance;
+    const health = page.state.health;
+    health.definitionPath = '/definition';
+    health.create();
+    const request = http.expectOne(`${base}/health/create`);
+    page.state.leaveTab();
+    request.flush(run);
+    http.expectOne(`${base}/health`).flush([record]);
+    http.expectNone(getUrl());
+    expect(health.result()).toEqual(run);
+    expect(health.cleanupResult()).toEqual(run);
+    expect(health.selectedId()).toBeNull();
+    expect(health.detail()).toBeNull();
+  });
+
+  it('rejects a late health detail after closing and reopening the same selection', () => {
+    const page = enter().componentInstance;
+    const state = page.state.health;
+    state.select(run.run_id);
+    const old = http.expectOne(getUrl());
+    page.state.leaveTab();
+    state.select(run.run_id);
+    http.expectNone(getUrl());
+    old.flush(run);
+    const fresh = http.expectOne(getUrl());
+    expect(state.detail()).toBeNull();
+    expect(state.detailLoading()).toBe(true);
+    fresh.flush(run);
+    expect(state.detail()).toEqual(run);
+    expect(state.detailLoading()).toBe(false);
+  });
+  it('invalidates focus restoration queued before the tab leaves', async () => {
+    const { fixture, component } = await healthView();
+    component.prepare('start');
+    component.cancel();
+    afterNextRender(
+      {
+        earlyRead: () => {
+          component.ionViewWillLeave();
+          document.body.tabIndex = -1;
+          document.body.focus();
+        },
+      },
+      { injector: fixture.debugElement.injector },
+    );
+    TestBed.tick();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(document.body);
+    document.body.removeAttribute('tabindex');
   });
 });
