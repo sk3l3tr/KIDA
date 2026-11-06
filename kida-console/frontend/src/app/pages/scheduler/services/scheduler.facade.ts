@@ -180,6 +180,7 @@ export class SchedulerFacade implements OnDestroy {
     this.createOpen.set(true);
   }
   closeCreate(): void {
+    if (this.createOpen()) this.trigger = null;
     this.createOpen.set(false);
     if (this.pending()?.action === 'add') this.cancel();
   }
@@ -190,7 +191,9 @@ export class SchedulerFacade implements OnDestroy {
     this.inspectedId.set(id);
   }
   closeInspector(): void {
+    if (this.inspectedId() !== null) this.trigger = null;
     this.inspectedId.set(null);
+    if (this.pending()?.action === 'delete') this.cancel();
   }
   prepareDelete(entry: ListedSchedule): void {
     if (!this.active || this.busy() || this.loading() || entry.origin !== 'USER') return;
@@ -310,7 +313,12 @@ export class SchedulerFacade implements OnDestroy {
             this.resultLabel.set(
               pending.action === 'add' ? 'Programación creada' : 'Programación eliminada',
             );
-            if (pending.action === 'add') this.form = emptyForm();
+            if (pending.action === 'add') {
+              this.form = emptyForm();
+              this.closeCreate();
+            } else if (this.inspectedId() === pending.body.id) {
+              this.closeInspector();
+            }
             this.loadSchedules(true);
           },
           error: (failure) => this.error.set(schedulerFailure(failure, true)),

@@ -36,7 +36,7 @@
       Fechas locales del navegador: {{ state.zone }}. El próximo intento de admisión no garantiza el
       inicio ni la finalización del comando. Actualización al entrar y manual, sin sondeo periódico.
     </p>
-    @if (!state.createOpen()) {
+    @if (!state.createOpen() && state.inspectedId() === null) {
       <ng-container [ngTemplateOutlet]="operationStatus" />
     }
   </div>
@@ -57,7 +57,10 @@
   }
 </app-side-panel>
 
-<app-scheduler-inspector [fallbackFocus]="state.focusFallback() ?? pageHeading" />
+<app-scheduler-inspector
+  [fallbackFocus]="state.focusFallback() ?? pageHeading"
+  [operationStatus]="operationStatus"
+/>
 
 <ng-template #operationStatus>
   <div aria-live="polite">

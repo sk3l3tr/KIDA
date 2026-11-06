@@ -26,15 +26,23 @@
           (click)="state.selectOrigin(origin)"
         >
           {{ originLabels[origin] }}
-          <small>{{
-            state.summary() === null
-              ? '—'
-              : origin === 'USER'
-                ? state.summary()!.user
-                : origin === 'INTERNAL'
-                  ? state.summary()!.internal
-                  : state.summary()!.total
-          }}</small>
+          <small>
+            @if (state.summary(); as summary) {
+              @switch (origin) {
+                @case ('USER') {
+                  {{ summary.user }}
+                }
+                @case ('INTERNAL') {
+                  {{ summary.internal }}
+                }
+                @case ('ALL') {
+                  {{ summary.total }}
+                }
+              }
+            } @else {
+              —
+            }
+          </small>
         </button>
       }
     </div>
@@ -104,13 +112,19 @@
                 >
               </td>
               <td>
-                <span class="origin-label">{{
-                  entry.origin === 'USER'
-                    ? 'Usuario'
-                    : entry.origin === 'INTERNAL'
-                      ? 'Interno'
-                      : entry.origin + ' (desconocido)'
-                }}</span>
+                <span class="origin-label">
+                  @switch (entry.origin) {
+                    @case ('USER') {
+                      Usuario
+                    }
+                    @case ('INTERNAL') {
+                      Interno
+                    }
+                    @default {
+                      {{ entry.origin }} (desconocido)
+                    }
+                  }
+                </span>
               </td>
               <td>
                 <span class="mode-label">{{

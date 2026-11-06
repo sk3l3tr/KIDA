@@ -905,7 +905,7 @@ describe('Scheduler page', () => {
       http.expectNone(`${base}/${action}`);
     },
   );
-  it('restores creation focus after the refresh has enabled the trigger again', async () => {
+  it('closes creation, clears its draft and restores focus to the list after refreshing', async () => {
     const fixture = enter(),
       view = fixture.componentInstance.state;
     view.openCreate();
@@ -921,14 +921,117 @@ describe('Scheduler page', () => {
     http.expectOne(`${base}/add`).flush(entry);
     const refresh = http.expectOne(`${base}?origin=ALL`);
     fixture.detectChanges();
-    expect(trigger.disabled).toBe(true);
+    expect(view.createOpen()).toBe(false);
+    expect(view.form).toEqual(emptyForm());
+    expect(trigger.isConnected).toBe(false);
+    // Ionic may retain the closing panel's DOM until its exit animation finishes.
+    const closingPanel = document.createElement('div');
+    closingPanel.setAttribute('aria-hidden', 'true');
+    closingPanel.appendChild(trigger);
+    fixture.nativeElement.appendChild(closingPanel);
+    expect(trigger.isConnected).toBe(true);
     refresh.flush([entry]);
     TestBed.tick();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(trigger.disabled).toBe(false);
-    expect(document.activeElement).toBe(trigger);
+    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('h2[tabindex="-1"]'));
   });
+  it('deletes from the inspector with one confirmation, closes it and recovers focus even if refresh fails', async () => {
+    const fixture = enter(),
+      state = fixture.componentInstance.state;
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.inspect-schedule')!.click();
+    fixture.detectChanges();
+    const inspector = root.querySelector('app-scheduler-inspector')!;
+    const trigger = inspector.querySelector<HTMLButtonElement>('button.danger')!;
+    trigger.focus();
+    trigger.click();
+    fixture.detectChanges();
+    expect(inspector.querySelector('ion-modal')?.getAttribute('aria-label')).toBe(entry.command);
+    const panel = fixture.debugElement
+      .query(By.css('app-scheduler-inspector'))
+      .query(By.directive(SidePanel)).componentInstance as SidePanel;
+    expect(panel.focusTrap()).toBe(false);
+    expect(dialogs.config?.text).toContain(
+      'Eliminar la programación no cancela comandos ya encolados.',
+    );
+    state.prepareDelete(entry);
+    dialogs.choose();
+    state.confirm();
+    const request = http.expectOne(`${base}/delete`);
+    expect(request.request.body).toEqual({ id: entry.id });
+    request.flush(entry);
+    expect(state.inspectedId()).toBeNull();
+    http.expectOne(`${base}?origin=ALL`).flush({}, { status: 503, statusText: 'Unavailable' });
+    TestBed.tick();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Programación eliminada');
+    expect(root.textContent).toContain('Error de actualización');
+    expect(state.error()).toBe('');
+    expect(document.activeElement).toBe(root.querySelector('h2[tabindex="-1"]'));
+    expect(inspector.querySelector('button.danger')).toBeNull();
+  });
+  it.each([422, 504])(
+    'keeps inspector errors visible and never retries a rejected or uncertain delete (%s)',
+    (status) => {
+      const fixture = enter(),
+        state = fixture.componentInstance.state;
+      state.openInspector(entry.id);
+      fixture.detectChanges();
+      const inspector = fixture.nativeElement.querySelector(
+        'app-scheduler-inspector',
+      ) as HTMLElement;
+      inspector.querySelector<HTMLButtonElement>('button.danger')!.click();
+      dialogs.choose();
+      http.expectOne(`${base}/delete`).flush({}, { status, statusText: 'Failed' });
+      fixture.detectChanges();
+      expect(state.inspectedId()).toBe(entry.id);
+      expect(inspector.textContent).toContain(
+        status === 422 ? 'Validación HTTP' : 'No se pudo confirmar',
+      );
+      expect(fixture.nativeElement.querySelector('.scheduler-layout [role="alert"]')).toBeNull();
+      http.expectNone(`${base}/delete`);
+      http.expectNone(`${base}?origin=ALL`);
+    },
+  );
+  it('cancels inspector confirmation on dismissal without sending a delete', () => {
+    const fixture = enter(),
+      state = fixture.componentInstance.state;
+    state.openInspector(entry.id);
+    fixture.detectChanges();
+    const inspector = fixture.nativeElement.querySelector('app-scheduler-inspector') as HTMLElement;
+    inspector.querySelector<HTMLButtonElement>('button.danger')!.click();
+    expect(state.pending()?.action).toBe('delete');
+    inspector.querySelector('ion-modal')!.dispatchEvent(new CustomEvent('didDismiss'));
+    fixture.detectChanges();
+    expect(state.inspectedId()).toBeNull();
+    expect(state.pending()).toBeNull();
+    expect(state.busy()).toBe(false);
+    state.confirm();
+    http.expectNone(`${base}/delete`);
+  });
+  it.each([422, 504])(
+    'keeps the creation panel and its draft after a failed add (%s)',
+    (status) => {
+      const fixture = enter(),
+        state = fixture.componentInstance.state;
+      state.openCreate();
+      const draft = structuredClone(state.form);
+      state.prepareAdd();
+      dialogs.choose();
+      http.expectOne(`${base}/add`).flush({}, { status, statusText: 'Failed' });
+      fixture.detectChanges();
+      expect(state.createOpen()).toBe(true);
+      expect(state.form).toEqual(draft);
+      expect(fixture.nativeElement.querySelector('app-side-panel .error')?.textContent).toContain(
+        status === 422 ? 'Validación HTTP' : 'No se pudo confirmar',
+      );
+      http.expectNone(`${base}/add`);
+    },
+  );
   it('focuses the list heading if deleting removed the original trigger', async () => {
     const fixture = enter(),
       view = fixture.componentInstance.state;

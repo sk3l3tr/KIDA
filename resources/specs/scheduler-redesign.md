@@ -153,7 +153,11 @@ Validación: 92 pruebas de Scheduler, SidePanel y AppDialog correctas, más buil
 - `AppDialog` confirma el cuerpo congelado.
 - Pruebas de unidades, límites, JSON, cambios horarios y cancelación sin envío.
 
-### SCH-06 — Operaciones y estados visibles
+### SCH-06 — Operaciones y estados visibles — Completada
+
+Implementación realizada: borrado de programaciones USER desde el inspector mediante la confirmación existente, suspensión de la trampa de foco y cancelación al cerrar el panel. El estado de operación se comparte entre página y panel activo. Alta correcta limpia/cierra el formulario; baja correcta cierra el inspector y recupera foco fuera del panel. Rechazos y resultados inciertos conservan el contexto, sin reenvío automático; éxito y error posterior de actualización permanecen separados.
+
+Validación: 139 pruebas de Scheduler, SidePanel, AppDialog, rutas y errores compartidos correctas, formato y build de desarrollo correctos; revisión independiente sin hallazgos. Incluye regresión de foco con DOM de panel cerrado aún conectado. Verificación visual/Ionic real pendiente, sin Playwright por instrucción del usuario. Producción mantiene el exceso previo de 19,21 kB sobre el presupuesto inicial de 1 MB.
 
 **Objetivo:** completar altas y bajas desde la nueva interfaz.
 

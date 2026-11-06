@@ -1,5 +1,6 @@
 <app-side-panel
   [open]="state.inspectedId() !== null"
+  [focusTrap]="state.pending() === null"
   [title]="state.inspectedSchedule()?.command ?? 'Inspeccionar programación'"
   [subtitle]="state.inspectedId() ?? undefined"
   [fallbackFocus]="fallbackFocus()"
@@ -20,25 +21,33 @@
         <div>
           <dt>Origen</dt>
           <dd>
-            {{
-              entry.origin === 'USER'
-                ? 'Usuario'
-                : entry.origin === 'INTERNAL'
-                  ? 'Interno'
-                  : entry.origin + ' (desconocido)'
-            }}
+            @switch (entry.origin) {
+              @case ('USER') {
+                Usuario
+              }
+              @case ('INTERNAL') {
+                Interno
+              }
+              @default {
+                {{ entry.origin }} (desconocido)
+              }
+            }
           </dd>
         </div>
         <div>
           <dt>Protección</dt>
           <dd>
-            {{
-              entry.origin === 'USER'
-                ? 'Se puede eliminar desde el inventario'
-                : entry.origin === 'INTERNAL'
-                  ? 'Gestionada por CORE · solo lectura'
-                  : 'Origen desconocido · solo lectura'
-            }}
+            @switch (entry.origin) {
+              @case ('USER') {
+                Se puede eliminar
+              }
+              @case ('INTERNAL') {
+                Gestionada por CORE · solo lectura
+              }
+              @default {
+                Origen desconocido · solo lectura
+              }
+            }
           </dd>
         </div>
       </dl>
@@ -83,4 +92,24 @@
   } @else {
     <p role="status">Programación no disponible en esta lectura.</p>
   }
+  @if (state.listError()) {
+    <p class="error" role="alert">Error de actualización: {{ state.listError() }}</p>
+  }
+  @if (state.inspectedId() !== null) {
+    <ng-container [ngTemplateOutlet]="operationStatus()" />
+  }
+  <div panel-actions>
+    @if (state.inspectedSchedule(); as entry) {
+      @if (entry.origin === 'USER') {
+        <button
+          type="button"
+          class="danger"
+          [disabled]="state.busy() || state.loading()"
+          (click)="state.prepareDelete(entry)"
+        >
+          Eliminar programación
+        </button>
+      }
+    }
+  </div>
 </app-side-panel>
