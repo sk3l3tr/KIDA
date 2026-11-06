@@ -34,12 +34,15 @@
       </ng-template>
       <ng-container [ngTemplateOutlet]="operationFeedback" />
       <section
-        class="panel"
+        class="configurations"
         aria-labelledby="backup-configurations-heading"
         [attr.aria-busy]="state.loading()"
       >
         <div class="section-header">
-          <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
+          <div>
+            <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
+            <p class="configuration-subtitle">Qué copiar, desde dónde y a qué destinos.</p>
+          </div>
           <div class="row-actions">
             <button
               (click)="backups.openConfigurationCreate()"
@@ -56,25 +59,28 @@
             </button>
           </div>
         </div>
-        <div class="configuration-search">
-          <label for="backup-search">Buscar por nombre o rutas</label>
-          <input
-            id="backup-search"
-            type="search"
-            class="console-control"
-            [value]="backups.search()"
-            (input)="backups.search.set($any($event.target).value)"
-          />
+        <div class="configuration-toolbar">
+          <div class="configuration-search">
+            <label for="backup-search">Buscar por nombre o rutas</label>
+            <input
+              id="backup-search"
+              type="search"
+              class="console-control"
+              placeholder="Buscar por nombre o ruta"
+              [value]="backups.search()"
+              (input)="backups.search.set($any($event.target).value)"
+            />
+          </div>
+          @if (state.updated()) {
+            <p class="configuration-updated" aria-live="polite">
+              Última actualización: {{ state.updated() | date: 'medium' }} (hora local del
+              navegador).
+            </p>
+          }
         </div>
         <div aria-live="polite">
           @if (state.loading()) {
             <p>Cargando configuraciones…</p>
-          }
-          @if (state.updated()) {
-            <p>
-              Última actualización: {{ state.updated() | date: 'medium' }} (hora local del
-              navegador).
-            </p>
           }
           @if (state.listError()) {
             <p class="error" role="alert">Error de actualización: {{ state.listError() }}</p>
@@ -92,14 +98,34 @@
         <ul class="backup-list configuration-grid">
           @for (job of filteredEntries(); track job.id) {
             <li class="panel configuration-card">
-              <h3>{{ job.name }}</h3>
+              <div class="configuration-card-header">
+                <span class="configuration-icon" aria-hidden="true"
+                  ><span class="i i-box"></span
+                ></span>
+                <div class="configuration-identity">
+                  <h3>{{ job.name }}</h3>
+                  <p>{{ job.id }}</p>
+                </div>
+              </div>
               <div class="configuration-routes">
-                <h4>Orígenes</h4>
+                <div class="configuration-route-heading">
+                  <h4>Orígenes</h4>
+                  <span
+                    >{{ job.sources.length }}
+                    {{ job.sources.length === 1 ? 'ruta' : 'rutas' }}</span
+                  >
+                </div>
                 <p>{{ job.sources[0] }}</p>
                 @if (job.sources.length > 1) {
                   <p class="route-extra">+{{ job.sources.length - 1 }} orígenes adicionales</p>
                 }
-                <h4>Destinos</h4>
+                <div class="configuration-route-heading">
+                  <h4>Destinos</h4>
+                  <span
+                    >{{ job.targets.length }}
+                    {{ job.targets.length === 1 ? 'ruta' : 'rutas' }}</span
+                  >
+                </div>
                 @for (target of job.targets.slice(0, 2); track $index) {
                   <div class="configuration-target">
                     <span>{{ target.path }}</span>
@@ -120,14 +146,14 @@
                   [disabled]="state.operationsBlocked()"
                   [attr.aria-label]="'Ver configuración ' + job.name"
                 >
-                  <span class="i i-eye" aria-hidden="true"></span>Ver detalles
+                  Ver detalles
                 </button>
                 <button
                   (click)="state.prepare('run', job)"
                   [disabled]="state.operationsBlocked()"
                   [attr.aria-label]="'Solicitar backup ' + job.name"
                 >
-                  <span class="i i-play" aria-hidden="true"></span>Solicitar backup
+                  Solicitar backup
                 </button>
                 <button
                   class="danger icon-only"
