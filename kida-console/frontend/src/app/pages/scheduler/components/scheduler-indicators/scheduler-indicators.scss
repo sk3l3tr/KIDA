@@ -1,0 +1,38 @@
+.indicators {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.panel {
+  border-width: var(--kida-border-width);
+  border-radius: var(--kida-radius);
+  box-shadow: var(--kida-shadow), var(--kida-effect);
+  overflow-wrap: anywhere;
+}
+h2,
+small {
+  color: var(--kida-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+h2 {
+  margin: 0;
+  font-weight: 500;
+}
+strong {
+  display: block;
+  margin: 0.75rem 0;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+.accent {
+  color: var(--ion-color-primary);
+}
+.next {
+  font-size: 1rem;
+}
+@media (max-width: 1080px) {
+  .indicators {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

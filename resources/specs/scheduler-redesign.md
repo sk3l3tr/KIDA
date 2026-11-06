@@ -50,7 +50,7 @@ Los parámetros admiten objetos, arrays, escalares y `null`. Se conserva la vali
 - Composición: cabecera con «Nueva programación» → cuatro indicadores → inventario con filtros, búsqueda y tabla → información de instantánea.
 - Conservar los componentes actuales y añadir únicamente `SchedulerIndicators` y `SchedulerInspector`. El formulario y el inspector reutilizarán `SidePanel`, con apertura mutuamente excluyente.
 - `SchedulerFacade` seguirá coordinando consultas, selección, paneles y operaciones. Los componentes presentan datos; los cálculos puros permanecen en utilidades locales.
-- Valor por defecto propuesto: consultar `ALL` al entrar, actualizar y completar una escritura. Aplicar origen y búsqueda localmente, con `USER` inicial. Permite contadores coherentes con una sola petición; cambia el filtrado actual por servidor.
+- Decisión confirmada: consultar `ALL` al entrar, actualizar y completar una escritura. Aplicar origen y búsqueda localmente, con `USER` inicial. Permite contadores coherentes con una sola petición; cambia el filtrado actual por servidor.
 - Indicadores y contadores por origen reflejarán toda la instantánea; búsqueda y filtro afectarán únicamente a las filas y al número de resultados. Buscar por comando, ID y parámetros; ordenar por próxima admisión, sin calcular ocurrencias futuras.
 - Conservar datos anteriores y su fecha ante errores de refresco. Sin primera lectura válida, mostrar valores desconocidos y error, nunca un vacío aparentemente confirmado.
 - Inspector basado en el objeto recibido: identificación, regla, próxima admisión, parámetros y JSON original completo. Sin nueva consulta ni definición reconstruida.
@@ -76,7 +76,9 @@ Validación: 116 pruebas y build de desarrollo correctos; revisión independient
 - Sin formulario permanente bajo el listado; shell y menú intactos.
 - Comprobación visual en escritorio y móvil.
 
-### SCH-02 — Instantánea y resumen global
+### SCH-02 — Instantánea y resumen global — Completada
+
+Validación: 118 pruebas y build de desarrollo correctos; revisión independiente sin hallazgos. Verificación visual pendiente. Producción mantiene el bloqueo previo por presupuesto inicial.
 
 **Objetivo:** mostrar información real y coherente.
 
@@ -173,7 +175,7 @@ Validación: 116 pruebas y build de desarrollo correctos; revisión independient
 
 ## 4. Riesgos y decisiones pendientes
 
-- Supuesto pendiente de confirmación: lectura `ALL` y filtros locales, al quedar esa elección sin respuesta. Es la propuesta del plan para reproducir los contadores globales.
+- Decisión confirmada por el usuario: una lectura `ALL` y filtros locales para reproducir los contadores globales.
 - Sin anclaje editable ni historial: son límites del contrato, resueltos mediante las adaptaciones indicadas.
 - La convivencia de `SidePanel` y `AppDialog` requiere comprobar foco y cierre en Ionic real durante la implementación.
 

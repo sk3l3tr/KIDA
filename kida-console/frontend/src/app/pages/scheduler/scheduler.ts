@@ -2,13 +2,22 @@ import { Component, OnDestroy, inject } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
 import { JsonPipe, NgTemplateOutlet } from '@angular/common';
 import { SidePanel } from '../../components/side-panel/side-panel';
+import { SchedulerIndicators } from './components/scheduler-indicators/scheduler-indicators';
 import { SchedulerFacade } from './services/scheduler.facade';
 import { SchedulerList } from './components/scheduler-list/scheduler-list';
 import { SchedulerCreateForm } from './components/scheduler-create-form/scheduler-create-form';
 
 @Component({
   selector: 'app-scheduler',
-  imports: [IonContent, JsonPipe, NgTemplateOutlet, SidePanel, SchedulerList, SchedulerCreateForm],
+  imports: [
+    SchedulerIndicators,
+    IonContent,
+    JsonPipe,
+    NgTemplateOutlet,
+    SidePanel,
+    SchedulerList,
+    SchedulerCreateForm,
+  ],
   providers: [SchedulerFacade],
   templateUrl: './scheduler.html',
   styleUrl: './scheduler.scss',

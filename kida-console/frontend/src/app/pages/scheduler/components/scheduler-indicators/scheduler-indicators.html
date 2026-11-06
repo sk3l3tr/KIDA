@@ -1,0 +1,39 @@
+<section
+  class="indicators"
+  aria-label="Resumen de programaciones"
+  [attr.aria-busy]="state.loading()"
+>
+  @let summary = state.summary();
+  <div class="panel">
+    <h2>Programaciones</h2>
+    <strong>{{ summary?.total ?? '—' }}</strong>
+    <small>{{
+      summary
+        ? summary.user + ' de usuario · ' + summary.internal + ' internas'
+        : 'Sin lectura disponible'
+    }}</small>
+  </div>
+  <div class="panel">
+    <h2>Recurrentes</h2>
+    <strong class="accent">{{ summary?.recurring ?? '—' }}</strong>
+    <small>Intervalo y cron</small>
+  </div>
+  <div class="panel">
+    <h2>Puntuales</h2>
+    <strong>{{ summary?.once ?? '—' }}</strong>
+    <small>Se retiran tras su admisión en cola</small>
+  </div>
+  <div class="panel">
+    <h2>Próxima admisión prevista</h2>
+    <strong class="next accent">{{
+      summary?.next ? localDate(summary!.next!.next_enqueue_at) : '—'
+    }}</strong>
+    <small>{{
+      summary?.next?.command ??
+        (summary ? 'Sin próximas admisiones disponibles' : 'Sin lectura disponible')
+    }}</small>
+  </div>
+</section>
+@if (summary && (state.loading() || state.listError())) {
+  <p role="status">Resumen anterior, desactualizado; pendiente de actualizar.</p>
+}

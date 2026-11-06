@@ -1,4 +1,4 @@
-import { Injectable, Injector, OnDestroy, inject, signal } from '@angular/core';
+import { Injectable, Injector, OnDestroy, inject, signal, computed } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Subscription, filter, finalize, take } from 'rxjs';
 import { ArcaService } from 'arca';
@@ -27,11 +27,46 @@ export class SchedulerFacade implements OnDestroy {
   private dialogContext?: string;
   private dialogSubscription?: Subscription;
   focusFallback: () => HTMLElement | undefined = () => undefined;
-  readonly entries = signal<ListedSchedule[] | null>(null);
+  readonly snapshot = signal<ListedSchedule[] | null>(null);
+  private readonly selectedOrigin = signal<OriginFilter>('USER');
+  readonly entries = computed(() => {
+    const entries = this.snapshot();
+    const origin = this.selectedOrigin();
+    return entries === null
+      ? null
+      : origin === 'ALL'
+        ? entries
+        : entries.filter((entry) => entry.origin === origin);
+  });
+  readonly summary = computed(() => {
+    const entries = this.snapshot();
+    if (entries === null) return null;
+    const next = entries
+      .filter((entry) => Number.isFinite(Date.parse(entry.next_enqueue_at)))
+      .reduce<ListedSchedule | null>(
+        (nearest, entry) =>
+          !nearest || Date.parse(entry.next_enqueue_at) < Date.parse(nearest.next_enqueue_at)
+            ? entry
+            : nearest,
+        null,
+      );
+    return {
+      total: entries.length,
+      user: entries.filter((entry) => entry.origin === 'USER').length,
+      internal: entries.filter((entry) => entry.origin === 'INTERNAL').length,
+      recurring: entries.filter(
+        (entry) => entry.schedule.type === 'interval' || entry.schedule.type === 'cron',
+      ).length,
+      once: entries.filter((entry) => entry.schedule.type === 'once').length,
+      next,
+    };
+  });
   readonly loading = signal(false);
   readonly listError = signal('');
   readonly updated = signal<Date | null>(null);
-  readonly visibleOrigin = signal<OriginFilter | null>(null);
+  readonly visibleOrigin = computed(() =>
+    this.snapshot() === null ? null : this.selectedOrigin(),
+  );
   readonly busy = signal(false);
   readonly pending = signal<PendingSchedule | null>(null);
   readonly error = signal('');
@@ -39,7 +74,12 @@ export class SchedulerFacade implements OnDestroy {
   readonly resultLabel = signal('');
   readonly createOpen = signal(false);
   readonly zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  origin: OriginFilter = 'USER';
+  get origin(): OriginFilter {
+    return this.selectedOrigin();
+  }
+  set origin(value: OriginFilter) {
+    this.selectedOrigin.set(value);
+  }
   form = emptyForm();
   private active = false;
   private generation = 0;
@@ -68,10 +108,9 @@ export class SchedulerFacade implements OnDestroy {
     this.closeConfirmation();
     this.busy.set(false);
     this.loading.set(false);
-    this.entries.set(null);
+    this.snapshot.set(null);
     this.listError.set('');
     this.updated.set(null);
-    this.visibleOrigin.set(null);
     this.error.set('');
     this.result.set(null);
     this.resultLabel.set('');
@@ -82,7 +121,6 @@ export class SchedulerFacade implements OnDestroy {
   selectOrigin(value: string): void {
     if (this.loading() || this.busy() || !['USER', 'INTERNAL', 'ALL'].includes(value)) return;
     this.origin = value as OriginFilter;
-    this.refresh();
   }
   refresh(): void {
     if (this.busy()) return;
@@ -90,12 +128,11 @@ export class SchedulerFacade implements OnDestroy {
   }
   private loadSchedules(restoreFocus = false): void {
     if (!this.active || this.loading()) return;
-    const origin = this.origin;
     this.loading.set(true);
     this.listError.set('');
     this.subscriptions.add(
       this.service
-        .list(origin)
+        .list('ALL')
         .pipe(
           finalize(() => {
             this.loading.set(false);
@@ -104,8 +141,7 @@ export class SchedulerFacade implements OnDestroy {
         )
         .subscribe({
           next: (entries) => {
-            this.entries.set(entries);
-            this.visibleOrigin.set(origin);
+            this.snapshot.set(entries);
             this.updated.set(new Date());
           },
           error: (failure) => this.listError.set(schedulerFailure(failure)),

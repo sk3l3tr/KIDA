@@ -251,7 +251,7 @@ describe('Scheduler page', () => {
     const view = fixture.componentInstance.state;
     fixture.componentInstance.ionViewWillEnter();
     expect(view.loading()).toBe(true);
-    http.expectOne(`${base}?origin=USER`).flush(data);
+    http.expectOne(`${base}?origin=ALL`).flush(data);
     fixture.detectChanges();
     view.form = {
       ...emptyForm(),
@@ -271,7 +271,7 @@ describe('Scheduler page', () => {
     );
     dialogs.choose();
     http.expectOne(`${base}/add`).flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
   });
   it('shares page state with the extracted form and list through their DOM actions', async () => {
     const fixture = enter();
@@ -289,7 +289,7 @@ describe('Scheduler page', () => {
     const add = http.expectOne(`${base}/add`);
     expect(add.request.body.command).toBe('system.health');
     add.flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
     fixture.detectChanges();
     fixture.nativeElement.querySelector('.schedule-list button').click();
     expect(dialogs.config?.text).toContain(`Identificador: ${entry.id}`);
@@ -297,7 +297,7 @@ describe('Scheduler page', () => {
     const remove = http.expectOne(`${base}/delete`);
     expect(remove.request.body).toEqual({ id: entry.id });
     remove.flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([]);
+    http.expectOne(`${base}?origin=ALL`).flush([]);
   });
   it('opens the existing form only from the header CTA and preserves its draft on dismissal', async () => {
     const fixture = enter();
@@ -325,7 +325,7 @@ describe('Scheduler page', () => {
     expect(root.querySelector<HTMLInputElement>('#scheduler-command')!.value).toBe('system.health');
     expect(state.form.command).toBe('system.health');
     http.expectNone(`${base}/add`);
-    http.expectNone(`${base}?origin=USER`);
+    http.expectNone(`${base}?origin=ALL`);
   });
   it('releases the panel focus trap for confirmation and cancels it when the panel closes', () => {
     const fixture = enter();
@@ -357,7 +357,7 @@ describe('Scheduler page', () => {
     state.openCreate();
     expect(state.createOpen()).toBe(false);
     fixture.componentInstance.ionViewWillEnter();
-    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
     state.openCreate();
     expect(state.createOpen()).toBe(true);
     TestBed.inject(ThemeIdentity).clear();
@@ -370,7 +370,7 @@ describe('Scheduler page', () => {
     state.prepareDelete(entry);
     dialogs.choose();
     http.expectOne(`${base}/delete`).flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([]);
+    http.expectOne(`${base}?origin=ALL`).flush([]);
     fixture.detectChanges();
     expect(state.createOpen()).toBe(false);
     expect(fixture.nativeElement.querySelector('form')).toBeNull();
@@ -388,16 +388,17 @@ describe('Scheduler page', () => {
     state.confirm();
     TestBed.inject(ThemeIdentity).clear();
     http.expectNone(`${base}/delete`);
-    http.expectNone(`${base}?origin=USER`);
+    http.expectNone(`${base}?origin=ALL`);
   });
   it('renders empty states, safe HTML text, future fields and unknown origins without delete', () => {
     const fixture = enter([]);
     expect(fixture.nativeElement.textContent).toContain('No hay programaciones');
     const view = fixture.componentInstance.state;
+    view.selectOrigin('ALL');
     view.refresh();
     const unsafe = '<img src=x onerror="alert(1)">';
     http
-      .expectOne(`${base}?origin=USER`)
+      .expectOne(`${base}?origin=ALL`)
       .flush([{ ...entry, origin: 'FUTURE', command: unsafe, params: { html: unsafe } }]);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain(unsafe);
@@ -409,11 +410,14 @@ describe('Scheduler page', () => {
     view.confirm();
     http.expectNone(`${base}/delete`);
   });
-  it('retains stale data with the original filter and timestamp when a different filter fails', async () => {
+  it('filters locally and retains the snapshot and timestamp when refresh fails', async () => {
     const fixture = enter(),
       view = fixture.componentInstance.state;
     const updated = view.updated();
     view.selectOrigin('ALL');
+    http.expectNone(`${base}?origin=ALL`);
+    expect(view.entries()).toEqual([entry]);
+    view.refresh();
     view.selectOrigin('INTERNAL');
     expect(view.origin).toBe('ALL');
     await fixture.whenStable();
@@ -421,12 +425,70 @@ describe('Scheduler page', () => {
     expect(fixture.nativeElement.querySelector('#scheduler-origin').disabled).toBe(true);
     http.expectOne(`${base}?origin=ALL`).error(new ProgressEvent('error'));
     expect(view.entries()).toEqual([entry]);
-    expect(view.visibleOrigin()).toBe('USER');
+    expect(view.visibleOrigin()).toBe('ALL');
     expect(view.updated()).toBe(updated);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('desactualizados');
-    expect(fixture.nativeElement.textContent).toContain('Origen de los datos visibles: Usuario');
+    expect(fixture.nativeElement.textContent).toContain('Origen de los datos visibles: Todos');
+    view.selectOrigin('INTERNAL');
+    expect(view.entries()).toEqual([]);
+    expect(view.snapshot()).toEqual([entry]);
     http.expectNone(`${base}?origin=ALL`);
+  });
+  it('derives global indicators independently of the local filter and preserves them on failure', () => {
+    const fixture = enter([
+      entry,
+      {
+        ...entry,
+        id: 'internal',
+        origin: 'INTERNAL',
+        schedule: { type: 'cron', expression: '* * * * *', timezone: 'UTC' },
+        next_enqueue_at: '2029-01-01T00:00:00Z',
+      },
+      { ...entry, id: 'once', schedule: { type: 'once', at: '2031-01-01T00:00:00Z' } },
+    ]);
+    const view = fixture.componentInstance.state;
+    expect(view.summary()).toMatchObject({
+      total: 3,
+      user: 2,
+      internal: 1,
+      recurring: 2,
+      once: 1,
+      next: { id: 'internal' },
+    });
+    view.selectOrigin('INTERNAL');
+    expect(view.entries()?.map((e) => e.id)).toEqual(['internal']);
+    expect(view.summary()?.total).toBe(3);
+    const summary = view.summary();
+    view.refresh();
+    http.expectOne(`${base}?origin=ALL`).error(new ProgressEvent('error'));
+    expect(view.summary()).toBe(summary);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Resumen anterior, desactualizado');
+    view.ionViewWillLeave();
+    expect(view.summary()).toBeNull();
+  });
+  it('distinguishes missing summary, failed initial load and a confirmed empty snapshot', () => {
+    const fixture = TestBed.createComponent(Scheduler);
+    const view = fixture.componentInstance.state;
+    fixture.detectChanges();
+    expect(view.summary()).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-scheduler-indicators').textContent).toContain(
+      'Sin lectura disponible',
+    );
+    view.ionViewWillEnter();
+    http.expectOne(`${base}?origin=ALL`).error(new ProgressEvent('error'));
+    expect(view.summary()).toBeNull();
+    view.refresh();
+    http.expectOne(`${base}?origin=ALL`).flush([]);
+    expect(view.summary()).toMatchObject({
+      total: 0,
+      user: 0,
+      internal: 0,
+      recurring: 0,
+      once: 0,
+      next: null,
+    });
   });
   it('cancels without a request and freezes the exact summary/body, blocking double clicks', () => {
     const fixture = enter(),
@@ -454,7 +516,7 @@ describe('Scheduler page', () => {
       schedule: { type: 'interval', seconds: 60 },
     });
     request.flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
     expect(view.form).toEqual(emptyForm());
     expect(view.busy()).toBe(false);
   });
@@ -462,7 +524,7 @@ describe('Scheduler page', () => {
     const fixture = enter(),
       view = fixture.componentInstance.state;
     view.selectOrigin('ALL');
-    http.expectOne(`${base}?origin=ALL`).flush([entry]);
+    http.expectNone(`${base}?origin=ALL`);
     const selected = structuredClone(entry);
     view.prepareDelete(selected);
     selected.id = 'changed';
@@ -480,7 +542,7 @@ describe('Scheduler page', () => {
     view.prepareAdd();
     view.confirm();
     http.expectOne(`${base}/add`).flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush({}, { status: 503, statusText: 'Unavailable' });
+    http.expectOne(`${base}?origin=ALL`).flush({}, { status: 503, statusText: 'Unavailable' });
     expect(view.result()).toEqual(entry);
     expect(view.resultLabel()).toBe('Programación creada');
     expect(view.error()).toBe('');
@@ -502,7 +564,7 @@ describe('Scheduler page', () => {
       expect(view.form).toEqual(form);
       expect(view.busy()).toBe(false);
       http.expectNone(`${base}/add`);
-      http.expectNone(`${base}?origin=USER`);
+      http.expectNone(`${base}?origin=ALL`);
     }
   });
   it('blocks invalid forms and invalidates confirmations on leave or session change', () => {
@@ -519,14 +581,14 @@ describe('Scheduler page', () => {
     http.expectNone(`${base}/add`);
     expect(view.form).toEqual(emptyForm());
     view.ionViewWillEnter();
-    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
     view.prepareDelete(entry);
     TestBed.inject(ThemeIdentity).clear();
     view.confirm();
     view.prepareDelete(entry);
     view.refresh();
     http.expectNone(`${base}/delete`);
-    http.expectNone(`${base}?origin=USER`);
+    http.expectNone(`${base}?origin=ALL`);
     expect(view.entries()).toBeNull();
     expect(view.pending()).toBeNull();
   });
@@ -569,7 +631,7 @@ describe('Scheduler page', () => {
     view.prepareAdd();
     view.confirm();
     http.expectOne(`${base}/add`).flush(entry);
-    const refresh = http.expectOne(`${base}?origin=USER`);
+    const refresh = http.expectOne(`${base}?origin=ALL`);
     fixture.detectChanges();
     expect(trigger.disabled).toBe(true);
     refresh.flush([entry]);
@@ -591,7 +653,7 @@ describe('Scheduler page', () => {
     view.prepareDelete(entry);
     view.confirm();
     http.expectOne(`${base}/delete`).flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([]);
+    http.expectOne(`${base}?origin=ALL`).flush([]);
     TestBed.tick();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -602,11 +664,11 @@ describe('Scheduler page', () => {
     const view = enter().componentInstance.state;
     view.prepareAdd();
     view.refresh();
-    http.expectNone(`${base}?origin=USER`);
+    http.expectNone(`${base}?origin=ALL`);
     view.confirm();
     view.refresh();
-    http.expectNone(`${base}?origin=USER`);
+    http.expectNone(`${base}?origin=ALL`);
     http.expectOne(`${base}/add`).flush(entry);
-    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
   });
 });
