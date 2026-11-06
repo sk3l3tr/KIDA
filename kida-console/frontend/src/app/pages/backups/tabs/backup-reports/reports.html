@@ -27,7 +27,7 @@
         <div class="section-header">
           <h3 #listHeading tabindex="-1" id="backup-report-list-heading">Informes disponibles</h3>
           <button class="secondary" (click)="state.refresh()" [disabled]="state.disabled()">
-            Actualizar informes
+            <span class="i i-refresh" aria-hidden="true"></span>Actualizar informes
           </button>
         </div>
         <div aria-live="polite" [attr.aria-busy]="state.loading()">
@@ -52,67 +52,109 @@
             <p>No hay informes de Health.</p>
           }
         </div>
-        <ul class="backup-list" aria-labelledby="backup-report-list-heading">
-          @for (id of state.entries(); track $index) {
+        <ul class="backup-list report-list" aria-labelledby="backup-report-list-heading">
+          @for (id of state.entries(); track id) {
             <li>
-              <pre>run_id: {{ id }}</pre>
+              <pre class="report-id">run_id: {{ id }}</pre>
               <div class="row-actions">
                 <button
                   class="secondary"
-                  (click)="state.select(id)"
+                  (click)="backups.openReportDetail(id)"
                   [disabled]="state.disabled()"
                   [attr.aria-pressed]="state.selectedId() === id"
                   [attr.aria-label]="'Ver informe ' + id"
                 >
-                  Ver informe
+                  <span class="i i-eye" aria-hidden="true"></span>Ver informe
                 </button>
                 <button
-                  class="danger"
+                  class="danger icon-only"
                   (click)="prepare(id)"
                   [disabled]="state.disabled()"
                   [attr.aria-label]="'Eliminar informe ' + id"
                 >
-                  Eliminar informe
+                  <span class="i i-trash" aria-hidden="true"></span>
                 </button>
               </div>
             </li>
           }
         </ul>
-        @if (state.selectedId() !== null) {
-          <section
-            aria-labelledby="backup-report-detail-heading"
-            [attr.aria-busy]="state.detailLoading()"
-          >
-            <h3 id="backup-report-detail-heading">Informe: {{ state.selectedId() }}</h3>
-            @if (state.detailLoading()) {
-              <p>Cargando informe…</p>
-            }
-            @if (state.detailError()) {
-              <p class="error" role="alert">
-                Error de consulta del informe: {{ state.detailError() }}
-              </p>
-            }
-            @if (state.detail(); as report) {
-              @if (state.detailLoading() || state.detailError() || state.listError()) {
-                <p>Informe anterior, desactualizado; pendiente de actualizar.</p>
-              }
-              <p>
-                Última consulta: {{ state.detailUpdated() | date: 'medium' }} (hora local del
-                navegador).
-              </p>
-              <p>Markdown mostrado como texto literal.</p>
-              <pre data-testid="report-markdown">{{ report.markdown }}</pre>
-              @if (limitedPrecision(report)) {
-                <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
-              }
-              <details>
-                <summary>Informe completo (JSON)</summary>
-                <pre>{{ report | json }}</pre>
-              </details>
-            }
-          </section>
-        }
       </section>
     </div>
+    <app-side-panel
+      [open]="backups.panel() === 'report-detail' && state.selectedId() !== null"
+      [focusTrap]="state.pending() === null"
+      context="BACKUPS / INFORME"
+      title="Informe de Backup Health"
+      [subtitle]="state.selectedId() ?? undefined"
+      [fallbackFocus]="this.listHeading()?.nativeElement ?? null"
+      (closed)="backups.closeReportDetail()"
+    >
+      @if (backups.panel() === 'report-detail' && state.selectedId() !== null) {
+        <section
+          aria-labelledby="backup-report-detail-heading"
+          [attr.aria-busy]="state.detailLoading()"
+        >
+          <h3 #panelHeading tabindex="-1" id="backup-report-detail-heading">
+            Informe: {{ state.selectedId() }}
+          </h3>
+          @if (state.detailLoading()) {
+            <p>Cargando informe…</p>
+          }
+          @if (state.detailError()) {
+            <p class="error" role="alert">
+              Error de consulta del informe: {{ state.detailError() }}
+            </p>
+          }
+          @if (state.error()) {
+            <p class="error" role="alert">{{ state.error() }}</p>
+          }
+          @for (message of state.uncertainties(); track $index) {
+            <pre class="error" role="alert">{{ message }}</pre>
+          }
+          @if (state.result(); as response) {
+            @if (response.run_id === state.selectedId()) {
+              <p role="status">{{ state.resultLabel() }} · deleted: {{ response.deleted }}</p>
+            }
+          }
+          @if (state.detail(); as report) {
+            @if (
+              state.loading() || state.detailLoading() || state.detailError() || state.listError()
+            ) {
+              <p>Informe anterior, desactualizado; pendiente de actualizar.</p>
+            }
+            <p>
+              Última consulta: {{ state.detailUpdated() | date: 'medium' }} (hora local del
+              navegador).
+            </p>
+            <p>Markdown mostrado como texto literal.</p>
+            <pre class="report-markdown" data-testid="report-markdown">{{ report.markdown }}</pre>
+            @if (limitedPrecision(report)) {
+              <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+            }
+            <details>
+              <summary>Informe completo (JSON)</summary>
+              <pre>{{ report | json }}</pre>
+            </details>
+          }
+        </section>
+      }
+      <div panel-actions>
+        <button type="button" class="secondary" (click)="backups.closeReportDetail()">
+          Cerrar informe
+        </button>
+        @let id = state.selectedId();
+        @if (id !== null) {
+          <button
+            type="button"
+            class="danger"
+            (click)="prepare(id)"
+            [disabled]="state.disabled()"
+            [attr.aria-label]="'Eliminar informe ' + id"
+          >
+            <span class="i i-trash" aria-hidden="true"></span>Eliminar informe
+          </button>
+        }
+      </div>
+    </app-side-panel>
   }
 </ion-content>

@@ -32,6 +32,8 @@ export class BackupsFacade {
         this.closeConfigurationDetail();
       if (this.panel() === 'health-detail' && this.health.selectedId() === null)
         this.closeHealthDetail();
+      if (this.panel() === 'report-detail' && this.reports.selectedId() === null)
+        this.closeReportDetail();
     });
   }
 
@@ -87,6 +89,20 @@ export class BackupsFacade {
       return;
     this.panel.set(null);
     this.health.leaveTab();
+    this.closed.next();
+  }
+
+  openReportDetail(id: string): void {
+    if (!this.active() || this.reports.disabled()) return;
+    if (!this.reports.entries()?.includes(id)) return;
+    this.reports.select(id);
+    this.panel.set('report-detail');
+  }
+
+  closeReportDetail(): void {
+    if (this.panel() !== 'report-detail') return;
+    this.panel.set(null);
+    this.reports.leaveTab();
     this.closed.next();
   }
 

@@ -1,4 +1,6 @@
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
+import { SidePanel } from '../../../components/side-panel/side-panel';
+import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterNextRender, inject } from '@angular/core';
@@ -47,6 +49,9 @@ function setup() {
       imports: [BackupReports],
       template: '@if (state.active()) { <app-backup-reports /> }',
     },
+  });
+  TestBed.overrideComponent(SidePanel, {
+    set: { template: '@if (open()) { <ng-content /><ng-content select="[panel-actions]" /> }' },
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
@@ -98,7 +103,7 @@ describe('Health report state, confirmation and page integration', () => {
     http.expectOne(listUrl).flush(rows);
   }
   function select(page: Backups) {
-    page.state.reports.select(id);
+    page.state.openReportDetail(id);
     http.expectOne(getUrl()).flush(report);
   }
   function refreshed(rows = [id, 'second']) {
@@ -450,8 +455,8 @@ describe('Health report state, confirmation and page integration', () => {
     'focuses Cancel and restores operation focus after %s',
     async (status) => {
       const { reports, fixture, component } = await reportView();
-      const trigger = [...fixture.nativeElement.querySelectorAll('button')].find(
-        (button: any) => button.getAttribute('aria-label') === `Eliminar informe ${id}`,
+      const trigger = fixture.nativeElement.querySelector(
+        '[panel-actions] button.danger',
       ) as HTMLButtonElement;
       trigger.focus();
       component.prepare(id);
@@ -582,5 +587,276 @@ describe('Health report state, confirmation and page integration', () => {
     await fixture.whenStable();
     expect(document.activeElement).toBe(document.body);
     document.body.removeAttribute('tabindex');
+  });
+  it.each([id, ''])(
+    'opens the exact report ID %j in a reader with safe full text and JSON',
+    async (value) => {
+      const fixture = entry([value]);
+      fixture.autoDetectChanges();
+      await fixture.whenStable();
+      expect(fixture.nativeElement.querySelector('[data-testid="report-markdown"]')).toBeNull();
+      const row = fixture.nativeElement.querySelector('.report-list li') as HTMLElement;
+      expect(row.querySelector('.report-id')?.textContent).toBe(`run_id: ${value}`);
+      expect(row.querySelectorAll('button')).toHaveLength(2);
+      const trigger = row.querySelector('button.secondary') as HTMLButtonElement;
+      trigger.focus();
+      trigger.click();
+      fixture.detectChanges();
+      const panel = fixture.debugElement.query(By.directive(SidePanel))
+        .componentInstance as SidePanel;
+      expect(panel.open()).toBe(true);
+      expect(fixture.nativeElement.querySelector('app-side-panel')?.textContent).toContain(
+        'Cargando informe',
+      );
+      const response = {
+        ...report,
+        run_id: value,
+        markdown: '  inicio\n\n' + report.markdown + '\n  fin\n',
+        future: { value: 9007199254740992 },
+      };
+      http.expectOne(getUrl(value)).flush(response);
+      fixture.detectChanges();
+      const reader = fixture.nativeElement.querySelector('app-side-panel') as HTMLElement;
+      expect(reader.querySelector('[data-testid="report-markdown"]')?.textContent).toBe(
+        response.markdown,
+      );
+      expect(reader.querySelector('details pre')?.textContent).toContain('9007199254740992');
+      expect(reader.textContent).toContain('Precisión limitada');
+      expect(fixture.nativeElement.querySelector('img,script,a')).toBeNull();
+      const remove = reader.querySelector('[panel-actions] button.danger') as HTMLButtonElement;
+      expect(remove.disabled).toBe(false);
+      remove.click();
+      expect(dialogs.config?.title).toBe('Confirmar eliminación de informe');
+      expect(fixture.componentInstance.state.reports.pending()?.run_id).toBe(value);
+      dialogs.choose('cancel');
+      http.expectNone(deleteUrl);
+    },
+  );
+
+  it.each([true, false])(
+    'keeps deleted:%s truthful in the reader and returns valid focus if it disappears',
+    async (wasDeleted) => {
+      const fixture = entry();
+      fixture.autoDetectChanges();
+      await fixture.whenStable();
+      const opener = fixture.nativeElement.querySelector(
+        '.report-list button.secondary',
+      ) as HTMLButtonElement;
+      opener.focus();
+      opener.click();
+      http.expectOne(getUrl()).flush(report);
+      fixture.detectChanges();
+      const panel = fixture.debugElement.query(By.directive(SidePanel))
+        .componentInstance as SidePanel;
+      const component = fixture.debugElement.query(By.directive(BackupReports))
+        .componentInstance as BackupReports;
+      const remove = fixture.nativeElement.querySelector(
+        '[panel-actions] button.danger',
+      ) as HTMLButtonElement;
+      remove.focus();
+      remove.click();
+      fixture.detectChanges();
+      expect(panel.focusTrap()).toBe(false);
+      expect(Object.isFrozen(component.state.pending())).toBe(true);
+      expect(component.state.pending()?.run_id).toBe(id);
+      expect(dialogs.element?.textContent).toContain('distinto de eliminar la ejecución');
+      dialogs.choose('cancel');
+      TestBed.tick();
+      await fixture.whenStable();
+      expect(panel.focusTrap()).toBe(true);
+      expect(document.activeElement).toBe(remove);
+      http.expectNone(deleteUrl);
+      remove.click();
+      dialogs.choose('confirm');
+      component.confirm();
+      const request = http.expectOne(deleteUrl);
+      expect(request.request.body).toEqual({ run_id: id });
+      request.flush({ ...deleted, deleted: wasDeleted });
+      refreshed(wasDeleted ? ['second'] : [id, 'second']);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component.state.result()?.deleted).toBe(wasDeleted);
+      expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(
+        wasDeleted ? 'Informe eliminado' : 'CORE no confirmó',
+      );
+      if (wasDeleted) {
+        expect(panel.open()).toBe(false);
+        expect(component.state.selectedId()).toBeNull();
+        expect(opener.isConnected).toBe(false);
+        panel.didDismiss();
+        await new Promise((resolve) => setTimeout(resolve));
+        expect(document.activeElement).toBe(component.listHeading()?.nativeElement);
+      } else {
+        expect(panel.open()).toBe(true);
+        expect(component.state.selectedId()).toBe(id);
+        expect(
+          fixture.nativeElement.querySelector('app-side-panel [role="status"]')?.textContent,
+        ).toContain('CORE no confirmó');
+        expect(
+          fixture.nativeElement.querySelector('[data-testid="report-markdown"]')?.textContent,
+        ).toBe(report.markdown);
+        expect(document.activeElement).toBe(remove);
+      }
+    },
+  );
+
+  it.each([id, 'second'])(
+    'rejects the old reader response after closing and opening %j',
+    async (nextId) => {
+      const fixture = entry();
+      const facade = fixture.componentInstance.state;
+      facade.openReportDetail(id);
+      const old = http.expectOne(getUrl());
+      fixture.detectChanges();
+      const panel = fixture.debugElement.query(By.directive(SidePanel))
+        .componentInstance as SidePanel;
+      panel.closed.emit();
+      expect(facade.reports.detailLoading()).toBe(false);
+      expect(facade.reports.selectedId()).toBeNull();
+      facade.openReportDetail(nextId);
+      http.expectNone(getUrl(nextId));
+      old.flush(report);
+      const fresh = http.expectOne(getUrl(nextId));
+      fixture.detectChanges();
+      expect(facade.reports.detail()).toBeNull();
+      expect(facade.reports.detailLoading()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="report-markdown"]')).toBeNull();
+      fresh.flush({ run_id: nextId, markdown: '# Nuevo\n\n  detalle' });
+      fixture.detectChanges();
+      expect(panel.open()).toBe(true);
+      expect(facade.reports.selectedId()).toBe(nextId);
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="report-markdown"]')?.textContent,
+      ).toBe('# Nuevo\n\n  detalle');
+      panel.closed.emit();
+      fixture.detectChanges();
+      expect(panel.open()).toBe(false);
+      expect(facade.reports.detailLoading()).toBe(false);
+      expect(facade.reports.detail()).toBeNull();
+    },
+  );
+
+  it('closes the reader with its correlated confirmation, restores its opener and ignores a late confirm', async () => {
+    const fixture = entry();
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const opener = fixture.nativeElement.querySelector(
+      '.report-list button.secondary',
+    ) as HTMLButtonElement;
+    opener.focus();
+    opener.click();
+    http.expectOne(getUrl()).flush(report);
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    const component = fixture.debugElement.query(By.directive(BackupReports))
+      .componentInstance as BackupReports;
+    (
+      fixture.nativeElement.querySelector('[panel-actions] button.danger') as HTMLButtonElement
+    ).click();
+    const context = dialogs.config!.context;
+    panel.didDismiss();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(panel.open()).toBe(false);
+    expect(dialogs.element).toBeNull();
+    expect(component.state.pending()).toBeNull();
+    expect(component.state.selectedId()).toBeNull();
+    expect(component.state.detail()).toBeNull();
+    expect(component.state.entries()).toEqual([id, 'second']);
+    expect(document.activeElement).toBe(opener);
+    TestBed.inject(ArcaActionsService).dispatchAction('REPORT_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    component.confirm();
+    http.expectNone(deleteUrl);
+  });
+
+  it('keeps a sent deletion and Health refresh after closing without affecting another panel', async () => {
+    const { fixture, page, reports, component } = await reportView();
+    component.prepare(id);
+    component.confirm();
+    const request = http.expectOne(deleteUrl);
+    page.state.closeReportDetail();
+    expect(reports.writing()).toBe(true);
+    page.state.panel.set('health-run');
+    request.flush(deleted);
+    http.expectOne(`${base}/health`).flush([]);
+    http.expectOne(listUrl).flush([id, 'second']);
+    http.expectNone(getUrl());
+    fixture.detectChanges();
+    expect(page.state.panel()).toBe('health-run');
+    expect(reports.selectedId()).toBeNull();
+    expect(reports.detail()).toBeNull();
+    expect(reports.result()).toEqual(deleted);
+    expect(reports.writing()).toBe(false);
+    expect(page.state.operationsBlocked()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(
+      'Informe eliminado',
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="report-markdown"]')).toBeNull();
+  });
+
+  it('keeps uncertainty visible after closing, changing tabs and refreshing without retry', async () => {
+    const { fixture, page, reports, component } = await reportView();
+    component.prepare(id);
+    dialogs.choose('confirm');
+    http
+      .expectOne(deleteUrl)
+      .flush({ detail: { code: 'core_timeout' } }, { status: 504, statusText: 'Timeout' });
+    fixture.detectChanges();
+    const warning = reports.uncertainties()[0];
+    expect(
+      fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+    ).toContain(warning);
+    page.state.closeReportDetail();
+    component.ionViewWillLeave();
+    component.ionViewWillEnter();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain(warning);
+    page.state.openReportDetail(id);
+    http.expectOne(getUrl()).flush(report);
+    reports.refresh();
+    http.expectOne(listUrl).flush([id, 'second']);
+    http.expectOne(getUrl()).flush(report);
+    fixture.detectChanges();
+    expect(reports.uncertainties()).toEqual([warning]);
+    expect(reports.disabled()).toBe(false);
+    expect(
+      fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+    ).toContain(warning);
+    http.expectNone(deleteUrl);
+  });
+
+  it('keeps previous reader text stale on failed refresh and closes only when selection disappears', async () => {
+    const { fixture, page, reports } = await reportView();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    reports.refresh();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-side-panel')?.textContent).toContain(
+      'Informe anterior, desactualizado',
+    );
+    http.expectOne(listUrl).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(panel.open()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="report-markdown"]')?.textContent,
+    ).toBe(report.markdown);
+    reports.refresh();
+    http.expectOne(listUrl).flush([id]);
+    http.expectOne(getUrl()).flush({}, { status: 502, statusText: 'Failed' });
+    fixture.detectChanges();
+    expect(panel.open()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+    ).toContain('Error de consulta');
+    reports.refresh();
+    http.expectOne(listUrl).flush([]);
+    fixture.detectChanges();
+    expect(panel.open()).toBe(false);
+    expect(page.state.panel()).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('No hay informes de Health');
   });
 });

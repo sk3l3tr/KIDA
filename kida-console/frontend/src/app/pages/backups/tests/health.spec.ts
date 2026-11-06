@@ -1312,12 +1312,14 @@ describe('Health basic state and page integration', () => {
       expect(health.writing()).toBe(true);
       expect(health.selectedId()).toBeNull();
       // Simulate another view owning the panel while the previous view's write finishes.
+      page.state.reports.selectedId.set('another-report');
       page.state.panel.set('report-detail');
       request.flush(operation === 'create' ? run : admitted);
       http.expectOne(`${base}/health`).flush([record]);
       http.expectNone(getUrl());
       fixture.detectChanges();
       expect(page.state.panel()).toBe('report-detail');
+      expect(page.state.reports.selectedId()).toBe('another-report');
       expect(health.selectedId()).toBeNull();
       expect(health.detail()).toBeNull();
       expect(health.result()).toEqual(operation === 'create' ? run : admitted);

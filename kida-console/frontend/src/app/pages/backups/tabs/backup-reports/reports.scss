@@ -1,0 +1,23 @@
+.report-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kida-space);
+  padding-block: 0.75rem;
+}
+.report-id {
+  flex: 1 1 18rem;
+  min-width: 0;
+  margin: 0;
+  max-height: none;
+}
+.report-markdown {
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+}
+[panel-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

@@ -24,13 +24,14 @@ import {
 import { BackupReportsState } from '../../services/reports-state';
 import { IonContent } from '@ionic/angular/standalone';
 import { BackupsFacade } from '../../services/backups.facade';
+import { SidePanel } from '../../../../components/side-panel/side-panel';
 import { limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-reports',
-  imports: [IonContent, DatePipe, JsonPipe],
+  imports: [IonContent, DatePipe, JsonPipe, SidePanel],
   templateUrl: './reports.html',
-  styleUrl: '../../backups.scss',
+  styleUrls: ['../../backups.scss', './reports.scss'],
 })
 export class BackupReports implements OnDestroy {
   readonly state = inject(BackupReportsState);
@@ -49,7 +50,8 @@ export class BackupReports implements OnDestroy {
   private readonly arca = inject(ArcaService);
   private dialogContext?: string;
   private dialogSubscription?: Subscription;
-  private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
+  readonly panelHeading = viewChild<ElementRef<HTMLElement>>('panelHeading');
+  readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
   private readonly restoreRequested = signal(false);
   private trigger: Element | null = null;
 
@@ -63,7 +65,7 @@ export class BackupReports implements OnDestroy {
       restoreDialogFocus(
         this.injector,
         this.trigger,
-        () => this.listHeading()?.nativeElement,
+        () => this.panelHeading()?.nativeElement ?? this.listHeading()?.nativeElement,
         () =>
           viewRevision === this.viewRevision &&
           !state.disabled() &&
@@ -100,6 +102,7 @@ export class BackupReports implements OnDestroy {
         'Acción: Eliminar informe',
         `run_id: ${pending.run_id}`,
         'Esta operación solicita a CORE eliminar el informe de Health.',
+        'Eliminar el informe es distinto de eliminar la ejecución de Health.',
       ],
       buttons: [
         { id: 'cancel', text: 'Cancelar', style: 'secondary' },
