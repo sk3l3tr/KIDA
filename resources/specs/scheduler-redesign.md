@@ -113,7 +113,11 @@ Validación: 121 pruebas y build de desarrollo correctos; revisión independient
 - Orígenes desconocidos conservados y sin borrado.
 - Pruebas de filtros combinados, orden, textos largos y contenido escapado.
 
-### SCH-04 — Inspector de programación
+### SCH-04 — Inspector de programación — Completada
+
+Implementación realizada: inspector con `SidePanel`, selección por ID desde la instantánea actual y apertura desde la tabla. Muestra identificación, regla, próxima admisión, parámetros y JSON completo; creación e inspección son excluyentes. Conserva el borrador, invalida la selección al salir/cambiar de sesión y muestra ausencia o datos desactualizados tras refrescar. El borrado desde el inspector permanece en SCH-06.
+
+Validación: 128 pruebas y build de desarrollo correctos; revisión independiente sin hallazgos. Retorno de foco comprobado con el modal simulado; verificación visual/Ionic real pendiente. Producción mantiene el exceso previo de 19,21 kB sobre el presupuesto inicial de 1 MB.
 
 **Objetivo:** consultar el detalle sin abandonar el inventario.
 

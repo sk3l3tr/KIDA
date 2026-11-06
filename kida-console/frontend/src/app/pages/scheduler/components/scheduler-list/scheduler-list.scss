@@ -90,8 +90,9 @@ td small {
   border: 1px solid var(--ion-border-color);
   border-radius: var(--kida-radius);
 }
-.row-actions summary {
+.row-actions button {
   min-height: 44px;
+  margin-bottom: 0.5rem;
 }
 .inventory-footer {
   padding-top: 1rem;

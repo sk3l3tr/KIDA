@@ -401,6 +401,8 @@ describe('Scheduler page', () => {
       .expectOne(`${base}?origin=ALL`)
       .flush([{ ...entry, origin: 'FUTURE', command: unsafe, params: { html: unsafe } }]);
     fixture.detectChanges();
+    fixture.nativeElement.querySelector('.inspect-schedule').click();
+    fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain(unsafe);
     expect(fixture.nativeElement.textContent).toContain('futureRule');
     expect(fixture.nativeElement.textContent).toContain('next_enqueue_at');
@@ -409,6 +411,159 @@ describe('Scheduler page', () => {
     for (const origin of ['INTERNAL', 'FUTURE']) view.prepareDelete({ ...entry, origin });
     view.confirm();
     http.expectNone(`${base}/delete`);
+  });
+  it('opens the inspector from the table with the complete snapshot and no additional requests', () => {
+    const fixture = enter(),
+      state = fixture.componentInstance.state;
+    fixture.nativeElement.querySelector('.inspect-schedule').click();
+    fixture.detectChanges();
+    expect(state.inspectedId()).toBe(entry.id);
+    expect(state.inspectedSchedule()).toEqual(entry);
+    const root = fixture.nativeElement.querySelector('app-scheduler-inspector') as HTMLElement;
+    expect(root.querySelector('ion-modal')?.getAttribute('aria-label')).toBe(entry.command);
+    expect(root.textContent).toContain(entry.id);
+    expect(root.textContent).toContain(ruleSummary(entry.schedule));
+    expect(root.textContent).toContain(localDate(entry.next_enqueue_at));
+    expect(root.textContent).toContain('El anclaje lo establece CORE');
+    expect(root.querySelector('details pre')?.textContent).toContain('futureRule');
+    expect(root.querySelector('details pre')?.textContent).toContain('"extra": "visible"');
+    expect(root.querySelector('section pre')?.textContent).toBe('null');
+    http.expectNone(`${base}?origin=ALL`);
+    http.expectNone(`${base}/add`);
+    http.expectNone(`${base}/delete`);
+  });
+  it.each(['INTERNAL', 'FUTURE'])('keeps inspected %s schedules read-only', (origin) => {
+    const fixture = enter([
+      {
+        ...entry,
+        origin,
+        schedule: { type: 'cron', expression: '0 3 * * *', timezone: 'Europe/Madrid' },
+      },
+    ]);
+    const state = fixture.componentInstance.state;
+    state.selectOrigin('ALL');
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('.inspect-schedule').click();
+    fixture.detectChanges();
+    const root = fixture.nativeElement.querySelector('app-scheduler-inspector') as HTMLElement;
+    expect(root.textContent).toContain(
+      origin === 'INTERNAL'
+        ? 'Gestionada por CORE · solo lectura'
+        : 'Origen desconocido · solo lectura',
+    );
+    expect(root.textContent).toContain('Cron: 0 3 * * * · Europe/Madrid');
+    expect(root.querySelector('button.danger')).toBeNull();
+    expect(fixture.nativeElement.querySelector('tbody button.danger')).toBeNull();
+    state.prepareDelete(state.inspectedSchedule()!);
+    state.confirm();
+    http.expectNone(`${base}/delete`);
+  });
+  it('excludes creation and inspection while preserving the creation draft and operation guards', () => {
+    const fixture = enter(),
+      state = fixture.componentInstance.state;
+    const draft = state.form;
+    state.openCreate();
+    state.openInspector('missing');
+    expect(state.createOpen()).toBe(true);
+    expect(state.inspectedId()).toBeNull();
+    state.openInspector(entry.id);
+    fixture.detectChanges();
+    expect(state.createOpen()).toBe(false);
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+    expect(state.inspectedId()).toBe(entry.id);
+    state.openCreate();
+    fixture.detectChanges();
+    expect(state.inspectedId()).toBeNull();
+    expect(state.createOpen()).toBe(true);
+    expect(state.form).toBe(draft);
+    state.prepareAdd();
+    state.openInspector(entry.id);
+    expect(state.inspectedId()).toBeNull();
+    expect(state.pending()?.action).toBe('add');
+    state.cancel();
+    state.refresh();
+    state.openInspector(entry.id);
+    expect(state.inspectedId()).toBeNull();
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
+    state.ionViewWillLeave();
+    state.openInspector(entry.id);
+    expect(state.inspectedId()).toBeNull();
+  });
+  it('updates inspected data from the snapshot, marks failed reads stale and handles missing definitions', () => {
+    const fixture = enter(),
+      state = fixture.componentInstance.state;
+    state.openInspector(entry.id);
+    const root = fixture.nativeElement.querySelector('app-scheduler-inspector') as HTMLElement;
+    state.refresh();
+    http.expectOne(`${base}?origin=ALL`).error(new ProgressEvent('error'));
+    fixture.detectChanges();
+    expect(state.inspectedSchedule()).toEqual(entry);
+    expect(root.textContent).toContain('Datos anteriores, desactualizados');
+    state.refresh();
+    http.expectOne(`${base}?origin=ALL`).flush([{ ...entry, command: 'updated.command' }]);
+    fixture.detectChanges();
+    expect(state.inspectedSchedule()?.command).toBe('updated.command');
+    expect(root.textContent).not.toContain('Datos anteriores, desactualizados');
+    state.refresh();
+    http.expectOne(`${base}?origin=ALL`).flush([]);
+    fixture.detectChanges();
+    expect(state.inspectedId()).toBe(entry.id);
+    expect(state.inspectedSchedule()).toBeNull();
+    expect(root.textContent).toContain('Programación no disponible en esta lectura');
+    expect(root.querySelector('pre')).toBeNull();
+  });
+  it('invalidates inspection on leave and identity changes without reopening it on a new entry', () => {
+    const fixture = enter(),
+      state = fixture.componentInstance.state;
+    state.openInspector(entry.id);
+    fixture.componentInstance.ionViewWillLeave();
+    fixture.detectChanges();
+    expect(state.inspectedId()).toBeNull();
+    expect(state.inspectedSchedule()).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-scheduler-inspector pre')).toBeNull();
+    fixture.componentInstance.ionViewWillEnter();
+    http.expectOne(`${base}?origin=ALL`).flush([entry]);
+    expect(state.inspectedId()).toBeNull();
+    state.openInspector(entry.id);
+    TestBed.inject(ThemeIdentity).clear();
+    fixture.detectChanges();
+    expect(state.inspectedId()).toBeNull();
+    expect(state.inspectedSchedule()).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-scheduler-inspector pre')).toBeNull();
+  });
+  it('closes inspection and restores focus to the trigger or list heading if the row is gone', async () => {
+    const fixture = enter();
+    document.body.appendChild(fixture.nativeElement);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const trigger = root.querySelector<HTMLButtonElement>('.inspect-schedule')!;
+    const pageHeading = root.querySelector<HTMLElement>('h1')!;
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+    trigger.click();
+    fixture.detectChanges();
+    let modal = root.querySelector('app-scheduler-inspector ion-modal')!;
+    modal.dispatchEvent(new CustomEvent('willPresent'));
+    pageHeading.focus();
+    modal.dispatchEvent(new CustomEvent('didDismiss'));
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(fixture.componentInstance.state.inspectedId()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    trigger.click();
+    fixture.detectChanges();
+    modal = root.querySelector('app-scheduler-inspector ion-modal')!;
+    modal.dispatchEvent(new CustomEvent('willPresent'));
+    fixture.componentInstance.state.selectOrigin('INTERNAL');
+    fixture.detectChanges();
+    expect(root.querySelector('.inspect-schedule')).toBeNull();
+    modal.dispatchEvent(new CustomEvent('didDismiss'));
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement).toBe(root.querySelector('.section-header h2'));
+    expect(fixture.componentInstance.state.inspectedId()).toBeNull();
+    fixture.destroy();
   });
   it('filters locally and retains the snapshot and timestamp when refresh fails', async () => {
     const fixture = enter(),
@@ -499,7 +654,14 @@ describe('Scheduler page', () => {
     expect(table.textContent).toContain(unsafe);
     expect(table.querySelector('.command-cell small').title).toBe(id);
     expect(table.querySelector('.command-cell small').textContent).toBe(id.slice(0, 8) + '…');
-    expect(table.querySelector('pre').textContent).toContain(id);
+    table.querySelector('.inspect-schedule').click();
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('app-scheduler-inspector pre').textContent,
+    ).toContain('html');
+    expect(
+      fixture.nativeElement.querySelector('app-scheduler-inspector details pre').textContent,
+    ).toContain(id);
     expect(table.querySelector('button.danger').getAttribute('aria-label')).toContain(id);
   });
   it('derives global indicators independently of the local filter and preserves them on failure', () => {

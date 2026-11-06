@@ -57,6 +57,8 @@
   }
 </app-side-panel>
 
+<app-scheduler-inspector [fallbackFocus]="state.focusFallback() ?? pageHeading" />
+
 <ng-template #operationStatus>
   <div aria-live="polite">
     @if (state.busy()) {

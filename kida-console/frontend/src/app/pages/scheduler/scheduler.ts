@@ -2,6 +2,7 @@ import { Component, OnDestroy, inject } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
 import { JsonPipe, NgTemplateOutlet } from '@angular/common';
 import { SidePanel } from '../../components/side-panel/side-panel';
+import { SchedulerInspector } from './components/scheduler-inspector/scheduler-inspector';
 import { SchedulerIndicators } from './components/scheduler-indicators/scheduler-indicators';
 import { SchedulerFacade } from './services/scheduler.facade';
 import { SchedulerList } from './components/scheduler-list/scheduler-list';
@@ -11,6 +12,7 @@ import { SchedulerCreateForm } from './components/scheduler-create-form/schedule
   selector: 'app-scheduler',
   imports: [
     SchedulerIndicators,
+    SchedulerInspector,
     IonContent,
     JsonPipe,
     NgTemplateOutlet,

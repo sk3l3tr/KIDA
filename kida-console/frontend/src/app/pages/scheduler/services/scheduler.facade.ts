@@ -85,6 +85,10 @@ export class SchedulerFacade implements OnDestroy {
   readonly result = signal<Schedule | null>(null);
   readonly resultLabel = signal('');
   readonly createOpen = signal(false);
+  readonly inspectedId = signal<string | null>(null);
+  readonly inspectedSchedule = computed(
+    () => this.snapshot()?.find((entry) => entry.id === this.inspectedId()) ?? null,
+  );
   readonly zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   get origin(): OriginFilter {
     return this.selectedOrigin();
@@ -114,6 +118,7 @@ export class SchedulerFacade implements OnDestroy {
   private reset(): void {
     this.active = false;
     this.createOpen.set(false);
+    this.closeInspector();
     ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
@@ -171,11 +176,21 @@ export class SchedulerFacade implements OnDestroy {
   }
   openCreate(): void {
     if (!this.active || this.busy() || this.loading()) return;
+    this.closeInspector();
     this.createOpen.set(true);
   }
   closeCreate(): void {
     this.createOpen.set(false);
     if (this.pending()?.action === 'add') this.cancel();
+  }
+  openInspector(id: string): void {
+    if (!this.active || this.busy() || this.loading()) return;
+    if (!this.snapshot()?.some((entry) => entry.id === id)) return;
+    this.closeCreate();
+    this.inspectedId.set(id);
+  }
+  closeInspector(): void {
+    this.inspectedId.set(null);
   }
   prepareDelete(entry: ListedSchedule): void {
     if (!this.active || this.busy() || this.loading() || entry.origin !== 'USER') return;

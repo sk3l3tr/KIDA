@@ -1,0 +1,56 @@
+section {
+  margin-bottom: 1.75rem;
+}
+h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--kida-muted);
+}
+dl {
+  margin: 0;
+}
+dl > div {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.65fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--ion-border-color);
+}
+dt,
+p {
+  color: var(--kida-muted);
+}
+dt,
+dd,
+p,
+summary {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+dd {
+  margin: 0;
+}
+.identifier,
+pre {
+  font-family: monospace;
+}
+pre {
+  padding: 1rem;
+  border: 1px solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  background: var(--ion-background-color);
+  font-size: 0.75rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 20rem;
+  overflow: auto;
+}
+summary {
+  cursor: pointer;
+  color: var(--ion-color-primary);
+  min-height: 44px;
+  padding-block: 0.75rem;
+}

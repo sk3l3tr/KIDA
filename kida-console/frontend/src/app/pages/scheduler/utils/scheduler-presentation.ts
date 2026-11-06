@@ -7,6 +7,12 @@ export const originLabels: Record<OriginFilter, string> = {
   ALL: 'Todos',
 };
 
+export const modeLabels: Record<string, string> = {
+  once: 'Puntual',
+  interval: 'Intervalo',
+  cron: 'Cron',
+};
+
 export function localDate(value: string): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return `Fecha desconocida: ${value}`;

@@ -1,0 +1,86 @@
+<app-side-panel
+  [open]="state.inspectedId() !== null"
+  [title]="state.inspectedSchedule()?.command ?? 'Inspeccionar programación'"
+  [subtitle]="state.inspectedId() ?? undefined"
+  [fallbackFocus]="fallbackFocus()"
+  (closed)="state.closeInspector()"
+>
+  @if (state.inspectedSchedule(); as entry) {
+    <section>
+      <h3>Identificación</h3>
+      <dl>
+        <div>
+          <dt>ID</dt>
+          <dd class="identifier">{{ entry.id }}</dd>
+        </div>
+        <div>
+          <dt>Comando</dt>
+          <dd class="identifier">{{ entry.command }}</dd>
+        </div>
+        <div>
+          <dt>Origen</dt>
+          <dd>
+            {{
+              entry.origin === 'USER'
+                ? 'Usuario'
+                : entry.origin === 'INTERNAL'
+                  ? 'Interno'
+                  : entry.origin + ' (desconocido)'
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Protección</dt>
+          <dd>
+            {{
+              entry.origin === 'USER'
+                ? 'Se puede eliminar desde el inventario'
+                : entry.origin === 'INTERNAL'
+                  ? 'Gestionada por CORE · solo lectura'
+                  : 'Origen desconocido · solo lectura'
+            }}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section>
+      <h3>Regla temporal</h3>
+      <dl>
+        <div>
+          <dt>Modalidad</dt>
+          <dd>{{ modeLabels[entry.schedule.type] ?? 'Desconocida' }}</dd>
+        </div>
+        <div>
+          <dt>Configuración</dt>
+          <dd>{{ ruleSummary(entry.schedule) }}</dd>
+        </div>
+        <div>
+          <dt>Próximo intento de admisión</dt>
+          <dd>{{ localDate(entry.next_enqueue_at) }}</dd>
+        </div>
+        <div>
+          <dt>Zona visual</dt>
+          <dd>{{ state.zone }}</dd>
+        </div>
+      </dl>
+      @if (entry.schedule.type === 'interval') {
+        <p>El anclaje lo establece CORE al crear; no está disponible en esta lectura.</p>
+      }
+      <p>La admisión en cola no garantiza el inicio ni el resultado del comando.</p>
+    </section>
+    <section>
+      <h3>Parámetros</h3>
+      <pre>{{ entry.params | json }}</pre>
+    </section>
+    <details>
+      <summary>Datos originales (JSON)</summary>
+      <pre>{{ entry | json }}</pre>
+    </details>
+    <p>Instantánea: {{ state.updated() | date: 'medium' }} · {{ state.zone }}.</p>
+    @if (state.loading() || state.listError()) {
+      <p role="status">Datos anteriores, desactualizados; pendientes de actualizar.</p>
+    }
+  } @else {
+    <p role="status">Programación no disponible en esta lectura.</p>
+  }
+</app-side-panel>

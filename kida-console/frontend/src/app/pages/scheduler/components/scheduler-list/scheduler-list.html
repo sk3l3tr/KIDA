@@ -122,10 +122,15 @@
                 {{ localDate(entry.next_enqueue_at) }}<small>{{ state.zone }}</small>
               </td>
               <td class="row-actions">
-                <details>
-                  <summary>Parámetros y datos originales</summary>
-                  <pre>{{ entry | json }}</pre>
-                </details>
+                <button
+                  type="button"
+                  class="secondary inspect-schedule"
+                  [attr.aria-label]="'Inspeccionar programación ' + entry.id"
+                  [disabled]="state.busy() || state.loading()"
+                  (click)="state.openInspector(entry.id)"
+                >
+                  Inspeccionar <span class="i i-eye" aria-hidden="true"></span>
+                </button>
                 @if (entry.origin === 'USER') {
                   <button
                     class="danger"
