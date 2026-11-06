@@ -1,18 +1,75 @@
 <ion-content class="console-content">
   <div class="console-layout scheduler-layout">
-    <div>
-      <span class="eyebrow">PROGRAMACIONES DE CORE</span>
-      <h1>Scheduler</h1>
-      <p>
-        Consulta, crea y elimina programaciones. Actualización al entrar y manual, sin sondeo
-        periódico.
-      </p>
-      <p>
-        Fechas locales del navegador: {{ state.zone }}. El próximo intento de admisión no garantiza
-        el inicio ni la finalización del comando.
-      </p>
-    </div>
+    <header class="scheduler-heading">
+      <div>
+        <span class="eyebrow">CORE / AUTOMATION</span>
+        <h1 #pageHeading tabindex="-1">Scheduler</h1>
+        <p>
+          Gestiona cuándo KIDA intenta ejecutar sus comandos. Programaciones puntuales y
+          recurrentes.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="primary scheduler-create"
+        [disabled]="state.busy() || state.loading()"
+        (click)="state.openCreate()"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Nueva programación
+      </button>
+    </header>
     <app-scheduler-list />
-    <app-scheduler-create-form />
+    <p class="scheduler-note">
+      Fechas locales del navegador: {{ state.zone }}. El próximo intento de admisión no garantiza el
+      inicio ni la finalización del comando. Actualización al entrar y manual, sin sondeo periódico.
+    </p>
+    @if (!state.createOpen()) {
+      <ng-container [ngTemplateOutlet]="operationStatus" />
+    }
   </div>
 </ion-content>
+
+<app-side-panel
+  [open]="state.createOpen()"
+  title="Nueva programación"
+  context="SCHEDULER / CREAR"
+  subtitle="Configura una definición para el scheduler de CORE"
+  [focusTrap]="state.pending() === null"
+  [fallbackFocus]="pageHeading"
+  (closed)="state.closeCreate()"
+>
+  <app-scheduler-create-form />
+  @if (state.createOpen()) {
+    <ng-container [ngTemplateOutlet]="operationStatus" />
+  }
+</app-side-panel>
+
+<ng-template #operationStatus>
+  <div aria-live="polite">
+    @if (state.busy()) {
+      <p>Confirmación o acción pendiente…</p>
+    }
+    @if (state.error()) {
+      <p class="error" role="alert">{{ state.error() }}</p>
+    }
+    @if (state.result() !== null) {
+      <h3 class="success">{{ state.resultLabel() }}</h3>
+      <details>
+        <summary>Resultado de CORE</summary>
+        <pre>{{ state.result() | json }}</pre>
+      </details>
+    }
+  </div>
+</ng-template>

@@ -37,6 +37,7 @@ export class SchedulerFacade implements OnDestroy {
   readonly error = signal('');
   readonly result = signal<Schedule | null>(null);
   readonly resultLabel = signal('');
+  readonly createOpen = signal(false);
   readonly zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   origin: OriginFilter = 'USER';
   form = emptyForm();
@@ -60,6 +61,7 @@ export class SchedulerFacade implements OnDestroy {
   }
   private reset(): void {
     this.active = false;
+    this.createOpen.set(false);
     ++this.generation;
     this.subscriptions.unsubscribe();
     this.subscriptions = new Subscription();
@@ -117,6 +119,14 @@ export class SchedulerFacade implements OnDestroy {
     } catch (failure) {
       this.error.set(failure instanceof Error ? failure.message : 'Formulario no válido.');
     }
+  }
+  openCreate(): void {
+    if (!this.active || this.busy() || this.loading()) return;
+    this.createOpen.set(true);
+  }
+  closeCreate(): void {
+    this.createOpen.set(false);
+    if (this.pending()?.action === 'add') this.cancel();
   }
   prepareDelete(entry: ListedSchedule): void {
     if (!this.active || this.busy() || this.loading() || entry.origin !== 'USER') return;

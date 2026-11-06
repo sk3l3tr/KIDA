@@ -1,5 +1,4 @@
-<section class="panel" aria-label="Crear programación">
-  <h2>Crear programación</h2>
+<section class="scheduler-create-form" aria-label="Crear programación">
   <p>
     CORE valida si el comando es programable, sus parámetros, cron, zonas y restricciones
     temporales.
@@ -86,19 +85,4 @@
     Salir o cambiar de sesión descarta el formulario y las confirmaciones. Una petición enviada
     puede seguir ejecutándose.
   </p>
-  <div aria-live="polite">
-    @if (state.busy()) {
-      <p>Confirmación o acción pendiente…</p>
-    }
-    @if (state.error()) {
-      <p class="error" role="alert">{{ state.error() }}</p>
-    }
-    @if (state.result() !== null) {
-      <h3 class="success">{{ state.resultLabel() }}</h3>
-      <details>
-        <summary>Resultado de CORE</summary>
-        <pre>{{ state.result() | json }}</pre>
-      </details>
-    }
-  </div>
 </section>

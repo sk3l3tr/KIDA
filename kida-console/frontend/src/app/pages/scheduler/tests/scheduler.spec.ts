@@ -2,7 +2,18 @@ import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testi
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { Component, ElementRef, TemplateRef, contentChild, inject, input } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { By } from '@angular/platform-browser';
+import { IonicModule } from '@ionic/angular';
+import {
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonToolbar,
+} from '@ionic/angular/standalone';
+import { SidePanel } from '../../../components/side-panel/side-panel';
 import { Router } from '@angular/router';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { appConfig } from '../../../app.config';
@@ -16,6 +27,25 @@ import { localDate, schedulerFailure, ruleSummary } from '../utils/scheduler-pre
 import { schedulerActions } from '../utils/scheduler.actions';
 
 let dialogs: ReturnType<typeof mockArcaDialogs>;
+
+// Simulate Ionic presentation; keep SidePanel, projected content and ARCA real.
+@Component({
+  selector: 'ion-modal',
+  imports: [NgTemplateOutlet],
+  template: '@if (isOpen()) { <ng-container [ngTemplateOutlet]="content() ?? null" /> }',
+})
+class TestSchedulerModal {
+  readonly isOpen = input(false);
+  readonly focusTrap = input(true);
+  readonly enterAnimation = input<unknown>();
+  readonly leaveAnimation = input<unknown>();
+  readonly content = contentChild(TemplateRef);
+  private readonly host = inject(ElementRef<HTMLElement>);
+  dismiss(): void {
+    this.host.nativeElement.dispatchEvent(new CustomEvent('didDismiss'));
+  }
+}
+
 const base = `${environment.apiBaseUrl}/scheduler`;
 const entry: ListedSchedule = {
   id: 'c6482104-f062-44d2-9fbe-53942c708567',
@@ -42,6 +72,12 @@ function setup() {
       },
       { provide: ArcaPanelsService, useValue: { showLoader: vi.fn(), hideLoader: vi.fn() } },
     ],
+  });
+  TestBed.overrideComponent(SidePanel, {
+    remove: { imports: [IonicModule] },
+    add: {
+      imports: [TestSchedulerModal, IonButton, IonButtons, IonContent, IonHeader, IonToolbar],
+    },
   });
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   dialogs = mockArcaDialogs();
@@ -203,7 +239,7 @@ describe('Scheduler page', () => {
   let http: HttpTestingController;
   beforeEach(() => {
     http = setup();
-    // jsdom has no modal top layer. Real focus/keyboard behavior is checked with Playwright.
+    // jsdom has no modal top layer; presentation is simulated above.
   });
   afterEach(() => {
     dialogs.dismiss();
@@ -239,6 +275,7 @@ describe('Scheduler page', () => {
   });
   it('shares page state with the extracted form and list through their DOM actions', async () => {
     const fixture = enter();
+    fixture.nativeElement.querySelector('.scheduler-create').click();
     fixture.detectChanges();
     await fixture.whenStable();
     const command = fixture.nativeElement.querySelector('#scheduler-command') as HTMLInputElement;
@@ -261,6 +298,85 @@ describe('Scheduler page', () => {
     expect(remove.request.body).toEqual({ id: entry.id });
     remove.flush(entry);
     http.expectOne(`${base}?origin=USER`).flush([]);
+  });
+  it('opens the existing form only from the header CTA and preserves its draft on dismissal', async () => {
+    const fixture = enter();
+    const root = fixture.nativeElement as HTMLElement;
+    const state = fixture.componentInstance.state;
+    expect(root.querySelector('h1')?.textContent).toBe('Scheduler');
+    expect(root.querySelector('.scheduler-heading')?.textContent).toContain('Nueva programación');
+    expect(root.querySelector('.scheduler-layout form')).toBeNull();
+    expect(root.querySelector('form')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.scheduler-create')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(state.createOpen()).toBe(true);
+    expect(root.querySelector('app-side-panel form')).not.toBeNull();
+    const command = root.querySelector<HTMLInputElement>('#scheduler-command')!;
+    command.value = 'system.health';
+    command.dispatchEvent(new Event('input', { bubbles: true }));
+    root.querySelector('ion-modal')!.dispatchEvent(new CustomEvent('didDismiss'));
+    fixture.detectChanges();
+    expect(state.createOpen()).toBe(false);
+    expect(root.querySelector('form')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.scheduler-create')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelector<HTMLInputElement>('#scheduler-command')!.value).toBe('system.health');
+    expect(state.form.command).toBe('system.health');
+    http.expectNone(`${base}/add`);
+    http.expectNone(`${base}?origin=USER`);
+  });
+  it('releases the panel focus trap for confirmation and cancels it when the panel closes', () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state;
+    state.openCreate();
+    fixture.detectChanges();
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    expect(panel.focusTrap()).toBe(true);
+    state.prepareAdd();
+    fixture.detectChanges();
+    expect(panel.focusTrap()).toBe(false);
+    fixture.nativeElement.querySelector('ion-modal').dispatchEvent(new CustomEvent('didDismiss'));
+    fixture.detectChanges();
+    expect(state.createOpen()).toBe(false);
+    expect(state.pending()).toBeNull();
+    expect(state.busy()).toBe(false);
+    state.confirm();
+    http.expectNone(`${base}/add`);
+  });
+  it('closes creation and clears the draft on leave or identity change', () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state;
+    state.openCreate();
+    expect(state.createOpen()).toBe(true);
+    fixture.componentInstance.ionViewWillLeave();
+    expect(state.createOpen()).toBe(false);
+    expect(state.form).toEqual(emptyForm());
+    state.openCreate();
+    expect(state.createOpen()).toBe(false);
+    fixture.componentInstance.ionViewWillEnter();
+    http.expectOne(`${base}?origin=USER`).flush([entry]);
+    state.openCreate();
+    expect(state.createOpen()).toBe(true);
+    TestBed.inject(ThemeIdentity).clear();
+    expect(state.createOpen()).toBe(false);
+    expect(state.form).toEqual(emptyForm());
+  });
+  it('keeps deletion results visible without opening the creation panel', () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state;
+    state.prepareDelete(entry);
+    dialogs.choose();
+    http.expectOne(`${base}/delete`).flush(entry);
+    http.expectOne(`${base}?origin=USER`).flush([]);
+    fixture.detectChanges();
+    expect(state.createOpen()).toBe(false);
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scheduler-layout').textContent).toContain(
+      'Programación eliminada',
+    );
   });
   it('invalidates the local facade and its pending confirmation when the page is destroyed', () => {
     const fixture = enter();
@@ -442,6 +558,7 @@ describe('Scheduler page', () => {
   it('restores creation focus after the refresh has enabled the trigger again', async () => {
     const fixture = enter(),
       view = fixture.componentInstance.state;
+    view.openCreate();
     fixture.autoDetectChanges();
     await fixture.whenStable();
     const trigger = fixture.nativeElement.querySelector(
