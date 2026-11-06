@@ -229,7 +229,7 @@ export class BackupHealthState {
   cancel(): void {
     this.pending.set(null);
   }
-  confirm(): void {
+  confirm(onConfirmed?: () => void): void {
     const pending = this.pending();
     if (!this.active() || !pending) return;
     this.pending.set(null);
@@ -258,6 +258,7 @@ export class BackupHealthState {
         );
         if (currentView) this.selectedId.set(value);
       }
+      if (currentView) onConfirmed?.();
     });
   }
   private write(

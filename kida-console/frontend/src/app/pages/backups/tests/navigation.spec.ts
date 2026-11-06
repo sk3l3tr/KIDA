@@ -18,6 +18,7 @@ import { BackupHealthState } from '../services/health-state';
 import { BackupReportsState } from '../services/reports-state';
 import { BackupConfigurations } from '../tabs/backup-configurations/backup-configurations';
 import { BackupHealth } from '../tabs/backup-health/health';
+import { SidePanel } from '../../../components/side-panel/side-panel';
 import { BackupReports } from '../tabs/backup-reports/reports';
 
 const base = `${environment.apiBaseUrl}/backup`;
@@ -49,6 +50,9 @@ describe('Backups child routes and shared session', () => {
     // JSDOM does not run Ionic outlet transitions; Angular routes still resolve the real children.
     TestBed.overrideComponent(Backups, {
       set: { imports: [RouterOutlet], template: '<router-outlet />' },
+    });
+    TestBed.overrideComponent(SidePanel, {
+      set: { template: '@if (open()) { <ng-content /><ng-content select="[panel-actions]" /> }' },
     });
     http = TestBed.inject(HttpTestingController);
     TestBed.inject(Router).setUpLocationChangeListener();
@@ -143,6 +147,7 @@ describe('Backups child routes and shared session', () => {
     health.ionViewWillEnter();
     initial();
     page.state.health.definitionPath = 'private draft';
+    page.state.openHealthForm('health-create');
     page.state.search.set('private search');
     harness.detectChanges();
     await harness.fixture.whenStable();
@@ -160,6 +165,10 @@ describe('Backups child routes and shared session', () => {
     health.ionViewWillEnter();
     initial();
     expect(page.state.active()).toBe(true);
+    expect(tab.nativeElement.querySelector('#health-definition')).toBeNull();
+    page.state.openHealthForm('health-create');
+    harness.detectChanges();
+    await harness.fixture.whenStable();
     expect(tab.nativeElement.querySelector('#health-definition').value).toBe('');
   });
 });

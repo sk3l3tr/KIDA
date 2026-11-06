@@ -66,8 +66,25 @@ export class BackupsFacade {
     this.panel.set('health-detail');
   }
 
+  openHealthForm(mode: 'health-create' | 'health-run'): void {
+    if (!this.active() || this.health.disabled()) return;
+    this.health.leaveTab();
+    this.panel.set(mode);
+    this.closed.next();
+  }
+
   closeHealthDetail(): void {
     if (this.panel() !== 'health-detail') return;
+    this.closeHealthPanel();
+  }
+
+  closeHealthPanel(): void {
+    if (
+      this.panel() !== 'health-detail' &&
+      this.panel() !== 'health-create' &&
+      this.panel() !== 'health-run'
+    )
+      return;
     this.panel.set(null);
     this.health.leaveTab();
     this.closed.next();

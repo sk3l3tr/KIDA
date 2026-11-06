@@ -5,6 +5,7 @@ import {
   Injector,
   OnDestroy,
   effect,
+  computed,
   inject,
   signal,
   viewChild,
@@ -54,9 +55,18 @@ export class BackupHealth implements OnDestroy {
   private readonly arca = inject(ArcaService);
   private dialogContext?: string;
   private dialogSubscription?: Subscription;
-  readonly detailHeading = viewChild<ElementRef<HTMLElement>>('detailHeading');
+  readonly panelHeading = viewChild<ElementRef<HTMLElement>>('panelHeading');
+  readonly panelTitle = computed(() => {
+    switch (this.backups.panel()) {
+      case 'health-create':
+        return 'Crear Health';
+      case 'health-run':
+        return 'Ejecutar Health automático';
+      default:
+        return 'Detalle de Backup Health';
+    }
+  });
   readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
-  private readonly createButton = viewChild<ElementRef<HTMLButtonElement>>('createButton');
   private readonly restoreRequested = signal(false);
   private trigger: Element | null = null;
 
@@ -70,14 +80,11 @@ export class BackupHealth implements OnDestroy {
       restoreDialogFocus(
         this.injector,
         this.trigger,
-        () => {
-          if (this.backups.panel() === 'health-detail') return this.detailHeading()?.nativeElement;
-          return this.createButton()?.nativeElement;
-        },
+        () => this.panelHeading()?.nativeElement ?? this.listHeading()?.nativeElement,
         () =>
           viewRevision === this.viewRevision &&
           !state.disabled() &&
-          !!this.createButton()?.nativeElement.isConnected,
+          !!this.listHeading()?.nativeElement.isConnected,
       );
     });
   }
@@ -156,7 +163,11 @@ export class BackupHealth implements OnDestroy {
     if (!this.state.pending()) return;
     this.closeConfirmation();
     this.restoreRequested.set(true);
-    this.state.confirm();
+    const automaticForm =
+      this.state.pending()?.action === 'run' && this.backups.panel() === 'health-run';
+    this.state.confirm(() => {
+      if (automaticForm && this.backups.panel() === 'health-run') this.backups.closeHealthPanel();
+    });
   }
   private closeConfirmation(): void {
     this.dialogSubscription?.unsubscribe();
@@ -169,8 +180,7 @@ export class BackupHealth implements OnDestroy {
     this.trigger = this.document.activeElement;
     this.restoreRequested.set(true);
     state.create(() => {
-      this.trigger = null;
-      this.backups.panel.set('health-detail');
+      if (this.backups.panel() === 'health-create') this.backups.closeHealthPanel();
     });
   }
 }

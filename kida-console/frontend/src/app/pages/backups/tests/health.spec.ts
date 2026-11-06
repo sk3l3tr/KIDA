@@ -1,5 +1,7 @@
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
 import { SidePanel } from '../../../components/side-panel/side-panel';
+import { EMPTY } from 'rxjs';
+import { BackupsService } from '../services/backups.service';
 import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -355,6 +357,26 @@ describe('Health basic state and page integration', () => {
       ).componentInstance as BackupHealth,
     };
   }
+  async function formView(mode: 'health-create' | 'health-run') {
+    const fixture = enter();
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const label = mode === 'health-create' ? 'Crear Health' : 'Ejecutar Health automático';
+    const trigger = [...fixture.nativeElement.querySelectorAll('button')].find(
+      (button: any) => button.textContent.trim() === label,
+    ) as HTMLButtonElement;
+    trigger.focus();
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const page = fixture.componentInstance;
+    const component = fixture.debugElement.query(By.directive(BackupHealth))
+      .componentInstance as BackupHealth;
+    const panel = fixture.debugElement.query(By.directive(SidePanel))
+      .componentInstance as SidePanel;
+    return { fixture, page, component, panel, trigger, health: page.state.health };
+  }
+
   it('uses the shared dialog for Health with its exact target and warning', async () => {
     const { component, health } = await healthView();
     component.prepare('stop');
@@ -642,7 +664,7 @@ describe('Health basic state and page integration', () => {
       TestBed.tick();
       await fixture.whenStable();
       expect(document.activeElement).toBe(
-        status === 200 ? component.detailHeading()?.nativeElement : trigger,
+        status === 200 ? component.panelHeading()?.nativeElement : trigger,
       );
       expect(health.disabled()).toBe(false);
     },
@@ -677,45 +699,50 @@ describe('Health basic state and page integration', () => {
   it.each([200, 502, 504])(
     'restores create focus after response %s and all dependent reads',
     async (status) => {
-      const fixture = enter();
-      fixture.autoDetectChanges();
-      await fixture.whenStable();
+      const { fixture, component, panel, trigger: opener } = await formView('health-create');
       const trigger = fixture.nativeElement.querySelector(
         'button[type="submit"]',
       ) as HTMLButtonElement;
       trigger.focus();
-      fixture.debugElement
-        .query((element) => element.componentInstance instanceof BackupHealth)
-        .componentInstance.create();
+      component.create();
       fixture.detectChanges();
       expect(trigger.matches(':disabled')).toBe(true);
       const request = http.expectOne(`${base}/health/create`);
       if (status === 200) {
         request.flush(run);
         fixture.detectChanges();
-        expect(trigger.matches(':disabled')).toBe(true);
+        expect(panel.open()).toBe(false);
+        expect(fixture.nativeElement.querySelector('#health-create-form')).toBeNull();
+        panel.didDismiss();
+        await new Promise((resolve) => setTimeout(resolve));
+        expect(document.activeElement).toBe(component.listHeading()?.nativeElement);
         http.expectOne(`${base}/health`).flush([record]);
-        http.expectOne(getUrl()).flush(run);
-      } else
+        http.expectNone(getUrl());
+      } else {
         request.flush(
           { detail: { code: status === 502 ? 'core_error' : 'core_timeout' } },
           { status, statusText: 'Failed' },
         );
+      }
       TestBed.tick();
       await fixture.whenStable();
-      expect(trigger.matches(':disabled')).toBe(false);
-      expect(document.activeElement).toBe(
-        status === 200
-          ? fixture.debugElement.query(By.directive(BackupHealth)).componentInstance.detailHeading()
-              ?.nativeElement
-          : trigger,
-      );
+      expect(component.state.disabled()).toBe(false);
+      if (status === 200) {
+        expect(opener.disabled).toBe(false);
+        expect(document.activeElement).toBe(component.listHeading()?.nativeElement);
+      } else {
+        expect(trigger.matches(':disabled')).toBe(false);
+        expect(document.activeElement).toBe(trigger);
+      }
     },
   );
   it('clears Health data and cached form DOM after a detached page session change', async () => {
     const fixture = enter(),
       page = fixture.componentInstance;
     selection(page);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    page.state.openHealthForm('health-create');
     fixture.detectChanges();
     await fixture.whenStable();
     const input = fixture.nativeElement.querySelector('#health-definition') as HTMLInputElement;
@@ -727,6 +754,8 @@ describe('Health basic state and page integration', () => {
     const healthComponent = fixture.debugElement.query(
       (element) => element.componentInstance instanceof BackupHealth,
     ).componentInstance as BackupHealth;
+    page.state.openHealthForm('health-run');
+    fixture.detectChanges();
     healthComponent.prepare('run');
     fixture.detectChanges();
     expect(dialogs.element !== null).toBe(true);
@@ -875,8 +904,13 @@ describe('Health basic state and page integration', () => {
       .componentInstance as SidePanel;
     expect(panel.open()).toBe(true);
     expect(fixture.nativeElement.querySelectorAll('[panel-actions] button')).toHaveLength(3);
-    expect(fixture.nativeElement.querySelector('#health-definition')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('#health-automatic-definition')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('#health-definition')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#health-automatic-definition')).toBeNull();
+    expect(
+      [...fixture.nativeElement.querySelectorAll('button')].some(
+        (button: any) => button.textContent.trim() === 'Crear Health',
+      ),
+    ).toBe(true);
   });
 
   it('suspends the panel trap during confirmation and restores it with focus on cancellation', async () => {
@@ -1006,19 +1040,26 @@ describe('Health basic state and page integration', () => {
       expect(text).toContain(value);
   });
 
-  it('keeps a confirmed creation operable in its inspector when history refresh fails', async () => {
-    const fixture = enter([]);
-    fixture.detectChanges();
-    const component = fixture.debugElement.query(By.directive(BackupHealth))
-      .componentInstance as BackupHealth;
+  it('keeps a confirmed creation result outside the panel when history refresh fails', async () => {
+    const { fixture, component, page, panel } = await formView('health-create');
     component.create();
     http.expectOne(`${base}/health/create`).flush(run);
+    expect(page.state.panel()).toBeNull();
     http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges();
-    expect(fixture.componentInstance.state.panel()).toBe('health-detail');
-    expect(fixture.nativeElement.querySelector('app-backup-health-detail')?.textContent).toContain(
-      run.run_id,
+    expect(panel.open()).toBe(false);
+    expect(component.state.result()).toEqual(run);
+    expect(component.state.listError()).not.toBe('');
+    expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(run.run_id);
+    expect(fixture.nativeElement.querySelector('.success details pre')?.textContent).toContain(
+      'kept-volume',
     );
+    expect(fixture.nativeElement.querySelector('app-backup-health-detail')).toBeNull();
+    component.state.refresh();
+    http.expectOne(`${base}/health`).flush([record]);
+    page.state.openHealthDetail(run.run_id);
+    http.expectOne(getUrl()).flush(run);
+    fixture.detectChanges();
     const trigger = fixture.nativeElement.querySelector(
       '[panel-actions] button',
     ) as HTMLButtonElement;
@@ -1044,4 +1085,282 @@ describe('Health basic state and page integration', () => {
     expect(component.state.result()).toEqual(run);
     expect(component.state.selectedId()).toBeNull();
   });
+  it('keeps independent form drafts across close and tabs, then clears them on module exit', async () => {
+    const { fixture, page, component, panel, health } = await formView('health-create');
+    const definition = fixture.nativeElement.querySelector(
+      '#health-definition',
+    ) as HTMLInputElement;
+    definition.value = ' /srv/definición #1.toml ';
+    definition.dispatchEvent(new Event('input', { bubbles: true }));
+    const mode = fixture.nativeElement.querySelector('#health-mode') as HTMLSelectElement;
+    mode.value = 'AUTOMATIC';
+    mode.dispatchEvent(new Event('change', { bubbles: true }));
+    await fixture.whenStable();
+    panel.closed.emit();
+    page.state.openHealthForm('health-run');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('#health-definition')).toBeNull();
+    const automatic = fixture.nativeElement.querySelector(
+      '#health-automatic-definition',
+    ) as HTMLInputElement;
+    automatic.value = ' /srv/otra definición.toml ';
+    automatic.dispatchEvent(new Event('input', { bubbles: true }));
+    await fixture.whenStable();
+    component.ionViewWillLeave();
+    component.ionViewWillEnter();
+    page.state.openHealthForm('health-create');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('#health-definition').value).toBe(definition.value);
+    expect(fixture.nativeElement.querySelector('#health-mode').value).toBe('AUTOMATIC');
+    expect(health.automaticPath).toBe(automatic.value);
+    expect(fixture.nativeElement.querySelector('#health-automatic-definition')).toBeNull();
+    panel.closed.emit();
+    page.state.openHealthForm('health-run');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('#health-automatic-definition').value).toBe(
+      automatic.value,
+    );
+    http.expectNone((request) => request.url.startsWith(base));
+    page.state.ionViewWillLeave();
+    expect(health.definitionPath).toBe('');
+    expect(health.mode).toBe('MANUAL');
+    expect(health.automaticPath).toBe('');
+    expect(page.state.panel()).toBeNull();
+  });
+
+  it.each(['MANUAL', 'AUTOMATIC'] as const)(
+    'submits creation in %s once without executing, and closes only on its result',
+    async (mode) => {
+      const { fixture, page, health, panel } = await formView('health-create');
+      health.definitionPath = ' /srv/definición #ñ.toml ';
+      health.mode = mode;
+      health.automaticPath = '/independent-automatic';
+      fixture.detectChanges();
+      const submit = fixture.nativeElement.querySelector(
+        'button[form="health-create-form"]',
+      ) as HTMLButtonElement;
+      expect(submit.form?.id).toBe('health-create-form');
+      expect(fixture.nativeElement.querySelectorAll('button[type="submit"]')).toHaveLength(1);
+      submit.click();
+      const form = fixture.nativeElement.querySelector('#health-create-form') as HTMLFormElement;
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      const request = http.expectOne(`${base}/health/create`);
+      expect(request.request.body).toEqual({ definition_path: health.definitionPath, mode });
+      expect(dialogs.element).toBeNull();
+      expect(panel.open()).toBe(true);
+      expect(page.state.configurations.operationsBlocked()).toBe(true);
+      http.expectNone(`${base}/health/start`);
+      http.expectNone(`${base}/health/run`);
+      request.flush(run);
+      fixture.detectChanges();
+      expect(page.state.panel()).toBeNull();
+      expect(panel.open()).toBe(false);
+      expect(health.definitionPath).toBe('');
+      expect(health.mode).toBe('MANUAL');
+      expect(health.automaticPath).toBe('/independent-automatic');
+      expect(health.result()).toEqual(run);
+      expect(health.resultLabel()).toContain('Crear no inicia');
+      expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(run.run_id);
+      expect(health.selectedId()).toBeNull();
+      http.expectOne(`${base}/health`).flush([record]);
+      http.expectNone(getUrl());
+    },
+  );
+
+  it('confirms automatic submission with its frozen exact route, cancels and then admits it once', async () => {
+    const { fixture, page, component, panel, health } = await formView('health-run');
+    health.automaticPath = ' ./ruta/../automático #ñ.toml ';
+    health.definitionPath = '/independent-create';
+    health.mode = 'AUTOMATIC';
+    fixture.detectChanges();
+    const submit = fixture.nativeElement.querySelector(
+      'button[form="health-run-form"]',
+    ) as HTMLButtonElement;
+    expect(submit.form?.id).toBe('health-run-form');
+    submit.focus();
+    submit.click();
+    fixture.detectChanges();
+    const frozen = health.pending()!;
+    expect(frozen.value).toBe(' ./ruta/../automático #ñ.toml ');
+    expect(Object.isFrozen(frozen)).toBe(true);
+    expect(String(dialogs.config?.text)).toContain('La admisión no confirma');
+    expect(panel.focusTrap()).toBe(false);
+    http.expectNone(`${base}/health/run`);
+    dialogs.choose('cancel');
+    TestBed.tick();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(submit);
+    expect(panel.open()).toBe(true);
+    expect(panel.focusTrap()).toBe(true);
+    expect(health.automaticPath).toBe(frozen.value);
+    submit.click();
+    health.automaticPath = '/changed-after-confirmation';
+    dialogs.choose('confirm');
+    component.confirm();
+    const request = http.expectOne(`${base}/health/run`);
+    expect(request.request.body).toEqual({ definition_path: frozen.value });
+    request.flush(admitted);
+    fixture.detectChanges();
+    expect(page.state.panel()).toBeNull();
+    expect(panel.open()).toBe(false);
+    expect(health.automaticPath).toBe('');
+    expect(health.definitionPath).toBe('/independent-create');
+    expect(health.mode).toBe('AUTOMATIC');
+    expect(health.queuedResult()).toEqual(admitted);
+    expect(health.resultLabel()).toContain('solicitud admitida');
+    const result = fixture.nativeElement.querySelector('.success')?.textContent;
+    expect(result).toContain(run.run_id);
+    expect(result).toContain('queue-id');
+    expect(result).toContain('run_id identifica Health');
+    http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(health.result()).toEqual(admitted);
+    expect(health.listError()).not.toBe('');
+    http.expectNone(getUrl());
+  });
+
+  it.each([
+    { mode: 'health-create', operation: 'create', status: 502 },
+    { mode: 'health-create', operation: 'create', status: 504 },
+    { mode: 'health-create', operation: 'create', status: 0 },
+    { mode: 'health-run', operation: 'run', status: 502 },
+    { mode: 'health-run', operation: 'run', status: 504 },
+    { mode: 'health-run', operation: 'run', status: 0 },
+  ] as const)(
+    'preserves $mode draft and panel after failure $status without retrying',
+    async ({ mode, operation, status }) => {
+      const { fixture, page, component, panel, health } = await formView(mode);
+      health.definitionPath = ' /create ';
+      health.mode = 'AUTOMATIC';
+      health.automaticPath = ' /run ';
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+      if (operation === 'run') dialogs.choose('confirm');
+      const request = http.expectOne(`${base}/health/${operation}`);
+      if (status === 0) request.error(new ProgressEvent('error'));
+      else
+        request.flush(
+          { detail: { code: status === 502 ? 'core_error' : 'core_timeout' } },
+          { status, statusText: 'Failed' },
+        );
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(page.state.panel()).toBe(mode);
+      expect(panel.open()).toBe(true);
+      expect(health.definitionPath).toBe(' /create ');
+      expect(health.mode).toBe('AUTOMATIC');
+      expect(health.automaticPath).toBe(' /run ');
+      expect(health.result()).toBeNull();
+      const message = status === 502 ? health.error() : health.uncertainties()[0];
+      expect(message).toBeTruthy();
+      expect(
+        fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+      ).toContain(message);
+      page.state.closeHealthPanel();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-side-panel [role="alert"]')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain(message);
+      component.ionViewWillLeave();
+      component.ionViewWillEnter();
+      page.state.openHealthForm(mode);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const input = fixture.nativeElement.querySelector('app-side-panel input') as HTMLInputElement;
+      expect(input.value).toBe(operation === 'create' ? ' /create ' : ' /run ');
+      http.expectNone(`${base}/health/${operation}`);
+      http.expectNone(`${base}/health`);
+    },
+  );
+
+  it.each(['health-create', 'health-run'] as const)(
+    'keeps %s open when the request completes without a result',
+    async (mode) => {
+      const { fixture, page, panel, health } = await formView(mode);
+      health.definitionPath = '/create';
+      health.automaticPath = '/automatic';
+      health.mode = 'AUTOMATIC';
+      const service = TestBed.inject(BackupsService);
+      const operation = mode === 'health-create' ? 'healthCreate' : 'healthRun';
+      vi.spyOn(service, operation).mockReturnValue(EMPTY);
+      (fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+      if (mode === 'health-run') dialogs.choose('confirm');
+      fixture.detectChanges();
+      expect(page.state.panel()).toBe(mode);
+      expect(panel.open()).toBe(true);
+      expect(health.definitionPath).toBe('/create');
+      expect(health.mode).toBe('AUTOMATIC');
+      expect(health.automaticPath).toBe('/automatic');
+      expect(health.result()).toBeNull();
+      expect(health.writing()).toBe(false);
+      http.expectNone((request) => request.url.startsWith(base));
+    },
+  );
+
+  it.each(['health-create', 'health-run'] as const)(
+    'does not close another panel or select a run for a late %s response',
+    async (mode) => {
+      const { fixture, page, panel, health } = await formView(mode);
+      health.definitionPath = '/create';
+      health.automaticPath = '/automatic';
+      const operation = mode === 'health-create' ? 'create' : 'run';
+      (fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+      if (mode === 'health-run') dialogs.choose('confirm');
+      const request = http.expectOne(`${base}/health/${operation}`);
+      panel.closed.emit();
+      expect(health.writing()).toBe(true);
+      expect(health.selectedId()).toBeNull();
+      // Simulate another view owning the panel while the previous view's write finishes.
+      page.state.panel.set('report-detail');
+      request.flush(operation === 'create' ? run : admitted);
+      http.expectOne(`${base}/health`).flush([record]);
+      http.expectNone(getUrl());
+      fixture.detectChanges();
+      expect(page.state.panel()).toBe('report-detail');
+      expect(health.selectedId()).toBeNull();
+      expect(health.detail()).toBeNull();
+      expect(health.result()).toEqual(operation === 'create' ? run : admitted);
+      expect(health.writing()).toBe(false);
+    },
+  );
+
+  it('cancels the automatic confirmation when its panel closes and ignores the late dialog result', async () => {
+    const { fixture, page, component, panel, health } = await formView('health-run');
+    health.automaticPath = ' /automatic ';
+    (fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+    const context = dialogs.config!.context;
+    panel.closed.emit();
+    fixture.detectChanges();
+    expect(page.state.panel()).toBeNull();
+    expect(dialogs.element).toBeNull();
+    expect(health.pending()).toBeNull();
+    expect(health.automaticPath).toBe(' /automatic ');
+    TestBed.inject(ArcaActionsService).dispatchAction('HEALTH_DIALOG_CLOSE', {
+      option: 'confirm',
+      data: { context },
+    });
+    component.confirm();
+    http.expectNone(`${base}/health/run`);
+  });
+
+  it.each(['health-create', 'health-run'] as const)(
+    'keeps invalid Unicode in %s without dispatching or losing its draft',
+    async (mode) => {
+      const { fixture, panel, health } = await formView(mode);
+      health.definitionPath = '\ud800';
+      health.automaticPath = '\ud800';
+      (fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(panel.open()).toBe(true);
+      expect(health.error()).toContain('Unicode');
+      expect(health.definitionPath).toBe('\ud800');
+      expect(health.automaticPath).toBe('\ud800');
+      expect(dialogs.element).toBeNull();
+      expect(
+        fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+      ).toContain('Unicode');
+      http.expectNone((request) => request.url.startsWith(base));
+    },
+  );
 });
