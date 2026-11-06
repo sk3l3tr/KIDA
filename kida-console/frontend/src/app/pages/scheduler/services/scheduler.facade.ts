@@ -75,10 +75,6 @@ export class SchedulerFacade implements OnDestroy {
   });
   readonly loading = signal(false);
   readonly listError = signal('');
-  readonly updated = signal<Date | null>(null);
-  readonly visibleOrigin = computed(() =>
-    this.snapshot() === null ? null : this.selectedOrigin(),
-  );
   readonly busy = signal(false);
   readonly pending = signal<PendingSchedule | null>(null);
   readonly error = signal('');
@@ -127,7 +123,6 @@ export class SchedulerFacade implements OnDestroy {
     this.loading.set(false);
     this.snapshot.set(null);
     this.listError.set('');
-    this.updated.set(null);
     this.error.set('');
     this.result.set(null);
     this.resultLabel.set('');
@@ -160,7 +155,6 @@ export class SchedulerFacade implements OnDestroy {
         .subscribe({
           next: (entries) => {
             this.snapshot.set(entries);
-            this.updated.set(new Date());
           },
           error: (failure) => this.listError.set(schedulerFailure(failure)),
         }),

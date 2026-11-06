@@ -23,8 +23,7 @@ p {
 }
 dt,
 dd,
-p,
-summary {
+p {
   font-size: 0.8125rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -47,10 +46,4 @@ pre {
   overflow-wrap: anywhere;
   max-height: 20rem;
   overflow: auto;
-}
-summary {
-  cursor: pointer;
-  color: var(--ion-color-primary);
-  min-height: 44px;
-  padding-block: 0.75rem;
 }

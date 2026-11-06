@@ -209,14 +209,14 @@ describe('Scheduler validation', () => {
   it('converts local components and seconds to RFC3339 UTC', () => {
     const expected = new Date(2030, 0, 1, 12, 0, 37).toISOString();
     expect(localToUtc('2030-01-01T12:00:37')).toBe(expected);
-    expect(localDate(expected)).toContain('UTC');
+    expect(localDate(expected)).toBe('1/1/2030, 12:00:37');
   });
   it('rejects the DST gap and selects the first overlap occurrence in Europe/Madrid', () => {
     vi.stubEnv('TZ', 'Europe/Madrid');
     try {
       expect(() => localToUtc('2030-03-31T02:30:15')).toThrow('no existe');
       expect(localToUtc('2030-10-27T02:30:15')).toBe('2030-10-27T00:30:15.000Z');
-      expect(localDate(localToUtc('2030-10-27T02:30:15'))).toContain('UTC+02:00');
+      expect(localDate(localToUtc('2030-10-27T02:30:15'))).toBe('27/10/2030, 2:30:15');
     } finally {
       vi.unstubAllEnvs();
     }
@@ -449,7 +449,7 @@ describe('Scheduler page', () => {
     http.expectNone(`${base}/delete`);
     http.expectNone(`${base}?origin=ALL`);
   });
-  it('renders empty states, safe HTML text, future fields and unknown origins without delete', () => {
+  it('renders empty states and safe HTML text, preserves future fields and blocks unknown origin deletion', () => {
     const fixture = enter([]);
     expect(fixture.nativeElement.textContent).toContain('No hay programaciones');
     const view = fixture.componentInstance.state;
@@ -463,8 +463,13 @@ describe('Scheduler page', () => {
     fixture.nativeElement.querySelector('.inspect-schedule').click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain(unsafe);
-    expect(fixture.nativeElement.textContent).toContain('futureRule');
-    expect(fixture.nativeElement.textContent).toContain('next_enqueue_at');
+    expect(view.inspectedSchedule()).toEqual({
+      ...entry,
+      origin: 'FUTURE',
+      command: unsafe,
+      params: { html: unsafe },
+    });
+    expect(fixture.nativeElement.textContent).toContain('FUTURE (desconocido)');
     expect(fixture.nativeElement.querySelector('img')).toBeNull();
     expect(fixture.nativeElement.querySelector('tbody button.danger')).toBeNull();
     for (const origin of ['INTERNAL', 'FUTURE']) view.prepareDelete({ ...entry, origin });
@@ -483,9 +488,6 @@ describe('Scheduler page', () => {
     expect(root.textContent).toContain(entry.id);
     expect(root.textContent).toContain(ruleSummary(entry.schedule));
     expect(root.textContent).toContain(localDate(entry.next_enqueue_at));
-    expect(root.textContent).toContain('El anclaje lo establece CORE');
-    expect(root.querySelector('details pre')?.textContent).toContain('futureRule');
-    expect(root.querySelector('details pre')?.textContent).toContain('"extra": "visible"');
     expect(root.querySelector('section pre')?.textContent).toBe('null');
     http.expectNone(`${base}?origin=ALL`);
     http.expectNone(`${base}/add`);
@@ -626,10 +628,9 @@ describe('Scheduler page', () => {
     expect(fixture.componentInstance.state.inspectedId()).toBeNull();
     fixture.destroy();
   });
-  it('filters locally and retains the snapshot and timestamp when refresh fails', async () => {
+  it('filters locally and retains the snapshot and origin when refresh fails', async () => {
     const fixture = enter(),
       view = fixture.componentInstance.state;
-    const updated = view.updated();
     view.selectOrigin('ALL');
     http.expectNone(`${base}?origin=ALL`);
     expect(view.entries()).toEqual([entry]);
@@ -641,11 +642,12 @@ describe('Scheduler page', () => {
     expect(fixture.nativeElement.querySelector('[data-origin="USER"]').disabled).toBe(true);
     http.expectOne(`${base}?origin=ALL`).error(new ProgressEvent('error'));
     expect(view.entries()).toEqual([entry]);
-    expect(view.visibleOrigin()).toBe('ALL');
-    expect(view.updated()).toBe(updated);
+    expect(view.origin).toBe('ALL');
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('desactualizados');
-    expect(fixture.nativeElement.textContent).toContain('Origen de los datos visibles: Todos');
+    expect(
+      fixture.nativeElement.querySelector('[data-origin="ALL"]').getAttribute('aria-pressed'),
+    ).toBe('true');
     view.selectOrigin('INTERNAL');
     expect(view.entries()).toEqual([]);
     expect(view.snapshot()).toEqual([entry]);
@@ -721,7 +723,7 @@ describe('Scheduler page', () => {
       fixture.nativeElement.querySelector('app-scheduler-inspector pre').textContent,
     ).toContain('html');
     expect(
-      fixture.nativeElement.querySelector('app-scheduler-inspector details pre').textContent,
+      fixture.nativeElement.querySelector('app-scheduler-inspector .identifier').textContent,
     ).toContain(id);
     expect(table.querySelector('button.danger').getAttribute('aria-label')).toContain(id);
   });

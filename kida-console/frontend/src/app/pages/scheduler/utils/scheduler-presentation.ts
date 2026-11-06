@@ -16,11 +16,9 @@ export const modeLabels: Record<string, string> = {
 export function localDate(value: string): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return `Fecha desconocida: ${value}`;
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? '+' : '-';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.toLocaleString('es-ES')} (UTC${sign}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)})`;
+  return date.toLocaleString('es-ES');
 }
+
 export function ruleSummary(rule: ScheduleRule): string {
   switch (rule.type) {
     case 'once': {

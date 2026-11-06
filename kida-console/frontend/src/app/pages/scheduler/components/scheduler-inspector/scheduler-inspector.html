@@ -72,20 +72,12 @@
           <dd>{{ state.zone }}</dd>
         </div>
       </dl>
-      @if (entry.schedule.type === 'interval') {
-        <p>El anclaje lo establece CORE al crear; no está disponible en esta lectura.</p>
-      }
-      <p>La admisión en cola no garantiza el inicio ni el resultado del comando.</p>
     </section>
     <section>
       <h3>Parámetros</h3>
       <pre>{{ entry.params | json }}</pre>
     </section>
-    <details>
-      <summary>Datos originales (JSON)</summary>
-      <pre>{{ entry | json }}</pre>
-    </details>
-    <p>Instantánea: {{ state.updated() | date: 'medium' }} · {{ state.zone }}.</p>
+
     @if (state.loading() || state.listError()) {
       <p role="status">Datos anteriores, desactualizados; pendientes de actualizar.</p>
     }

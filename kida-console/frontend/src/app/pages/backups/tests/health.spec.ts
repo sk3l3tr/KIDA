@@ -673,7 +673,6 @@ describe('Health basic state and page integration', () => {
     'restores create focus after response %s and all dependent reads',
     async (status) => {
       const fixture = enter();
-      const page = fixture.componentInstance;
       fixture.autoDetectChanges();
       await fixture.whenStable();
       const trigger = fixture.nativeElement.querySelector(

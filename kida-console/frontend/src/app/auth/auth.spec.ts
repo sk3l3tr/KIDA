@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { inject } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { Observable, Subject, of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { ArcaActionsService, ArcaModalService, ArcaPanelsService, ArcaService } from 'arca';
 import { environment } from '../../environments/environment';
 import { appConfig } from '../app.config';

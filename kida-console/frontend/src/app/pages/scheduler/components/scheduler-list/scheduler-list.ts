@@ -1,5 +1,4 @@
 import { Component, ElementRef, inject, viewChild } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { OriginFilter } from '../../utils/scheduler.models';
 import { SchedulerFacade } from '../../services/scheduler.facade';
@@ -12,7 +11,7 @@ import {
 
 @Component({
   selector: 'app-scheduler-list',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule],
   templateUrl: './scheduler-list.html',
   styleUrls: ['../../scheduler.scss', './scheduler-list.scss'],
   styles: ':host { display: contents; }',
