@@ -231,8 +231,8 @@ describe('Docker page', () => {
       .flush(project);
     const v = view(f, 'projects');
     const button = Array.from(
-      v.location.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>,
-    ).find((button) => button.textContent?.includes('Inspeccionar ' + container.name))!;
+      v.location.nativeElement.querySelectorAll('app-side-panel button') as NodeListOf<HTMLButtonElement>,
+    ).find((button) => button.getAttribute('aria-label') === 'Inspeccionar contenedor ' + container.name)!;
     button.click();
     v.changeDetectorRef.detectChanges();
     expect(state.inspectedContainer()?.source).toBe('detail');
@@ -255,6 +255,33 @@ describe('Docker page', () => {
     TestBed.inject(ThemeIdentity).begin();
     expect(state.inspectedContainer()).toBeNull();
   });
+  it('groups inspected services, keeps full long names and counts active containers per service', () => {
+    const f = initial();
+    const state = f.componentInstance.state;
+    const longName = 'project-'.repeat(20);
+    state.inspect(project.name);
+    http.expectOne(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`).flush({
+      ...project,
+      services: [
+        { name: 'first', containers: [
+          { ...container, name: longName, online: true },
+          { ...container, id: 'second', name: 'second', online: false },
+        ] },
+        { name: null, containers: [] },
+      ],
+    });
+    const v = view(f, 'projects');
+    const root = v.location.nativeElement as HTMLElement;
+    const groups = root.querySelectorAll('app-side-panel .service-group');
+    expect(groups).toHaveLength(2);
+    expect(groups[0].querySelector('.service-heading > span')?.textContent).toBe('1/2 activos');
+    expect(groups[1].querySelector('h4')?.textContent).toBe('Sin nombre');
+    expect(groups[1].textContent).toContain('Sin contenedores.');
+    expect(groups[0].querySelector('.container-name')?.textContent).toBe(longName);
+    expect(groups[0].querySelector('button')?.getAttribute('aria-label')).toBe('Inspeccionar contenedor ' + longName);
+    expect(Array.from(root.querySelectorAll('.project-fields dd'), (field) => field.textContent)).toEqual([project.name, '2', '2', '1']);
+    expect(root.querySelector('details')).toBeNull();
+  });
   it('retains only the same project reading on failure and never displays another project detail', () => {
     const f = initial(),
       state = f.componentInstance.state;
@@ -272,13 +299,13 @@ describe('Docker page', () => {
     const host = v.location.nativeElement.querySelector('app-side-panel');
     expect(host.textContent).toContain('Error de inspección');
     expect(host.textContent).toContain('desactualizada');
-    expect(host.textContent).toContain('Nombre: ' + project.name);
+    expect(host.querySelector('.project-fields dd')?.textContent).toBe(project.name);
     state.inspect('second');
     state.inspect(project.name);
     http.expectNone(`${base}/compose/projects/inspect?project=${encodeURIComponent(project.name)}`);
     v.changeDetectorRef.detectChanges();
     expect(host.textContent).not.toContain(project.name);
-    expect(host.textContent).not.toContain('Nombre: ' + project.name);
+    expect(host.querySelector('.project-fields')).toBeNull();
     http.expectOne(`${base}/compose/projects/inspect?project=second`).flush({}, fail);
     v.changeDetectorRef.detectChanges();
     expect(host.textContent).toContain('Error de inspección');
@@ -288,7 +315,7 @@ describe('Docker page', () => {
       .expectOne(`${base}/compose/projects/inspect?project=second`)
       .flush({ name: 'second', services: [] });
     v.changeDetectorRef.detectChanges();
-    expect(host.textContent).toContain('0 servicios · 0 contenedores · 0 en ejecución');
+    expect(Array.from(host.querySelectorAll('.project-fields dd'), (field) => (field as HTMLElement).textContent)).toEqual(['second', '0', '0', '0']);
     expect(host.textContent).toContain('Sin servicios');
   });
   it.each(['close', 'container', 'tab', 'session'] as const)(
@@ -436,8 +463,9 @@ describe('Docker page', () => {
     expect(rendered.textContent).toContain(container.name);
     expect(rendered.querySelector('img')).toBeNull();
     expect(rendered.textContent).toContain('future-status');
-    expect(rendered.textContent).toContain('Salida: 0');
-    expect(rendered.textContent).toContain('Reinicios: 0');
+    const fields = Array.from(rendered.querySelectorAll('app-container-details .inspection-fields > div') as NodeListOf<HTMLElement>);
+    expect(fields.find((field) => field.querySelector('dt')?.textContent === 'Código de salida')?.querySelector('dd')?.textContent).toBe('0');
+    expect(fields.find((field) => field.querySelector('dt')?.textContent === 'Reinicios')?.querySelector('dd')?.textContent).toBe('0');
     expect(rendered.textContent).toContain('Desconocido / no disponible');
     expect(view(f, 'projects').location.nativeElement.textContent).toContain('Sin nombre');
     expect(rendered.textContent).toContain('future');

@@ -1,34 +1,97 @@
-<h3>Identificación y estado</h3>
-<p>Nombre: {{ container().name }} · ID: {{ container().id }}</p>
-<p>Imagen: {{ container().image }}</p>
-<p>
-  Actividad: {{ container().online ? 'En ejecución' : 'Fuera de línea' }} · Estado:
-  {{ container().status }} · Salud: {{ display(container().health) }}
-</p>
-<h3>Ejecución</h3>
-<p>Inicio: {{ date(container().started_at) }} · Fin: {{ date(container().finished_at) }}</p>
-<p>
-  Salida: {{ counter(container().exit_code) }} · Reinicios:
-  {{ counter(container().restart_count) }} · Política:
-  {{ display(container().restart_policy) }}
-</p>
-<h3>Puertos</h3>
-@for (port of container().ports; track $index) {
-  <p>
-    {{ display(port.container_port) }} / {{ port.protocol }} → {{ display(port.host_ip) }}:{{
-      display(port.host_port)
-    }}
-  </p>
-} @empty {
-  <p>Sin puertos.</p>
-}
-<h3>Redes</h3>
-@for (network of container().networks; track $index) {
-  <p>
-    {{ network.name }} · IP: {{ display(network.ip_address) }} · Puerta de enlace:
-    {{ display(network.gateway) }} · MAC: {{ display(network.mac_address) }}
-  </p>
-} @empty {
-  <p>Sin redes.</p>
-}
+<section>
+  <h3>Identificación y estado</h3>
+  <dl class="inspection-fields">
+    <div>
+      <dt>Nombre completo</dt>
+      <dd class="identifier">{{ container().name }}</dd>
+    </div>
+    <div>
+      <dt>ID</dt>
+      <dd class="identifier">{{ container().id }}</dd>
+    </div>
+    <div>
+      <dt>Imagen</dt>
+      <dd class="identifier">{{ container().image }}</dd>
+    </div>
+    <div>
+      <dt>Estado Docker</dt>
+      <dd class="identifier">{{ container().status }}</dd>
+    </div>
+    <div>
+      <dt>Actividad</dt>
+      <dd>{{ container().online ? 'En ejecución' : 'Fuera de línea' }}</dd>
+    </div>
+    <div>
+      <dt>Salud</dt>
+      <dd>{{ display(container().health) }}</dd>
+    </div>
+  </dl>
+</section>
+<section>
+  <h3>Ejecución</h3>
+  <dl class="inspection-fields">
+    <div>
+      <dt>Inicio</dt>
+      <dd>{{ date(container().started_at) }}</dd>
+    </div>
+    <div>
+      <dt>Fin</dt>
+      <dd>{{ date(container().finished_at) }}</dd>
+    </div>
+    <div>
+      <dt>Código de salida</dt>
+      <dd>{{ counter(container().exit_code) }}</dd>
+    </div>
+    <div>
+      <dt>Reinicios</dt>
+      <dd>{{ counter(container().restart_count) }}</dd>
+    </div>
+    <div>
+      <dt>Política</dt>
+      <dd>{{ display(container().restart_policy) }}</dd>
+    </div>
+  </dl>
+</section>
+<section>
+  <h3>Puertos</h3>
+  @for (port of container().ports; track $index) {
+    <dl class="inspection-fields">
+      <div>
+        <dt>Puerto / protocolo</dt>
+        <dd class="identifier">{{ display(port.container_port) }} / {{ port.protocol }}</dd>
+      </div>
+      <div>
+        <dt>Host</dt>
+        <dd class="identifier">{{ display(port.host_ip) }}:{{ display(port.host_port) }}</dd>
+      </div>
+    </dl>
+  } @empty {
+    <p class="inspection-note">Sin puertos.</p>
+  }
+</section>
+<section>
+  <h3>Redes</h3>
+  @for (network of container().networks; track $index) {
+    <dl class="inspection-fields">
+      <div>
+        <dt>Red</dt>
+        <dd class="identifier">{{ network.name }}</dd>
+      </div>
+      <div>
+        <dt>IP</dt>
+        <dd class="identifier">{{ display(network.ip_address) }}</dd>
+      </div>
+      <div>
+        <dt>Puerta de enlace</dt>
+        <dd class="identifier">{{ display(network.gateway) }}</dd>
+      </div>
+      <div>
+        <dt>MAC</dt>
+        <dd class="identifier">{{ display(network.mac_address) }}</dd>
+      </div>
+    </dl>
+  } @empty {
+    <p class="inspection-note">Sin redes.</p>
+  }
+</section>
 <ng-content select="[container-operations]" />

@@ -32,6 +32,7 @@ export class SidePanel {
     return value;
   } });
   readonly title = input.required<string>();
+  readonly context = input<string>();
   readonly subtitle = input<string>();
   readonly focusTrap = input(true);
   readonly fallbackFocus = input<HTMLElement | null>(null);

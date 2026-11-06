@@ -1,0 +1,47 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+h3 {
+  margin: 0 0 1rem;
+  color: var(--kida-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+section + section,
+[container-operations] {
+  margin-top: 2rem;
+}
+.inspection-fields {
+  margin: 0;
+  > div {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 1rem;
+    padding-block: 0.75rem;
+    border-bottom: 1px solid var(--ion-border-color);
+  }
+  dt {
+    color: var(--kida-muted);
+  }
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+.identifier {
+  font-family: ui-monospace, monospace;
+}
+.inspection-note {
+  color: var(--kida-muted);
+  line-height: 1.6;
+}
+@media (max-width: 380px) {
+  .inspection-fields > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+  }
+}

@@ -1,7 +1,1 @@
-:host {
-  display: block;
-  min-width: 0;
-}
-p {
-  overflow-wrap: anywhere;
-}
+@use '../../utils/inspector';

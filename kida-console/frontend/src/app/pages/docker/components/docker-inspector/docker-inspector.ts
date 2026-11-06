@@ -4,6 +4,7 @@ import { DockerSectionStatus } from '../docker-section-status/docker-section-sta
 import { SidePanel } from '../../../../components/side-panel/side-panel';
 import { ContainerDetails } from '../container-details/container-details';
 import { ContainerActions } from '../container-actions/container-actions';
+import { ComposeService } from '../../utils/docker.models';
 import { DockerFacade } from '../../services/docker.facade';
 
 @Component({
@@ -16,12 +17,16 @@ import { DockerFacade } from '../../services/docker.facade';
     ContainerActions,
   ],
   templateUrl: './docker-inspector.html',
-  styles: 'p, h3, h4 { overflow-wrap: anywhere; }',
+  styleUrl: './docker-inspector.scss',
 })
 export class DockerInspector {
   readonly state = inject(DockerFacade);
   readonly source = input.required<'projects' | 'containers'>();
   readonly fallbackFocus = input<HTMLElement | null>(null);
+
+  activeCount(service: ComposeService): number {
+    return service.containers.filter((container) => container.online).length;
+  }
 
   panelOpen(): boolean {
     const selected = this.state.inspectedContainer();

@@ -11,14 +11,21 @@
   #modal
 >
   <ng-template>
-    <ion-header>
+    <ion-header class="ion-no-border">
       <ion-toolbar>
         <div class="panel-heading">
-          <h2>{{ title() }}</h2>
-          @if (subtitle()) { <p>{{ subtitle() }}</p> }
+          @if (context()) {
+            <p class="panel-context">{{ context() }}</p>
+          }
+          <h2 [title]="title()">{{ title() }}</h2>
+          @if (subtitle()) {
+            <p class="panel-subtitle" [title]="subtitle()">{{ subtitle() }}</p>
+          }
         </div>
         <ion-buttons slot="end">
-          <ion-button #closeButton (click)="modal.dismiss()">Cerrar</ion-button>
+          <ion-button #closeButton aria-label="Cerrar" (click)="modal.dismiss()">
+            <span class="i i-close" aria-hidden="true"></span>
+          </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>

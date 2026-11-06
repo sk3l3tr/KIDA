@@ -16,7 +16,7 @@ class TestModal {
 }
 
 @Component({ imports: [SidePanel], template: `<button #origin>Abrir</button><h1 #fallback tabindex="-1">Vista</h1>
-  <app-side-panel [open]="open()" title="Detalles" subtitle="Lectura" [focusTrap]="trap" [fallbackFocus]="fallback" (closed)="closed = closed + 1; open.set(false)">
+  <app-side-panel [open]="open()" context="DOCKER / CONTENEDOR" title="Detalles" subtitle="Lectura" [focusTrap]="trap" [fallbackFocus]="fallback" (closed)="closed = closed + 1; open.set(false)">
     <p>Contenido de otro módulo</p><button panel-actions>Acción</button>
   </app-side-panel>` })
 class TestHost { open = signal(false); trap = false; closed = 0; }
@@ -34,6 +34,9 @@ describe('SidePanel', () => {
     expect(root.textContent).toContain('Contenido de otro módulo');
     expect(root.querySelector('.panel-actions')?.textContent).toContain('Acción');
     expect(root.textContent).toContain('Lectura');
+    expect(root.querySelector('.panel-context')?.textContent).toBe('DOCKER / CONTENEDOR');
+    expect(root.querySelector('h2')?.textContent).toBe('Detalles');
+    expect(root.querySelector('ion-button')?.getAttribute('aria-label')).toBe('Cerrar');
     const instance = fixture.debugElement.children.find((e) => e.componentInstance instanceof SidePanel)!.componentInstance as SidePanel;
     expect(instance.focusTrap()).toBe(false);
     modal.dispatchEvent(new CustomEvent('didDismiss'));

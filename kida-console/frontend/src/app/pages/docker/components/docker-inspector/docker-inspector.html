@@ -1,13 +1,19 @@
 <app-side-panel
   [open]="panelOpen()"
   [focusTrap]="state.pending() === null"
-  [title]="state.inspectedContainer() ? 'Inspeccionar contenedor' : 'Inspeccionar proyecto'"
+  [context]="state.inspectedContainer() ? 'DOCKER / CONTENEDOR' : 'COMPOSE / PROYECTO'"
+  [title]="
+    state.currentContainer()?.name ??
+    state.inspectedContainer()?.id ??
+    state.projectPanelOpen() ??
+    'Inspeccionar proyecto'
+  "
   [subtitle]="state.inspectedContainer()?.id ?? state.projectPanelOpen() ?? undefined"
   [fallbackFocus]="fallbackFocus()"
   (closed)="closePanel()"
 >
   @if (state.inspectedContainer(); as selected) {
-    <p>
+    <p class="inspection-origin">
       Origen:
       {{
         selected.source === 'inventory'
@@ -21,7 +27,7 @@
     @if (state.currentContainer(); as container) {
       <app-container-details [container]="container">
         <section container-operations>
-          <h3>Operaciones</h3>
+          <h3>Operaciones disponibles</h3>
           @if (!state.containerInInventory()) {
             <p>Sin el mismo ID en el inventario principal, las operaciones no están disponibles.</p>
           } @else {
@@ -35,7 +41,6 @@
     <app-docker-operation-status />
   } @else if (state.projectPanelOpen() !== null) {
     @let name = state.projectPanelOpen();
-    <h3>Inspección: {{ name }}</h3>
     @if (state.selected() !== name) {
       <p role="status">Proyecto no disponible en esta lectura</p>
     } @else {
@@ -46,35 +51,69 @@
         staleText="Inspección anterior, desactualizada."
       />
       @if (state.detail.data(); as project) {
-        <p>Nombre: {{ project.name }}</p>
-        <p>Proyecto observado. La detección no acredita propiedad ni administración KIDA.</p>
-        <p>
-          {{ state.inspectedProjectTotals().services }} servicios ·
-          {{ state.inspectedProjectTotals().containers }} contenedores ·
-          {{ state.inspectedProjectTotals().online }} en ejecución
-        </p>
-        <h3>Servicios</h3>
-        @for (service of project.services; track $index) {
-          <h4>Servicio: {{ service.name === null ? 'Sin nombre' : service.name }}</h4>
-          @for (container of service.containers; track container.id) {
-            <p>
-              {{ container.name }} · {{ container.image }} ·
-              {{ container.online ? 'En ejecución' : 'Fuera de línea' }} ·
-              {{ container.status }}
-            </p>
-            <button
-              type="button"
-              [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
-              (click)="state.openContainer(container.id, 'detail', project.name)"
-            >
-              Inspeccionar {{ container.name }}
-            </button>
+        <section>
+          <h3>Proyecto observado</h3>
+          <dl class="inspection-fields project-fields">
+            <div>
+              <dt>Proyecto</dt>
+              <dd class="identifier">{{ project.name }}</dd>
+            </div>
+            <div>
+              <dt>Servicios</dt>
+              <dd>{{ state.inspectedProjectTotals().services }}</dd>
+            </div>
+            <div>
+              <dt>Contenedores</dt>
+              <dd>{{ state.inspectedProjectTotals().containers }}</dd>
+            </div>
+            <div>
+              <dt>En ejecución</dt>
+              <dd>{{ state.inspectedProjectTotals().online }}</dd>
+            </div>
+          </dl>
+          <p class="inspection-note">La detección no acredita propiedad ni administración KIDA.</p>
+        </section>
+        <section>
+          <h3>Servicios y contenedores</h3>
+          @for (service of project.services; track $index) {
+            <section class="service-group">
+              <header class="service-heading">
+                <div>
+                  <h4>{{ service.name === null ? 'Sin nombre' : service.name }}</h4>
+                  <p>
+                    {{ service.containers.length }}
+                    {{ service.containers.length === 1 ? 'contenedor' : 'contenedores' }}
+                  </p>
+                </div>
+                <span>{{ activeCount(service) }}/{{ service.containers.length }} activos</span>
+              </header>
+              @for (container of service.containers; track container.id) {
+                <div class="inspection-container-row">
+                  <div class="container-identity">
+                    <p class="container-name" [title]="container.name">{{ container.name }}</p>
+                    <p class="container-summary">
+                      {{ container.image }} ·
+                      {{ container.online ? 'En ejecución' : 'Fuera de línea' }} ·
+                      {{ container.status }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="inspect-container"
+                    [attr.aria-label]="'Inspeccionar contenedor ' + container.name"
+                    (click)="state.openContainer(container.id, 'detail', project.name)"
+                  >
+                    Inspeccionar <span class="i i-eye" aria-hidden="true"></span>
+                  </button>
+                </div>
+              } @empty {
+                <p class="inspection-note">Sin contenedores.</p>
+              }
+            </section>
           } @empty {
-            <p>Sin contenedores.</p>
+            <p class="inspection-note">Sin servicios.</p>
           }
-        } @empty {
-          <p>Sin servicios.</p>
-        }
+        </section>
       }
     }
   }
