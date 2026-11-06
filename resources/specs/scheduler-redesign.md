@@ -93,7 +93,11 @@ Validación: 118 pruebas y build de desarrollo correctos; revisión independient
 - Actualización manual y al entrar, sin sondeo.
 - Pruebas de cálculos, errores y conservación de datos anteriores.
 
-### SCH-03 — Inventario, filtros y búsqueda
+### SCH-03 — Inventario, filtros y búsqueda — Completada
+
+Implementación realizada: tabla de seis columnas, filtros de origen con contadores globales, búsqueda local por comando/ID/parámetros y orden por próxima admisión (fechas desconocidas al final). JSON completo accesible hasta incorporar el inspector de SCH-04.
+
+Validación: 121 pruebas y build de desarrollo correctos; revisión independiente sin hallazgos. Comprobación visual pendiente. Producción mantiene el exceso previo de 19,21 kB sobre el presupuesto inicial de 1 MB.
 
 **Objetivo:** reproducir la tabla operativa del mockup.
 

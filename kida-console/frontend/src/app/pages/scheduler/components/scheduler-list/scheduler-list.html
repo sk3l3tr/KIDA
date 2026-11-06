@@ -1,4 +1,8 @@
-<section class="panel" aria-label="Programaciones" [attr.aria-busy]="state.loading()">
+<section
+  class="panel scheduler-inventory"
+  aria-label="Programaciones"
+  [attr.aria-busy]="state.loading()"
+>
   <div class="section-header">
     <h2 #listHeading tabindex="-1">Programaciones</h2>
     <button
@@ -9,19 +13,42 @@
       Actualizar listado
     </button>
   </div>
-  <label for="scheduler-origin">Filtro de origen</label>
-  <select
-    class="console-control"
-    id="scheduler-origin"
-    [ngModel]="state.origin"
-    (ngModelChange)="state.selectOrigin($event)"
-    [attr.disabled]="state.loading() || state.busy() ? '' : null"
-  >
-    <option value="USER">Usuario</option>
-    <option value="INTERNAL">Interno</option>
-    <option value="ALL">Todos</option>
-  </select>
-  <div aria-live="polite">
+  <div class="inventory-tools">
+    <div class="origin-filters" role="group" aria-label="Filtro de origen">
+      @for (origin of origins; track origin) {
+        <button
+          type="button"
+          class="secondary"
+          [class.selected]="state.origin === origin"
+          [attr.data-origin]="origin"
+          [attr.aria-pressed]="state.origin === origin"
+          [disabled]="state.loading() || state.busy()"
+          (click)="state.selectOrigin(origin)"
+        >
+          {{ originLabels[origin] }}
+          <small>{{
+            state.summary() === null
+              ? '—'
+              : origin === 'USER'
+                ? state.summary()!.user
+                : origin === 'INTERNAL'
+                  ? state.summary()!.internal
+                  : state.summary()!.total
+          }}</small>
+        </button>
+      }
+    </div>
+    <input
+      class="console-control inventory-search"
+      type="search"
+      id="scheduler-search"
+      aria-label="Buscar programaciones"
+      placeholder="Buscar por comando, ID o parámetros"
+      [ngModel]="state.search()"
+      (ngModelChange)="state.search.set($event)"
+    />
+  </div>
+  <div class="inventory-status" aria-live="polite">
     @if (state.loading()) {
       <p>Cargando…</p>
     }
@@ -42,44 +69,85 @@
         <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
       }
       @if (state.entries()!.length === 0) {
-        <p>No hay programaciones para este filtro.</p>
+        <div class="inventory-empty">
+          @if (state.snapshot()!.length === 0) {
+            <h3>No hay programaciones</h3>
+            <p>La última lectura no contiene definiciones.</p>
+          } @else {
+            <h3>Sin coincidencias</h3>
+            <p>Ninguna programación coincide con el origen y la búsqueda seleccionados.</p>
+          }
+        </div>
       }
     }
   </div>
-  <ul class="schedule-list">
-    @for (entry of state.entries(); track entry.id) {
-      <li>
-        <h3>{{ entry.command }}</h3>
-        <p>Identificador: {{ entry.id }}</p>
-        <p>
-          Origen:
-          {{
-            entry.origin === 'USER'
-              ? 'Usuario'
-              : entry.origin === 'INTERNAL'
-                ? 'Interno'
-                : entry.origin + ' (desconocido)'
-          }}
-        </p>
-        <p>{{ ruleSummary(entry.schedule) }}</p>
-        <p>
-          Próximo intento de admisión: {{ localDate(entry.next_enqueue_at) }} · {{ state.zone }}
-        </p>
-        <details>
-          <summary>Parámetros y datos originales</summary>
-          <pre>{{ entry | json }}</pre>
-        </details>
-        @if (entry.origin === 'USER') {
-          <button
-            class="danger"
-            (click)="state.prepareDelete(entry)"
-            [disabled]="state.busy() || state.loading()"
-            [attr.aria-label]="'Eliminar programación ' + entry.id"
-          >
-            Eliminar
-          </button>
-        }
-      </li>
-    }
-  </ul>
+  @if (state.entries()?.length) {
+    <div class="table-wrap" role="region" aria-label="Inventario de programaciones" tabindex="0">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Comando / ID</th>
+            <th scope="col">Origen</th>
+            <th scope="col">Modalidad</th>
+            <th scope="col">Regla temporal</th>
+            <th scope="col" aria-sort="ascending">Próxima admisión</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of state.entries(); track entry.id) {
+            <tr>
+              <td class="command-cell">
+                <strong>{{ entry.command }}</strong>
+                <small [title]="entry.id"
+                  >{{ entry.id.slice(0, 8) }}{{ entry.id.length > 8 ? '…' : '' }}</small
+                >
+              </td>
+              <td>
+                <span class="origin-label">{{
+                  entry.origin === 'USER'
+                    ? 'Usuario'
+                    : entry.origin === 'INTERNAL'
+                      ? 'Interno'
+                      : entry.origin + ' (desconocido)'
+                }}</span>
+              </td>
+              <td>
+                <span class="mode-label">{{
+                  modeLabels[entry.schedule.type] ?? 'Desconocida'
+                }}</span>
+              </td>
+              <td>{{ ruleSummary(entry.schedule) }}</td>
+              <td>
+                {{ localDate(entry.next_enqueue_at) }}<small>{{ state.zone }}</small>
+              </td>
+              <td class="row-actions">
+                <details>
+                  <summary>Parámetros y datos originales</summary>
+                  <pre>{{ entry | json }}</pre>
+                </details>
+                @if (entry.origin === 'USER') {
+                  <button
+                    class="danger"
+                    (click)="state.prepareDelete(entry)"
+                    [disabled]="state.busy() || state.loading()"
+                    [attr.aria-label]="'Eliminar programación ' + entry.id"
+                  >
+                    Eliminar
+                  </button>
+                } @else {
+                  <small>Protegida</small>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  @if (state.entries() !== null) {
+    <div class="inventory-footer" aria-live="polite">
+      {{ state.entries()!.length }} resultados · {{ state.summary()!.total }} definiciones
+    </div>
+  }
 </section>

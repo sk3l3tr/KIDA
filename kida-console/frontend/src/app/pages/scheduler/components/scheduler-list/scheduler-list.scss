@@ -1,0 +1,106 @@
+.scheduler-inventory {
+  min-width: 0;
+}
+.inventory-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-block: 1.25rem;
+  padding-block: 1rem;
+  border-block: 1px solid var(--ion-border-color);
+}
+.origin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.origin-filters button {
+  min-height: 44px;
+}
+.origin-filters .selected {
+  color: var(--ion-color-primary);
+  border-color: var(--ion-color-primary);
+}
+.origin-filters small {
+  display: inline;
+  margin-left: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.inventory-search {
+  flex: 1;
+  min-width: min(100%, 15rem);
+  max-width: 27rem;
+  min-height: 44px;
+  margin-left: auto;
+}
+.inventory-status,
+.inventory-footer {
+  color: var(--kida-muted);
+  font-size: 0.8125rem;
+}
+.inventory-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+.table-wrap {
+  overflow-x: auto;
+  margin-block: 1rem;
+}
+table {
+  width: 100%;
+  min-width: 60rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid var(--ion-border-color);
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+th {
+  color: var(--kida-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+th:nth-child(4) {
+  width: 23%;
+}
+th:nth-child(6) {
+  width: 20%;
+}
+td small {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--kida-muted);
+}
+.command-cell strong,
+.command-cell small {
+  font-family: monospace;
+}
+.mode-label {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+}
+.row-actions summary {
+  min-height: 44px;
+}
+.inventory-footer {
+  padding-top: 1rem;
+  border-top: 1px solid var(--ion-border-color);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .inventory-search {
+    max-width: none;
+    flex-basis: 100%;
+  }
+}

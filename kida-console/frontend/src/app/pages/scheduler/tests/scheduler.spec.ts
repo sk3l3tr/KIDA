@@ -291,7 +291,7 @@ describe('Scheduler page', () => {
     add.flush(entry);
     http.expectOne(`${base}?origin=ALL`).flush([entry]);
     fixture.detectChanges();
-    fixture.nativeElement.querySelector('.schedule-list button').click();
+    fixture.nativeElement.querySelector('tbody button.danger').click();
     expect(dialogs.config?.text).toContain(`Identificador: ${entry.id}`);
     dialogs.choose();
     const remove = http.expectOne(`${base}/delete`);
@@ -405,7 +405,7 @@ describe('Scheduler page', () => {
     expect(fixture.nativeElement.textContent).toContain('futureRule');
     expect(fixture.nativeElement.textContent).toContain('next_enqueue_at');
     expect(fixture.nativeElement.querySelector('img')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.schedule-list button')).toBeNull();
+    expect(fixture.nativeElement.querySelector('tbody button.danger')).toBeNull();
     for (const origin of ['INTERNAL', 'FUTURE']) view.prepareDelete({ ...entry, origin });
     view.confirm();
     http.expectNone(`${base}/delete`);
@@ -422,7 +422,7 @@ describe('Scheduler page', () => {
     expect(view.origin).toBe('ALL');
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('#scheduler-origin').disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('[data-origin="USER"]').disabled).toBe(true);
     http.expectOne(`${base}?origin=ALL`).error(new ProgressEvent('error'));
     expect(view.entries()).toEqual([entry]);
     expect(view.visibleOrigin()).toBe('ALL');
@@ -434,6 +434,73 @@ describe('Scheduler page', () => {
     expect(view.entries()).toEqual([]);
     expect(view.snapshot()).toEqual([entry]);
     http.expectNone(`${base}?origin=ALL`);
+  });
+  it('combines local origin and search filters without changing global counters or requesting data', async () => {
+    const fixture = enter([
+      entry,
+      {
+        ...entry,
+        id: 'internal-42',
+        origin: 'INTERNAL',
+        command: 'backup.run',
+        params: { target: 'Archive' },
+      },
+      { ...entry, id: 'future-42', origin: 'FUTURE', command: 'system.health' },
+    ]);
+    const view = fixture.componentInstance.state;
+    const input = fixture.nativeElement.querySelector('#scheduler-search') as HTMLInputElement;
+    input.value = '  ARCHIVE  ';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(view.entries()).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('Sin coincidencias');
+    fixture.nativeElement.querySelector('[data-origin="INTERNAL"]').click();
+    fixture.detectChanges();
+    expect(view.entries()?.map((e) => e.id)).toEqual(['internal-42']);
+    expect(fixture.nativeElement.querySelectorAll('thead th')).toHaveLength(6);
+    expect(
+      fixture.nativeElement.querySelector('[data-origin="INTERNAL"]').getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(
+      fixture.nativeElement.querySelector('[data-origin="ALL"] small').textContent.trim(),
+    ).toBe('3');
+    view.selectOrigin('ALL');
+    view.search.set('FUTURE-42');
+    fixture.detectChanges();
+    expect(view.entries()?.map((e) => e.id)).toEqual(['future-42']);
+    expect(fixture.nativeElement.querySelector('tbody button.danger')).toBeNull();
+    view.search.set('SYSTEM.');
+    expect(view.entries()?.map((e) => e.id)).toEqual([entry.id, 'future-42']);
+    expect(view.summary()?.total).toBe(3);
+    http.expectNone(`${base}?origin=ALL`);
+    fixture.componentInstance.ionViewWillLeave();
+    expect(view.search()).toBe('');
+  });
+  it('sorts queue admissions by instant, leaves unknown dates last and preserves snapshot order', () => {
+    const data = [
+      { ...entry, id: 'unknown', next_enqueue_at: 'unknown' },
+      { ...entry, id: 'later', next_enqueue_at: '2030-01-01T12:00:00Z' },
+      { ...entry, id: 'earlier', next_enqueue_at: '2030-01-01T12:30:00+02:00' },
+      { ...entry, id: 'unknown-2', next_enqueue_at: 'unavailable' },
+    ];
+    const fixture = enter(data),
+      view = fixture.componentInstance.state;
+    expect(view.entries()?.map((e) => e.id)).toEqual(['earlier', 'later', 'unknown', 'unknown-2']);
+    expect(view.snapshot()?.map((e) => e.id)).toEqual(data.map((e) => e.id));
+    expect(fixture.nativeElement.querySelector('tbody tr').textContent).toContain('earlier');
+  });
+  it('keeps long identifiers and untrusted content accessible as text in the table', () => {
+    const unsafe = '<script>alert(1)</script>';
+    const id = 'long-identifier-'.repeat(30);
+    const fixture = enter([{ ...entry, id, command: unsafe.repeat(20), params: { html: unsafe } }]);
+    const table = fixture.nativeElement.querySelector('table');
+    expect(table.querySelector('script')).toBeNull();
+    expect(table.textContent).toContain(unsafe);
+    expect(table.querySelector('.command-cell small').title).toBe(id);
+    expect(table.querySelector('.command-cell small').textContent).toBe(id.slice(0, 8) + '…');
+    expect(table.querySelector('pre').textContent).toContain(id);
+    expect(table.querySelector('button.danger').getAttribute('aria-label')).toContain(id);
   });
   it('derives global indicators independently of the local filter and preserves them on failure', () => {
     const fixture = enter([
@@ -646,9 +713,7 @@ describe('Scheduler page', () => {
       view = fixture.componentInstance.state;
     fixture.autoDetectChanges();
     await fixture.whenStable();
-    const trigger = fixture.nativeElement.querySelector(
-      '.schedule-list button',
-    ) as HTMLButtonElement;
+    const trigger = fixture.nativeElement.querySelector('tbody button.danger') as HTMLButtonElement;
     trigger.focus();
     view.prepareDelete(entry);
     view.confirm();

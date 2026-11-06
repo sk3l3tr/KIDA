@@ -29,14 +29,26 @@ export class SchedulerFacade implements OnDestroy {
   focusFallback: () => HTMLElement | undefined = () => undefined;
   readonly snapshot = signal<ListedSchedule[] | null>(null);
   private readonly selectedOrigin = signal<OriginFilter>('USER');
+  readonly search = signal('');
   readonly entries = computed(() => {
     const entries = this.snapshot();
     const origin = this.selectedOrigin();
-    return entries === null
-      ? null
-      : origin === 'ALL'
-        ? entries
-        : entries.filter((entry) => entry.origin === origin);
+    const query = this.search().trim().toLowerCase();
+    if (entries === null) return null;
+    return entries
+      .filter((entry) => origin === 'ALL' || entry.origin === origin)
+      .filter((entry) =>
+        [entry.command, entry.id, JSON.stringify(entry.params)].some((value) =>
+          value.toLowerCase().includes(query),
+        ),
+      )
+      .sort((a, b) => {
+        const left = Date.parse(a.next_enqueue_at);
+        const right = Date.parse(b.next_enqueue_at);
+        return (
+          (Number.isFinite(left) ? left : Infinity) - (Number.isFinite(right) ? right : Infinity)
+        );
+      });
   });
   readonly summary = computed(() => {
     const entries = this.snapshot();
@@ -116,6 +128,7 @@ export class SchedulerFacade implements OnDestroy {
     this.resultLabel.set('');
     this.form = emptyForm();
     this.origin = 'USER';
+    this.search.set('');
     this.trigger = null;
   }
   selectOrigin(value: string): void {
