@@ -1,9 +1,9 @@
 @let state = this.state();
-<section class="panel" aria-labelledby="backup-create-heading">
+<section aria-labelledby="backup-create-heading">
   <h2 id="backup-create-heading">Crear configuración</h2>
   <p>CORE valida las reglas de dominio. Las rutas pertenecen al servidor CORE.</p>
   @if (state.active()) {
-    <form (ngSubmit)="state.create()">
+    <form id="backup-configuration-form" (ngSubmit)="submit()">
       <fieldset [disabled]="state.operationsBlocked()">
         <legend>Configuración del backup</legend>
         <label for="backup-name">Nombre</label
@@ -173,8 +173,13 @@
             </fieldset>
           }
         </details>
-        <button type="submit">Crear configuración</button>
       </fieldset>
     </form>
+    @if (state.error()) {
+      <p class="error" role="alert">{{ state.error() }}</p>
+    }
+    @for (message of state.uncertainties(); track $index) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
   }
 </section>

@@ -35,7 +35,10 @@
         <div class="section-header">
           <h2 id="backup-configurations-heading" #listHeading tabindex="-1">Configuraciones</h2>
           <div class="row-actions">
-            <button (click)="focusCreateForm()" [disabled]="state.operationsBlocked()">
+            <button
+              (click)="backups.openConfigurationCreate()"
+              [disabled]="state.operationsBlocked()"
+            >
               <span class="i i-box" aria-hidden="true"></span>Nueva configuración
             </button>
             <button
@@ -133,18 +136,26 @@
           }
         </ul>
       </section>
-      <app-backup-create-form #createForm [state]="state" />
     </div>
     <app-side-panel
-      [open]="backups.panel() === 'configuration-detail' && state.selected() !== null"
+      [open]="
+        backups.panel() === 'configuration-create' ||
+        (backups.panel() === 'configuration-detail' && state.selected() !== null)
+      "
       [focusTrap]="state.pending() === null"
       context="BACKUPS / CONFIGURACIÓN"
-      [title]="state.selected()?.name ?? 'Configuración de backup'"
+      [title]="
+        backups.panel() === 'configuration-create'
+          ? 'Nueva configuración'
+          : (state.selected()?.name ?? 'Configuración de backup')
+      "
       [subtitle]="state.selected()?.id"
       [fallbackFocus]="this.listHeading()?.nativeElement ?? null"
-      (closed)="backups.closeConfigurationDetail()"
+      (closed)="backups.closeConfigurationPanel()"
     >
-      @if (state.selected(); as job) {
+      @if (backups.panel() === 'configuration-create') {
+        <app-backup-create-form [state]="state" (created)="backups.closeConfigurationPanel()" />
+      } @else if (state.selected(); as job) {
         <section aria-labelledby="backup-detail-heading">
           <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
           <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
@@ -187,7 +198,18 @@
       }
 
       <div panel-actions>
-        @if (state.selected(); as job) {
+        @if (backups.panel() === 'configuration-create') {
+          <button class="secondary" type="button" (click)="backups.closeConfigurationPanel()">
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="backup-configuration-form"
+            [disabled]="state.operationsBlocked()"
+          >
+            Crear configuración
+          </button>
+        } @else if (state.selected(); as job) {
           <button
             (click)="state.prepare('run', job)"
             [disabled]="state.operationsBlocked()"

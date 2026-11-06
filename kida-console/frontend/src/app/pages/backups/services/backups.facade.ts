@@ -42,6 +42,17 @@ export class BackupsFacade {
 
   closeConfigurationDetail(): void {
     if (this.panel() !== 'configuration-detail') return;
+    this.closeConfigurationPanel();
+  }
+
+  openConfigurationCreate(): void {
+    if (!this.active() || this.configurations.operationsBlocked()) return;
+    this.configurations.leaveTab();
+    this.panel.set('configuration-create');
+  }
+
+  closeConfigurationPanel(): void {
+    if (this.panel() !== 'configuration-detail' && this.panel() !== 'configuration-create') return;
     this.panel.set(null);
     this.configurations.leaveTab();
   }

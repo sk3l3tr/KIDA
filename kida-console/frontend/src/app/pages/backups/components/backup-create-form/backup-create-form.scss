@@ -1,0 +1,20 @@
+fieldset {
+  margin-block: var(--kida-space);
+  padding: calc(var(--kida-space) / 2);
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+}
+label {
+  display: block;
+  margin-block: 0.75rem;
+}
+input[type='checkbox'] {
+  display: inline-block;
+  width: 1.125rem;
+  height: 1.125rem;
+  min-height: 1.125rem;
+  padding: 0;
+  margin: 0 0.5rem 0 0;
+  accent-color: var(--ion-color-primary);
+  vertical-align: middle;
+}

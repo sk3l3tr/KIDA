@@ -102,6 +102,24 @@ describe('SidePanel', () => {
     fixture.detectChanges();
     expect(content.getAttribute('aria-label')).toBe('Segundo');
   });
+  it('falls back when a pending refresh disables the origin before dismissal', async () => {
+    const fixture = TestBed.createComponent(TestHost);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const origin = root.querySelector('button')!;
+    const fallback = root.querySelector('h1')!;
+    origin.focus();
+    fixture.componentInstance.open.set(true);
+    fixture.detectChanges();
+    const modal = root.querySelector('ion-modal')!;
+    modal.dispatchEvent(new CustomEvent('willPresent'));
+    origin.disabled = true;
+    origin.blur();
+    modal.dispatchEvent(new CustomEvent('didDismiss'));
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement).toBe(fallback);
+  });
   it('makes the panel visible on entry and reverses the animation on exit', () => {
     const fixture = TestBed.createComponent(SidePanel);
     fixture.componentRef.setInput('title', 'Detalles');

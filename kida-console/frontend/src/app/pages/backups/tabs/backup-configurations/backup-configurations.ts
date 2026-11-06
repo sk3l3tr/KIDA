@@ -30,9 +30,6 @@ export class BackupConfigurations implements OnDestroy {
   readonly state = inject(BackupConfigurationsState);
   readonly limitedPrecision = limitedPrecision;
   readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
-  private readonly createForm = viewChild<unknown, ElementRef<HTMLElement>>('createForm', {
-    read: ElementRef,
-  });
   readonly filteredEntries = computed(() => {
     const search = this.backups.search().toLowerCase();
     return (
@@ -45,12 +42,6 @@ export class BackupConfigurations implements OnDestroy {
         ) ?? []
     );
   });
-
-  focusCreateForm(): void {
-    const input = this.createForm()?.nativeElement.querySelector<HTMLInputElement>('#backup-name');
-    input?.scrollIntoView?.({ block: 'center' });
-    input?.focus({ preventScroll: true });
-  }
 
   ionViewWillEnter(): void {
     this.backups.ionViewWillEnter();

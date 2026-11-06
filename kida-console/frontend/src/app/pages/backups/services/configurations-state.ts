@@ -120,7 +120,7 @@ export class BackupConfigurationsState {
         }),
     );
   }
-  create(): void {
+  create(onCreated?: () => void): void {
     if (!this.available()) return;
     this.trigger = this.document.activeElement;
     this.error.set('');
@@ -134,6 +134,7 @@ export class BackupConfigurationsState {
           this.form = emptyForm();
           if (currentView) this.selectedId.set((result as BackupJob).id);
           this.resultLabel.set('Configuración creada');
+          if (currentView) onCreated?.();
         },
       );
     } catch (failure) {

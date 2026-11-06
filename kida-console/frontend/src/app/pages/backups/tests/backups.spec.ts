@@ -1,6 +1,7 @@
 import { BackupConfigurations } from '../tabs/backup-configurations/backup-configurations';
 import { mockArcaDialogs } from '../../../components/app-dialog/app-dialog.testing';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { EMPTY } from 'rxjs';
 import { By } from '@angular/platform-browser';
 import { SidePanel } from '../../../components/side-panel/side-panel';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -283,6 +284,180 @@ describe('Backups page', () => {
     view.state.configurations.form = validForm();
     return fixture;
   }
+  function openCreate(fixture: ComponentFixture<Backups>): SidePanel {
+    fixture.nativeElement.querySelector('.section-header button').click();
+    fixture.detectChanges();
+    return fixture.debugElement.query(By.directive(SidePanel)).componentInstance as SidePanel;
+  }
+  it('opens a single creation form in the panel and preserves the complete draft across closing and tabs', async () => {
+    const fixture = enter();
+    const facade = fixture.componentInstance.state;
+    const draft = validForm();
+    draft.targets[0].required = false;
+    draft.targets[0].filesystem_uuid = { mode: 'value', value: ' UUID ñ exacto ' };
+    draft.lifecycleEnabled = true;
+    draft.pre_backup = [{ command: ' antes ', params: { mode: 'value', value: 'false' } }];
+    draft.post_backup = [{ command: ' después ', params: { mode: 'null', value: '' } }];
+    draft.schedule = { mode: 'value', value: '{"futuro":0}' };
+    draft.retention = 'value';
+    draft.max_age = { mode: 'null', value: '' };
+    draft.keep_last = { mode: 'value', value: '0' };
+    draft.protected_restore_points = [{ path: ' punto 😀 ' }];
+    facade.configurations.form = draft;
+    const original = structuredClone(draft);
+    expect(fixture.nativeElement.querySelector('app-backup-create-form')).toBeNull();
+    const panel = openCreate(fixture);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(panel.open()).toBe(true);
+    expect(panel.title()).toBe('Nueva configuración');
+    expect(facade.panel()).toBe('configuration-create');
+    expect(
+      fixture.nativeElement.querySelectorAll('app-side-panel app-backup-create-form'),
+    ).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('app-backup-create-form details').open).toBe(false);
+    expect(fixture.nativeElement.querySelector('#backup-name').value).toBe(draft.name);
+    panel.closed.emit();
+    fixture.detectChanges();
+    expect(panel.open()).toBe(false);
+    openCreate(fixture);
+    expect(facade.configurations.form).toEqual(original);
+    facade.leaveTab();
+    fixture.detectChanges();
+    expect(facade.panel()).toBeNull();
+    expect(facade.configurations.form).toEqual(original);
+    openCreate(fixture);
+    const form = fixture.nativeElement.querySelector(
+      'app-backup-create-form form',
+    ) as HTMLFormElement;
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const request = http.expectOne(`${base}/config/create`);
+    expect(request.request.body).toEqual(createBody(original));
+    request.flush(job);
+    http.expectOne(`${base}/config`).flush({ backups: [job] });
+  });
+  it('submits once from panel actions, closes only after confirmed creation and preserves success after refresh failure', async () => {
+    const fixture = enter();
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const origin = fixture.nativeElement.querySelector(
+      '.section-header button',
+    ) as HTMLButtonElement;
+    origin.focus();
+    const panel = openCreate(fixture);
+    const state = fixture.componentInstance.state.configurations;
+    const submit = fixture.nativeElement.querySelector(
+      '[panel-actions] button[type="submit"]',
+    ) as HTMLButtonElement;
+    expect(submit).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('button[type="submit"]')).toHaveLength(1);
+    expect(submit.form?.id).toBe('backup-configuration-form');
+    submit.click();
+    fixture.detectChanges();
+    const request = http.expectOne(`${base}/config/create`);
+    expect(panel.open()).toBe(true);
+    expect(submit.disabled).toBe(true);
+    state.create();
+    http.expectNone(`${base}/config/create`);
+    request.flush(job);
+    const refresh = http.expectOne(`${base}/config`);
+    fixture.detectChanges();
+    expect(panel.open()).toBe(false);
+    expect(fixture.componentInstance.state.panel()).toBeNull();
+    expect(state.form).toEqual(emptyForm());
+    expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(
+      'Configuración creada',
+    );
+    panel.didDismiss();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(origin.disabled).toBe(true);
+    expect(document.activeElement?.id).toBe('backup-configurations-heading');
+    refresh.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(state.result()).toEqual(job);
+    expect(state.listError()).not.toBe('');
+    expect(fixture.nativeElement.querySelector('.success')?.textContent).toContain(
+      'Configuración creada',
+    );
+  });
+  it.each([422, 504, 0])(
+    'keeps the creation panel and draft after failure %s with accessible feedback and no retry',
+    async (status) => {
+      const fixture = enter();
+      const state = fixture.componentInstance.state.configurations;
+      const draft = structuredClone(state.form);
+      const panel = openCreate(fixture);
+      await fixture.whenStable();
+      fixture.nativeElement
+        .querySelector('app-backup-create-form form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      const request = http.expectOne(`${base}/config/create`);
+      if (status === 0) request.error(new ProgressEvent('error'));
+      else request.flush({}, { status, statusText: 'Failed' });
+      fixture.detectChanges();
+      expect(panel.open()).toBe(true);
+      expect(state.form).toEqual(draft);
+      expect(
+        fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+      ).toContain(status === 422 ? 'Validación' : 'No se pudo confirmar');
+      panel.closed.emit();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain(
+        status === 422 ? 'Validación' : 'No se pudo confirmar',
+      );
+      http.expectNone(`${base}/config/create`);
+      http.expectNone(`${base}/config`);
+    },
+  );
+  it('keeps the creation draft and panel for local validation or completion without a confirmed result', () => {
+    const fixture = enter();
+    const state = fixture.componentInstance.state.configurations;
+    const panel = openCreate(fixture);
+    state.form.schedule = { mode: 'value', value: '{' };
+    const submit = () =>
+      fixture.nativeElement
+        .querySelector('app-backup-create-form form')
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submit();
+    fixture.detectChanges();
+    expect(panel.open()).toBe(true);
+    expect(state.form.schedule.value).toBe('{');
+    expect(
+      fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+    ).toContain('JSON');
+    http.expectNone(`${base}/config/create`);
+    state.form = validForm();
+    vi.spyOn(TestBed.inject(BackupsService), 'create').mockReturnValue(EMPTY);
+    submit();
+    fixture.detectChanges();
+    expect(panel.open()).toBe(true);
+    expect(state.form).toEqual(validForm());
+    expect(state.busy()).toBe(false);
+    expect(state.result()).toBeNull();
+    http.expectNone(`${base}/config`);
+  });
+  it('keeps another panel and selection untouched when a closed creation succeeds late', () => {
+    const fixture = enter();
+    const facade = fixture.componentInstance.state;
+    const panel = openCreate(fixture);
+    fixture.nativeElement
+      .querySelector('app-backup-create-form form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const request = http.expectOne(`${base}/config/create`);
+    panel.closed.emit();
+    fixture.detectChanges();
+    expect(facade.configurations.busy()).toBe(true);
+    facade.leaveTab();
+    facade.panel.set('health-create');
+    request.flush(job);
+    http.expectOne(`${base}/config`).flush({ backups: [job] });
+    fixture.detectChanges();
+    expect(facade.panel()).toBe('health-create');
+    expect(facade.configurations.selectedId()).toBeNull();
+    expect(facade.configurations.form).toEqual(emptyForm());
+    expect(facade.configurations.result()).toEqual(job);
+  });
   it('filters names and every source/target locally without changing server order or data', () => {
     const second = {
       ...job,
@@ -500,7 +675,7 @@ describe('Backups page', () => {
     expect(facade.panel()).toBeNull();
     expect(facade.configurations.selected()).toBeNull();
   });
-  it('opens another configuration without stale details and focuses the existing creation draft', async () => {
+  it('opens another configuration without stale details and opens the existing creation draft in the panel', async () => {
     const fixture = enter([
       job,
       { ...job, id: 'other', name: 'Otra configuración', sources: ['/otra'] },
@@ -525,9 +700,10 @@ describe('Backups page', () => {
     create.click();
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(document.activeElement?.id).toBe('backup-name');
+    expect(fixture.nativeElement.querySelector('app-side-panel #backup-name')).not.toBeNull();
     expect(fixture.componentInstance.state.configurations.form).toEqual(validForm());
-    expect(panel.open()).toBe(false);
+    expect(panel.open()).toBe(true);
+    expect(panel.title()).toBe('Nueva configuración');
   });
   it('confirms a backup operation through the shared ARCA action protocol', () => {
     const view = enter().componentInstance;
@@ -540,6 +716,7 @@ describe('Backups page', () => {
   it('submits the extracted configuration form including lifecycle commands', async () => {
     const fixture = enter();
     const configurations = fixture.componentInstance.state.configurations;
+    openCreate(fixture);
     configurations.form.pre_backup = [{ command: 'before', params: { mode: 'null', value: '' } }];
     fixture.detectChanges();
     await fixture.whenStable();
@@ -734,11 +911,12 @@ describe('Backups page', () => {
     expect(document.activeElement).toBe(trigger);
     http.expectNone(`${base}/run`);
   });
-  it('restores the enabled submit button after the post-create refresh', async () => {
+  it('restores the enabled submit button after a direct state creation and post-create refresh', async () => {
     const fixture = enter(),
       view = fixture.componentInstance;
     fixture.autoDetectChanges();
     await fixture.whenStable();
+    openCreate(fixture);
     const trigger = fixture.nativeElement.querySelector(
       'button[type="submit"]',
     ) as HTMLButtonElement;
@@ -777,6 +955,8 @@ describe('Backups page', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelectorAll('.backup-list li').length).toBe(1);
+    openCreate(fixture);
+    await fixture.whenStable();
     const name = fixture.nativeElement.querySelector('#backup-name') as HTMLInputElement;
     name.value = ' cached form ';
     name.dispatchEvent(new Event('input', { bubbles: true }));
@@ -791,6 +971,10 @@ describe('Backups page', () => {
     expect(fixture.nativeElement.querySelector('#backup-name')).toBeNull();
     enterPage(fixture.componentInstance);
     http.expectOne(`${base}/config`).flush({ backups: [] });
+    fixture.changeDetectorRef.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('#backup-name')).toBeNull();
+    openCreate(fixture);
     fixture.changeDetectorRef.detectChanges();
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('#backup-name').value).toBe('');
@@ -828,6 +1012,7 @@ describe('Backups page', () => {
     const configurations = page.state.configurations;
     fixture.autoDetectChanges();
     await fixture.whenStable();
+    openCreate(fixture);
     const trigger = fixture.nativeElement.querySelector(
       'button[type="submit"]',
     ) as HTMLButtonElement;
@@ -880,6 +1065,7 @@ describe('Backups page', () => {
     const configurations = page.state.configurations;
     fixture.autoDetectChanges();
     await fixture.whenStable();
+    openCreate(fixture);
     const trigger = fixture.nativeElement.querySelector(
       'button[type="submit"]',
     ) as HTMLButtonElement;

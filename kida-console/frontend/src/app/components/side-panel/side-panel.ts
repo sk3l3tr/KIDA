@@ -78,7 +78,7 @@ export class SidePanel {
   }
 
   private usable(target: HTMLElement | null): boolean {
-    return !!target?.isConnected && target !== target.ownerDocument.body &&
+    return !!target?.isConnected && !target.matches(':disabled') && target !== target.ownerDocument.body &&
       target !== target.ownerDocument.documentElement &&
       !target.closest('.ion-page-hidden, [inert], [aria-hidden="true"]');
   }
