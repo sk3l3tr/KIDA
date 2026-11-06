@@ -147,10 +147,24 @@ describe('Health report state, confirmation and page integration', () => {
     expect(page.state.reports.entries()).toBeNull();
     expect(page.state.reports.updated()).toBeNull();
     expect(page.state.reports.listError()).not.toBe('');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Error de actualización de informes');
+    expect(fixture.nativeElement.textContent).not.toContain('No hay informes de Health');
     page.state.reports.refresh();
     http.expectOne(listUrl).flush([]);
     expect(page.state.reports.entries()).toEqual([]);
     expect(page.state.reports.listError()).toBe('');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No hay informes de Health');
+    expect(fixture.nativeElement.querySelector('.report-list')).toBeNull();
+    page.state.reports.refresh();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Cargando informes');
+    expect(fixture.nativeElement.textContent).not.toContain('No hay informes de Health');
+    http.expectOne(listUrl).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Error de actualización de informes');
+    expect(fixture.nativeElement.textContent).not.toContain('No hay informes de Health');
     http.expectNone(listUrl);
   });
   it('retains stale reads on errors and clears selection only after successful disappearance', () => {
@@ -596,7 +610,7 @@ describe('Health report state, confirmation and page integration', () => {
       await fixture.whenStable();
       expect(fixture.nativeElement.querySelector('[data-testid="report-markdown"]')).toBeNull();
       const row = fixture.nativeElement.querySelector('.report-list li') as HTMLElement;
-      expect(row.querySelector('.report-id')?.textContent).toBe(`run_id: ${value}`);
+      expect(row.querySelector('.report-id')?.textContent).toBe(value);
       expect(row.querySelectorAll('button')).toHaveLength(2);
       const trigger = row.querySelector('button.secondary') as HTMLButtonElement;
       trigger.focus();

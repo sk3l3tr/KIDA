@@ -1,9 +1,20 @@
 <ion-content class="console-content">
   @if (backups.active()) {
     <div class="console-layout backups-layout">
-      <section class="panel" aria-labelledby="backup-reports-heading">
-        <h1 id="backup-reports-heading">Informes</h1>
-        <p>Consulta los informes de las comprobaciones de Backup Health.</p>
+      <section class="reports-history" aria-labelledby="backup-reports-heading">
+        <div class="section-header">
+          <div>
+            <h1 #listHeading tabindex="-1" id="backup-reports-heading">
+              Informes de Backup Health
+            </h1>
+            <p class="reports-subtitle">
+              Consulta el documento de una comprobación por su identificador.
+            </p>
+          </div>
+          <button class="secondary" (click)="state.refresh()" [disabled]="state.disabled()">
+            <span class="i i-refresh" aria-hidden="true"></span>Actualizar informes
+          </button>
+        </div>
         @for (message of state.uncertainties(); track $index) {
           <pre class="error" role="alert">{{ message }}</pre>
         }
@@ -24,13 +35,7 @@
             </details>
           </div>
         }
-        <div class="section-header">
-          <h3 #listHeading tabindex="-1" id="backup-report-list-heading">Informes disponibles</h3>
-          <button class="secondary" (click)="state.refresh()" [disabled]="state.disabled()">
-            <span class="i i-refresh" aria-hidden="true"></span>Actualizar informes
-          </button>
-        </div>
-        <div aria-live="polite" [attr.aria-busy]="state.loading()">
+        <div class="reports-reading" aria-live="polite" [attr.aria-busy]="state.loading()">
           @if (state.loading()) {
             <p>Cargando informes…</p>
           }
@@ -48,36 +53,41 @@
           @if (state.entries() !== null && (state.loading() || state.listError())) {
             <p>Datos anteriores, desactualizados; pendientes de actualizar.</p>
           }
-          @if (state.entries()?.length === 0) {
+          @if (state.entries()?.length === 0 && !state.loading() && !state.listError()) {
             <p>No hay informes de Health.</p>
           }
         </div>
-        <ul class="backup-list report-list" aria-labelledby="backup-report-list-heading">
-          @for (id of state.entries(); track id) {
-            <li>
-              <pre class="report-id">run_id: {{ id }}</pre>
-              <div class="row-actions">
-                <button
-                  class="secondary"
-                  (click)="backups.openReportDetail(id)"
-                  [disabled]="state.disabled()"
-                  [attr.aria-pressed]="state.selectedId() === id"
-                  [attr.aria-label]="'Ver informe ' + id"
-                >
-                  <span class="i i-eye" aria-hidden="true"></span>Ver informe
-                </button>
-                <button
-                  class="danger icon-only"
-                  (click)="prepare(id)"
-                  [disabled]="state.disabled()"
-                  [attr.aria-label]="'Eliminar informe ' + id"
-                >
-                  <span class="i i-trash" aria-hidden="true"></span>
-                </button>
-              </div>
-            </li>
-          }
-        </ul>
+        @if (state.entries()?.length) {
+          <ul class="backup-list report-list" aria-labelledby="backup-reports-heading">
+            @for (id of state.entries(); track id) {
+              <li>
+                <div class="report-identity">
+                  <pre class="report-id">{{ id }}</pre>
+                  <p>Informe de comprobación · Identificado por run_id</p>
+                </div>
+                <div class="row-actions">
+                  <button
+                    class="secondary"
+                    (click)="backups.openReportDetail(id)"
+                    [disabled]="state.disabled()"
+                    [attr.aria-pressed]="state.selectedId() === id"
+                    [attr.aria-label]="'Ver informe ' + id"
+                  >
+                    Ver informe
+                  </button>
+                  <button
+                    class="danger icon-only"
+                    (click)="prepare(id)"
+                    [disabled]="state.disabled()"
+                    [attr.aria-label]="'Eliminar informe ' + id"
+                  >
+                    <span class="i i-trash" aria-hidden="true"></span>
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        }
       </section>
     </div>
     <app-side-panel
