@@ -7,7 +7,7 @@ import {
   viewChild,
   computed,
 } from '@angular/core';
-import { DatePipe, JsonPipe } from '@angular/common';
+import { DatePipe, JsonPipe, NgTemplateOutlet } from '@angular/common';
 import { BackupConfigurationsState } from '../../services/configurations-state';
 import { BackupCreateForm } from '../../components/backup-create-form/backup-create-form';
 import { IonContent } from '@ionic/angular/standalone';
@@ -17,7 +17,7 @@ import { SidePanel } from '../../../../components/side-panel/side-panel';
 
 @Component({
   selector: 'app-backup-configurations',
-  imports: [IonContent, DatePipe, JsonPipe, BackupCreateForm, SidePanel],
+  imports: [IonContent, DatePipe, JsonPipe, NgTemplateOutlet, BackupCreateForm, SidePanel],
   templateUrl: './backup-configurations.html',
   styleUrls: ['../../backups.scss', './backup-configurations.scss'],
 })

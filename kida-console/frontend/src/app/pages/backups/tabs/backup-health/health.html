@@ -25,40 +25,46 @@
         <p>Consulta y gestiona las comprobaciones de recuperación de las copias de seguridad.</p>
         @let health = state;
         <p>El diagnóstico técnico requiere validación funcional del administrador.</p>
-        @for (message of health.uncertainties(); track $index) {
-          <p class="error" role="alert">{{ message }}</p>
-        }
-        @if (health.error()) {
-          <p class="error" role="alert">{{ health.error() }}</p>
-        }
-        @if (health.result(); as response) {
-          <div class="success" role="status">
-            <strong>{{ health.resultLabel() }}</strong>
-            <p>run_id: {{ response.run_id }} · Estado devuelto por CORE: {{ response.state }}</p>
-            @if (health.queuedResult(); as admission) {
-              <p>execution_id (ejecución en cola): {{ admission.execution_id }}</p>
-              <p>run_id identifica Health; execution_id identifica la ejecución en cola.</p>
-            }
-            @if (health.cleanupResult(); as execution) {
-              <h4>Limpieza devuelta por CORE</h4>
-              <p>Estado de limpieza: {{ execution.cleanup.state }}</p>
-              <pre>{{ execution.cleanup.errors | json }}</pre>
-              <h4>Recursos registrados en la respuesta</h4>
-              <pre>{{ execution.resources | json }}</pre>
-              <p>
-                Revisa los errores y recursos registrados; la respuesta no demuestra que se hayan
-                eliminado.
-              </p>
-            }
-            @if (limitedPrecision(response)) {
-              <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
-            }
-            <details>
-              <summary>Respuesta de escritura (JSON)</summary>
-              <pre>{{ response | json }}</pre>
-            </details>
-          </div>
-        }
+        <ng-template #operationFeedback>
+          @if (health.result() || health.error() || health.uncertainties().length) {
+            <p>Resultados y avisos de Health. Pueden corresponder a otra ejecución de Health.</p>
+          }
+          @for (message of health.uncertainties(); track $index) {
+            <p class="error" role="alert">{{ message }}</p>
+          }
+          @if (health.error()) {
+            <p class="error" role="alert">{{ health.error() }}</p>
+          }
+          @if (health.result(); as response) {
+            <div class="success" role="status">
+              <strong>{{ health.resultLabel() }}</strong>
+              <p>run_id: {{ response.run_id }} · Estado devuelto por CORE: {{ response.state }}</p>
+              @if (health.queuedResult(); as admission) {
+                <p>execution_id (ejecución en cola): {{ admission.execution_id }}</p>
+                <p>run_id identifica Health; execution_id identifica la ejecución en cola.</p>
+              }
+              @if (health.cleanupResult(); as execution) {
+                <h4>Limpieza devuelta por CORE</h4>
+                <p>Estado de limpieza: {{ execution.cleanup.state }}</p>
+                <pre>{{ execution.cleanup.errors | json }}</pre>
+                <h4>Recursos registrados en la respuesta</h4>
+                <pre>{{ execution.resources | json }}</pre>
+                <p>
+                  Revisa los errores y recursos registrados; la respuesta no demuestra que se hayan
+                  eliminado.
+                </p>
+              }
+              @if (limitedPrecision(response)) {
+                <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+              }
+              <details>
+                <summary>Respuesta de escritura (JSON)</summary>
+                <pre>{{ response | json }}</pre>
+              </details>
+            </div>
+          }
+        </ng-template>
+        <ng-container [ngTemplateOutlet]="operationFeedback" />
         <section aria-labelledby="health-history-heading" [attr.aria-busy]="health.loading()">
           <div class="section-header">
             <h3 id="health-history-heading" #listHeading tabindex="-1">Historial de Health</h3>
@@ -219,6 +225,7 @@
           </fieldset>
         </form>
       } @else if (backups.panel() === 'health-detail') {
+        <ng-container [ngTemplateOutlet]="operationFeedback" />
         <app-backup-health-detail [state]="state" />
       }
       @if (backups.panel() === 'health-create' || backups.panel() === 'health-run') {

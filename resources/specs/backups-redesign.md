@@ -1,6 +1,6 @@
 # Backups: implementación del rediseño
 
-Estado: especificación general; implementación pendiente. Historias y criterios de ejecución enlazados abajo.
+Estado: HU-01 a HU-07 completadas. Validación integrada, revisión independiente y comprobación visual breve registradas en HU-07, con límites y fallo de presupuesto preexistente documentados.
 Referencia visual: [`../mockups/backups-mockup.html`](../mockups/backups-mockup.html).
 Decisiones confirmadas: tres rutas hijas, Configuraciones inicial y borradores conservados dentro del módulo.
 
@@ -83,7 +83,7 @@ Debe responder al cambio de tema sin recrear páginas, perder borradores o cerra
 
 ## Historias de usuario y orden de ejecución
 
-Cada archivo es la unidad de trabajo de una sesión CODEX. Estado de todas: **pendiente**.
+Cada archivo es la unidad de trabajo de una sesión CODEX. HU-01 a HU-07 constan como **completadas** en sus entregas. HU-07 registra las comprobaciones integradas y visuales, el resultado de revisión y los límites actuales.
 
 | Orden | Historia | Dependencia |
 | --- | --- | --- |

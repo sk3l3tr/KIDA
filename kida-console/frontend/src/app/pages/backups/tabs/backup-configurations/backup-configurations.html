@@ -6,27 +6,33 @@
         <p>Consulta, crea y elimina configuraciones y solicita copias de seguridad en CORE.</p>
         <p>Una solicitud admitida no confirma el inicio ni la finalización del backup.</p>
       </div>
-      @for (message of state.uncertainties(); track $index) {
-        <div class="error" role="alert">{{ message }}</div>
-      }
-      @if (state.error()) {
-        <p class="error" role="alert">{{ state.error() }}</p>
-      }
-      @if (state.result(); as response) {
-        <div class="success" role="status">
-          <strong>{{ state.resultLabel() }}</strong>
-          @if ('execution_id' in response) {
-            <p>execution_id: {{ response.execution_id }}</p>
-          }
-          @if (limitedPrecision(response)) {
-            <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
-          }
-          <details>
-            <summary>Respuesta de CORE</summary>
-            <pre>{{ response | json }}</pre>
-          </details>
-        </div>
-      }
+      <ng-template #operationFeedback>
+        @if (state.result() || state.error() || state.uncertainties().length) {
+          <p>Resultados y avisos de Configuraciones. Pueden corresponder a otra configuración.</p>
+        }
+        @for (message of state.uncertainties(); track $index) {
+          <div class="error" role="alert">{{ message }}</div>
+        }
+        @if (state.error()) {
+          <p class="error" role="alert">{{ state.error() }}</p>
+        }
+        @if (state.result(); as response) {
+          <div class="success" role="status">
+            <strong>{{ state.resultLabel() }}</strong>
+            @if ('execution_id' in response) {
+              <p>execution_id: {{ response.execution_id }}</p>
+            }
+            @if (limitedPrecision(response)) {
+              <p>Precisión limitada: contiene enteros fuera del rango seguro de JavaScript.</p>
+            }
+            <details>
+              <summary>Respuesta de CORE</summary>
+              <pre>{{ response | json }}</pre>
+            </details>
+          </div>
+        }
+      </ng-template>
+      <ng-container [ngTemplateOutlet]="operationFeedback" />
       <section
         class="panel"
         aria-labelledby="backup-configurations-heading"
@@ -156,8 +162,25 @@
       @if (backups.panel() === 'configuration-create') {
         <app-backup-create-form [state]="state" (created)="backups.closeConfigurationPanel()" />
       } @else if (state.selected(); as job) {
-        <section aria-labelledby="backup-detail-heading">
+        <ng-container [ngTemplateOutlet]="operationFeedback" />
+        <section aria-labelledby="backup-detail-heading" [attr.aria-busy]="state.loading()">
           <h3 id="backup-detail-heading">Detalles: {{ job.name }}</h3>
+          <div aria-live="polite">
+            @if (state.updated()) {
+              <p>
+                Última lectura: {{ state.updated() | date: 'medium' }} (hora local del navegador).
+              </p>
+            }
+            @if (state.loading()) {
+              <p>Actualizando configuraciones…</p>
+            }
+            @if (state.listError()) {
+              <p class="error" role="alert">Error de actualización: {{ state.listError() }}</p>
+            }
+            @if (state.loading() || state.listError()) {
+              <p>Configuración anterior, desactualizada; pendiente de actualizar.</p>
+            }
+          </div>
           <p>ID: {{ job.id }} · Compresión: {{ job.compression }}</p>
           <h4>Orígenes</h4>
           <ul>

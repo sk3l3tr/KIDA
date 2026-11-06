@@ -10,7 +10,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { DOCUMENT, DatePipe, JsonPipe } from '@angular/common';
+import { DOCUMENT, DatePipe, JsonPipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { restoreDialogFocus } from '../../../../services/dialog-focus';
 import { ArcaService } from 'arca';
@@ -33,7 +33,15 @@ import { healthDate, limitedPrecision } from '../../utils/backups-presentation';
 
 @Component({
   selector: 'app-backup-health',
-  imports: [IonContent, DatePipe, JsonPipe, FormsModule, BackupHealthDetail, SidePanel],
+  imports: [
+    IonContent,
+    DatePipe,
+    JsonPipe,
+    NgTemplateOutlet,
+    FormsModule,
+    BackupHealthDetail,
+    SidePanel,
+  ],
   templateUrl: './health.html',
   styleUrls: ['../../backups.scss', './health.scss'],
 })

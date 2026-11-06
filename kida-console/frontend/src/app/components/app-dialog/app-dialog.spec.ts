@@ -122,6 +122,37 @@ describe('AppDialog', () => {
     modal.remove();
   });
 
+  it('restores Cancel after Ionic presentation takes focus, and removes the listener on destruction', async () => {
+    const modal = document.createElement('ion-modal');
+    modal.tabIndex = -1;
+    document.body.append(modal);
+    const fixture = TestBed.createComponent(AppDialog);
+    modal.append(fixture.nativeElement);
+    fixture.detectChanges();
+    TestBed.inject(ArcaActionsService).dispatchAction(APP_DIALOG_OPEN, {
+      context: 'presented',
+      title: 'Confirmar',
+      text: '',
+      type: 'confirmation',
+      buttons: [
+        { id: 'confirm', text: 'Continuar' },
+        { id: 'cancel', text: 'Cancelar' },
+      ],
+    });
+    fixture.detectChanges();
+    modal.focus();
+    expect(document.activeElement).toBe(modal);
+    modal.dispatchEvent(new Event('ionModalDidPresent'));
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement?.textContent?.trim()).toBe('Cancelar');
+    fixture.destroy();
+    modal.focus();
+    modal.dispatchEvent(new Event('ionModalDidPresent'));
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(document.activeElement).toBe(modal);
+    modal.remove();
+  });
+
   it('focuses Cancel once its content has rendered, and cleans up on destruction', () => {
     const fixture = TestBed.createComponent(AppDialog);
     document.body.append(fixture.nativeElement);

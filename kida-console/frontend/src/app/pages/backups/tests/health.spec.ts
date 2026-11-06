@@ -933,6 +933,50 @@ describe('Health basic state and page integration', () => {
     http.expectNone(`${base}/health/start`);
   });
 
+  it.each([409, 504])(
+    'keeps operation feedback accessible inside the Health inspector after HTTP %s',
+    async (status) => {
+      const { component, fixture, page, health } = await healthView();
+      component.prepare('stop');
+      dialogs.choose();
+      http.expectOne(`${base}/health/stop`).flush({}, { status, statusText: 'Failure' });
+      fixture.detectChanges();
+      const message = status === 504 ? health.uncertainties()[0] : health.error();
+      expect(message).toBeTruthy();
+      expect(
+        fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+      ).toContain(message);
+      expect(page.state.panel()).toBe('health-detail');
+      page.state.closeHealthPanel();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(message);
+      health.entries.set([{ ...record, run_id: 'second' }]);
+      page.state.openHealthDetail('second');
+      http.expectOne(getUrl('second')).flush({ ...run, run_id: 'second' });
+      fixture.detectChanges();
+      const inspector = fixture.nativeElement.querySelector('app-side-panel');
+      expect(inspector.textContent).toContain('Detalle de Health: second');
+      expect(inspector.textContent).toContain('Pueden corresponder a otra ejecución de Health');
+      expect(inspector.querySelector('[role="alert"]')?.textContent).toContain(message);
+    },
+  );
+
+  it('shows the complete operation result and cleanup inside the open Health inspector after refresh failure', async () => {
+    const { component, fixture, page } = await healthView();
+    component.prepare('stop');
+    dialogs.choose();
+    http.expectOne(`${base}/health/stop`).flush(run);
+    http.expectOne(`${base}/health`).flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    const feedback = fixture.nativeElement.querySelector('app-side-panel [role="status"]');
+    expect(feedback?.textContent).toContain('Detener Health: respuesta de CORE');
+    expect(feedback?.textContent).toContain(run.run_id);
+    expect(feedback?.textContent).toContain('resource retained');
+    expect(feedback?.textContent).toContain('kept-volume');
+    expect(feedback?.textContent).toContain('"future": null');
+    expect(page.state.panel()).toBe('health-detail');
+  });
+
   it('closes the inspector and invalidates its correlated confirmation without losing drafts', async () => {
     const { component, fixture, page, health } = await healthView();
     health.definitionPath = '/draft';

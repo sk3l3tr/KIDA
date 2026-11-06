@@ -596,6 +596,67 @@ describe('Backups page', () => {
       );
     },
   );
+  it.each([409, 504])(
+    'keeps operation feedback accessible inside the configuration inspector after HTTP %s',
+    (status) => {
+      const fixture = enter();
+      const facade = fixture.componentInstance.state;
+      facade.openConfigurationDetail(job.id);
+      fixture.detectChanges();
+      fixture.nativeElement.querySelector('[panel-actions] button').click();
+      dialogs.choose();
+      http.expectOne(`${base}/run`).flush({}, { status, statusText: 'Failure' });
+      fixture.detectChanges();
+      const message =
+        status === 504 ? facade.configurations.uncertainties()[0] : facade.configurations.error();
+      expect(message).toBeTruthy();
+      expect(
+        fixture.nativeElement.querySelector('app-side-panel [role="alert"]')?.textContent,
+      ).toContain(message);
+      expect(facade.panel()).toBe('configuration-detail');
+      facade.closeConfigurationPanel();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(message);
+      facade.configurations.entries.set([{ ...job, id: 'second', name: 'Second' }]);
+      facade.openConfigurationDetail('second');
+      fixture.detectChanges();
+      const inspector = fixture.nativeElement.querySelector('app-side-panel');
+      expect(inspector.textContent).toContain('Detalles: Second');
+      expect(inspector.textContent).toContain('Pueden corresponder a otra configuración');
+      expect(inspector.querySelector('[role="alert"]')?.textContent).toContain(message);
+    },
+  );
+
+  it('shows the complete admitted backup result inside the open inspector even if its refresh fails', () => {
+    const fixture = enter();
+    const facade = fixture.componentInstance.state;
+    facade.openConfigurationDetail(job.id);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('[panel-actions] button').click();
+    dialogs.choose();
+    http
+      .expectOne(`${base}/run`)
+      .flush({ state: 'QUEUED', execution_id: 'exact-queue', future: null });
+    const refresh = http.expectOne(`${base}/config`);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-side-panel').textContent).toContain(
+      'Actualizando configuraciones',
+    );
+    refresh.flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    const feedback = fixture.nativeElement.querySelector('app-side-panel [role="status"]');
+    expect(feedback?.textContent).toContain('no confirma inicio ni finalización');
+    expect(feedback?.textContent).toContain('exact-queue');
+    expect(feedback?.textContent).toContain('"future": null');
+    const inspector = fixture.nativeElement.querySelector('app-side-panel');
+    expect(inspector.textContent).toContain('Última lectura:');
+    expect(inspector.textContent).toContain('Configuración anterior, desactualizada');
+    expect(inspector.querySelector('[role="alert"]')?.textContent).toContain(
+      facade.configurations.listError(),
+    );
+    expect(facade.panel()).toBe('configuration-detail');
+  });
+
   it('returns focus to the inspector trigger, falling back to the list heading if it disappeared', async () => {
     const fixture = enter();
     fixture.autoDetectChanges();

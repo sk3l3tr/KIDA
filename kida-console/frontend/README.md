@@ -65,7 +65,11 @@ The root URL and unknown paths redirect to `/dashboard`.
 `/settings` contains the appearance gallery followed by equipment information.
 `/administrators` retains account management. `/system` provides health/sensors, RTC
 diagnostics and confirmed power actions. `/scheduler` manages CORE schedules;
-dashboard and backups retain their placeholders. `/docker` provides container listing
+dashboard retains its placeholder. `/backups` redirects to `/backups/configurations`;
+its Configurations, Backup Health and Reports tabs use side panels for forms and
+details. Drafts and operation feedback persist between tabs and clear on module
+exit or session change. See the [Console guide](../../resources/docs/en/console/README.md).
+`/docker` provides container listing
 and actions, Compose version, project listing and inspection. See
 [theme registration and validation](src/theme/README.md) and the portable
 [theming engine](src/lib/theming/README.md). Menu entries live in `src/app/arca-config/app.menu.config.ts`;
