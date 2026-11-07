@@ -3,7 +3,6 @@ FROM node:24.15.0-bookworm-slim AS frontend
 RUN npm install --global pnpm@12.14.0
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
-COPY frontend/vendor/arca-3.2.7.tgz ./vendor/arca-3.2.7.tgz
 RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build

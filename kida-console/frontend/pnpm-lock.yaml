@@ -188,8 +188,8 @@ importers:
         specifier: 8.8.19
         version: 8.8.19(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(@angular/forms@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3)))(rxjs@7.8.2))(@angular/router@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(@angular/platform-browser@22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3)))(rxjs@7.8.2))(rxjs@7.8.2)(zone.js@0.16.3)
       arca:
-        specifier: file:vendor/arca-3.2.7.tgz
-        version: file:vendor/arca-3.2.7.tgz(fd9517e87b7dbb51a538dfe5d2045c2c)
+        specifier: http://git.atlantis.arpa/api/packages/sk3l3t0r/generic/arca/3.2.7/arca-3.2.7.tgz
+        version: http://git.atlantis.arpa/api/packages/sk3l3t0r/generic/arca/3.2.7/arca-3.2.7.tgz(fd9517e87b7dbb51a538dfe5d2045c2c)
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2
@@ -1459,8 +1459,8 @@ packages:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
 
-  arca@file:vendor/arca-3.2.7.tgz:
-    resolution: {integrity: sha512-RBqksIjKWN9N5tflyA2Xmd0KxoX7aPeakt99znubBqe7bh4OSW9oh0i8x+OOJQVo8ARcwd4VRlZ6jQUN4Szv8w==, tarball: file:vendor/arca-3.2.7.tgz}
+  arca@http://git.atlantis.arpa/api/packages/sk3l3t0r/generic/arca/3.2.7/arca-3.2.7.tgz:
+    resolution: {integrity: sha512-RBqksIjKWN9N5tflyA2Xmd0KxoX7aPeakt99znubBqe7bh4OSW9oh0i8x+OOJQVo8ARcwd4VRlZ6jQUN4Szv8w==, tarball: http://git.atlantis.arpa/api/packages/sk3l3t0r/generic/arca/3.2.7/arca-3.2.7.tgz}
     version: 3.2.7
     peerDependencies:
       '@angular/common': ^18.2.13
@@ -3343,7 +3343,7 @@ snapshots:
 
   ansi-styles@6.2.3: {}
 
-  arca@file:vendor/arca-3.2.7.tgz(fd9517e87b7dbb51a538dfe5d2045c2c):
+  arca@http://git.atlantis.arpa/api/packages/sk3l3t0r/generic/arca/3.2.7/arca-3.2.7.tgz(fd9517e87b7dbb51a538dfe5d2045c2c):
     dependencies:
       '@angular/common': 22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2)
       '@angular/core': 22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.3)

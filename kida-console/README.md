@@ -149,8 +149,10 @@ docker compose -f kida-console/compose.yaml down
 No usar `down -v` si se desea conservar la base de datos. Reiniciar o reconstruir
 la imagen conserva cuentas y sesiones mientras se conserve el volumen.
 
-La construcción requiere el paquete local `frontend/vendor/arca-3.2.7.tgz`,
-ya declarado en `package.json`; debe estar disponible en el contexto de build.
+La construcción descarga ARCA `3.2.7` desde el registro de paquetes de Forgejo
+mediante la URL declarada en `frontend/package.json`. Requiere acceso a ArpaNet
+(red local o VPN) y descarga anónima habilitada. `pnpm-lock.yaml` fija la
+integridad del paquete; no es necesario preparar un directorio `vendor`.
 La construcción instala con `pnpm install --frozen-lockfile` y
 `uv sync --locked --no-dev`. El contexto Docker excluye secretos, dependencias
 locales, bases de datos, pruebas y artefactos generados. `/api/health` permanece
