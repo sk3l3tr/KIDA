@@ -36,3 +36,34 @@ jobs:
               cargo test --workspace --locked
             '
 
+      - name: Console frontend tests
+        run: |
+          docker run --rm \
+            -v "$PWD/kida-console/frontend:/source:ro" \
+            -w /tmp/frontend \
+            node:24.15.0-bookworm-slim \
+            bash -euo pipefail -c '
+              tar -C /source --exclude=node_modules --exclude=.angular --exclude=dist -cf - . | tar -xf -
+              npm install --global pnpm@12.14.0
+              pnpm install --frozen-lockfile
+              pnpm exec ng test --watch=false
+            '
+
+      - name: Console backend tests
+        run: |
+          docker run --rm \
+            -e KIDA_ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200 \
+            -e UV_PYTHON_DOWNLOADS=never \
+            -w /tmp/workspace/kida-console/backend \
+            -v "$PWD:/source:ro" \
+            python:3.14-slim-bookworm \
+            bash -euo pipefail -c '
+              tar -C /source/kida-console/backend --exclude=.venv --exclude=__pycache__ --exclude=data --exclude=static --exclude=.env -cf - . | tar -xf -
+              # FastAPI validates static/index.html when importing the application.
+              mkdir -p /tmp/workspace/tests static
+              touch static/index.html
+              cp -a /source/tests/fixtures /tmp/workspace/tests/fixtures
+              pip install --no-cache-dir uv==0.13.5
+              uv sync --locked
+              uv run --locked python -m unittest discover -v
+            '
