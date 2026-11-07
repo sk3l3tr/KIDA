@@ -90,6 +90,26 @@ ambos servicios; no mezclar `localhost` y `127.0.0.1` por las cookies SameSite.
 
 ## Docker y LynxEngine
 
+Para instalar desde una release publicada, usa el
+[asistente de instalación](../resources/docs/es/001-installation.md).
+Descarga una imagen versionada de Forgejo y guarda el despliegue en
+`/opt/kida-console`, con proyecto Compose `kida-console`, configuración privada
+y volumen persistente. Permite HTTP directo (cookies sin Secure) o HTTPS
+mediante un proxy externo (cookies Secure). No configura TLS ni Docker.
+
+La release construye el Dockerfile de este directorio y publica
+`git.atlantis.arpa/sk3l3t0r/kida-console:<versión>` antes de publicar los binarios.
+El secreto `KIDA_PACKAGE_TOKEN` del runner debe permitir publicar paquetes de
+contenedores y genéricos. El daemon del runner debe poder acceder al registry
+HTTP de Forgejo. Para ejecutar las pruebas aisladas del instalador, sin root ni
+daemon Docker (requieren Python 3 y el plugin Compose):
+
+```bash
+python3 resources/scripts/tests/test_install.py
+```
+
+Los comandos siguientes corresponden al despliegue desde código fuente.
+
 El contenedor incluye solo FastAPI y Angular compilado; no incluye CORE, CLI,
 sockets ni servicios auxiliares. Compose utiliza red host en Linux para llegar a
 servicios del host y un volumen `console-data` para las cuentas y sesiones.

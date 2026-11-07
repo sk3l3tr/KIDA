@@ -51,6 +51,23 @@ jobs:
           cd dist
           sha256sum -c SHA256SUMS
 
+      - name: Build and publish Console image
+        env:
+          PACKAGE_TOKEN: ${{ secrets.KIDA_PACKAGE_TOKEN }}
+          VERSION: ${{ forgejo.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "${PACKAGE_TOKEN}"
+          [[ "${VERSION}" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]
+          IMAGE="git.atlantis.arpa/sk3l3t0r/kida-console:${VERSION}"
+          DOCKER_CONFIG="$(mktemp -d)"
+          export DOCKER_CONFIG
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$PACKAGE_TOKEN" | docker login git.atlantis.arpa \
+            --username sk3l3t0r --password-stdin
+          docker build --tag "$IMAGE" kida-console
+          docker push "$IMAGE"
+
       - name: Publish package
         env:
           PACKAGE_TOKEN: ${{ secrets.KIDA_PACKAGE_TOKEN }}

@@ -36,8 +36,40 @@ sudo env \
   bash /tmp/kida-install.sh
 ```
 
-El instalador verifica checksums, instala `kida-core` y `kida` en `/usr/local/bin` y habilita e inicia `kida.service`.
-El servicio funciona como root. No se instalan Docker, el plugin Compose ni `rtcwake`.
+El asistente instala siempre CORE y pregunta por CLI y Console por separado
+(ambas opcionales, respuesta por defecto: no). Instala en orden CORE → CLI →
+Console; omitir un componente no elimina instalaciones anteriores.
+
+Verifica los checksums de los binarios seleccionados e instala CORE y, si se
+elige, `kida` en `/usr/local/bin`. Habilita y reinicia `kida.service`, que funciona
+como root. Muestra progreso por etapa y solo anuncia éxito tras comprobar los
+servicios. No instala Docker, Compose ni `rtcwake`.
+
+Si eliges Console, comprueba primero Docker y Compose (con soporte de
+`up --wait-timeout`) y descarga la imagen
+`git.atlantis.arpa/sk3l3t0r/kida-console:RELEASE_VERSION`. Si falla esta
+comprobación, no instala ningún componente. La versión debe tener imagen
+publicada; las releases antiguas pueden carecer de ella. `KIDA_TOKEN` también
+se utiliza para autenticar la descarga de la imagen, sin conservar ese login.
+
+El registry usa HTTP: tanto el daemon del equipo como el del runner de releases
+necesitan autorizar `git.atlantis.arpa` como registry inseguro. El instalador no
+modifica Docker. HTTP transmite credenciales sin cifrar; úsalo únicamente en
+una red de confianza.
+
+En la primera instalación de Console, introduce el origen público HTTP o HTTPS
+y una contraseña de administrador de 12–128 caracteres (oculta y confirmada).
+HTTP directo puede usar `http://IP_DEL_HOST:8000`; HTTPS necesita un proxy TLS
+externo, que este script no configura. Las cookies se configuran según el
+protocolo elegido. La configuración se guarda en `/opt/kida-console/.env` con
+permisos `0600`, junto al Compose de despliegue. Las reinstalaciones conservan
+ese archivo y el volumen de cuentas y sesiones. El proyecto Compose se llama
+`kida-console` y usa red host. El script espera hasta 120 segundos a que Console
+esté saludable.
+
+Si una etapa falla, el mensaje identifica los componentes ya completados;
+no se revierte automáticamente su instalación. Ejecuta el script descargado
+con entrada interactiva disponible; no lo envíes a Bash mediante una tubería.
 
 ## 3. Comprobar
 
@@ -46,6 +78,12 @@ systemctl --no-pager --full status kida
 kida system info
 ```
 
-Comprueba ambos resultados aunque el instalador anuncie éxito.
+Ejecuta `kida system info` solo si instalaste CLI. Si instalaste Console:
+
+```bash
+sudo docker compose --project-name kida-console -f /opt/kida-console/compose.yaml ps
+```
+
+Comprueba los componentes seleccionados aunque el instalador anuncie éxito.
 Continúa con [primeros pasos](002-usage-overview.md) o [solución de problemas](troubleshooting.md).
 Antes de editar ajustes, consulta [configuración](configuration.md).
