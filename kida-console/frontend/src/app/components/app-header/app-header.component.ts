@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { IonMenuButton } from '@ionic/angular/standalone';
+import { IonicModule } from '@ionic/angular';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
 import { errorMessage } from '../../utils/messages';
@@ -8,7 +8,7 @@ import { errorMessage } from '../../utils/messages';
   selector: 'app-header',
   templateUrl: './app-header.component.html',
   styleUrls: ['./app-header.component.scss'],
-  imports: [IonMenuButton],
+  imports: [IonicModule],
 })
 export class AppHeaderComponent {
   private readonly authService = inject(AuthService);

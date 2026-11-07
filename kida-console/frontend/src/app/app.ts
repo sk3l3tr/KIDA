@@ -2,13 +2,12 @@ import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, NavigationError, Router } from '@angular/router';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { IonApp } from '@ionic/angular/standalone';
+import { IonicModule } from '@ionic/angular';
 import { CoreComponentsModule } from 'arca';
 
 @Component({
-  imports: [IonApp, CoreComponentsModule],
+  imports: [IonicModule, CoreComponentsModule],
   selector: 'app-root',
-  // ARCA updates its shell asynchronously through Zone.js.
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.scss',
   templateUrl: './app.html',

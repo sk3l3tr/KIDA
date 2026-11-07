@@ -19,7 +19,7 @@ import {
   withPreloading,
 } from '@angular/router';
 import { routes } from './app.routes';
-import { MenuController as ArcaMenuController } from '@ionic/angular';
+import { IonicModule, MenuController as ArcaMenuController } from '@ionic/angular';
 import { provideIonicAngular, IonicRouteStrategy, MenuController } from '@ionic/angular/standalone';
 
 // ARCA
@@ -46,7 +46,7 @@ export const appConfig: ApplicationConfig = {
     { provide: LOCALE_ID, useValue: 'es' },
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withJsonpSupport(), withInterceptors([authInterceptor])),
-    importProvidersFrom(CoreComponentsModule),
+    importProvidersFrom(CoreComponentsModule, IonicModule.forRoot()),
     { provide: GLOBAL_CONFIG, useValue: appGlobalConfig },
     { provide: MENU_CONFIG, useValue: appMenu },
     { provide: LANG_CONFIG, useValue: langConfig },
