@@ -1,0 +1,86 @@
+.accounts-list {
+  margin: 0;
+}
+.accounts-list li {
+  padding: 1.25rem 1.5rem;
+}
+.accounts-list li:last-child {
+  border-bottom: 0;
+}
+@media (hover: hover) {
+  .accounts-list li:hover {
+    background: var(--ion-background-color);
+  }
+}
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--kida-radius);
+  background: var(--ion-background-color);
+  color: var(--ion-color-primary);
+  .i-user {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+.account-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.account-name strong {
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.own-badge {
+  color: var(--ion-color-primary);
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+}
+button.delete-account {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--kida-muted);
+  border: var(--kida-border-width) solid transparent;
+  &:hover:enabled {
+    color: var(--ion-color-danger);
+    border-color: var(--ion-color-danger);
+  }
+}
+.accounts-help {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-top: var(--kida-border-width) solid var(--ion-border-color);
+  color: var(--kida-muted);
+  font-size: 0.75rem;
+}
+@media (max-width: 767px) {
+  .accounts-list li {
+    padding: 1.25rem 1rem;
+    gap: 0.5rem;
+  }
+  .account-avatar {
+    width: 2rem;
+    height: 2rem;
+  }
+  .delete-account {
+    padding-inline: 0.5rem;
+  }
+  .accounts-help {
+    padding: 1rem;
+  }
+}

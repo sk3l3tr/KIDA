@@ -1,47 +1,55 @@
-<form #createForm="ngForm" (ngSubmit)="state.create()">
-  <label for="create-username">Username nuevo</label>
-  <input
-    id="create-username"
-    name="createUsername"
-    [(ngModel)]="state.createUsername"
-    required
-    pattern="[a-zA-Z0-9_.-]{3,64}"
-    minlength="3"
-    maxlength="64"
-    autocomplete="off"
-  />
-  <label for="create-password">Contraseña nueva (12–128 caracteres)</label>
-  <input
-    id="create-password"
-    name="createPassword"
-    type="password"
-    [(ngModel)]="state.createPassword"
-    required
-    minlength="12"
-    maxlength="128"
-    autocomplete="new-password"
-  />
-  <fieldset>
-    <legend>Confirma tu identidad</legend>
-    <label for="admin-username">Tu username</label>
+<form id="create-account-form" (ngSubmit)="submit()">
+  <fieldset class="form-fields" [disabled]="state.busy()">
+    <label for="create-username">Nombre de usuario</label>
     <input
-      id="admin-username"
-      name="adminUsername"
-      [(ngModel)]="state.adminUsername"
+      id="create-username"
+      name="createUsername"
+      [(ngModel)]="state.createUsername"
       required
+      pattern="[a-zA-Z0-9_.\-]{3,64}"
+      minlength="3"
       maxlength="64"
-      autocomplete="username"
+      autocomplete="off"
+      aria-describedby="create-username-help"
     />
-    <label for="admin-password">Tu contraseña</label>
+    <small id="create-username-help"
+      >3–64 caracteres: letras, números, punto, guion o guion bajo.</small
+    >
+    <label for="create-password">Contraseña de la nueva cuenta</label>
     <input
-      id="admin-password"
-      name="adminPassword"
+      id="create-password"
+      name="createPassword"
       type="password"
-      [(ngModel)]="state.adminPassword"
+      [(ngModel)]="state.createPassword"
       required
+      minlength="12"
       maxlength="128"
-      autocomplete="current-password"
+      autocomplete="new-password"
+      aria-describedby="create-password-help"
     />
+    <small id="create-password-help">Entre 12 y 128 caracteres.</small>
+    <fieldset>
+      <legend>Confirma tu identidad</legend>
+      <p>Introduce tus credenciales para autorizar la creación.</p>
+      <label for="admin-username">Tu nombre de usuario</label>
+      <input
+        id="admin-username"
+        name="adminUsername"
+        [(ngModel)]="state.adminUsername"
+        required
+        maxlength="64"
+        autocomplete="username"
+      />
+      <label for="admin-password">Tu contraseña</label>
+      <input
+        id="admin-password"
+        name="adminPassword"
+        type="password"
+        [(ngModel)]="state.adminPassword"
+        required
+        maxlength="128"
+        autocomplete="current-password"
+      />
+    </fieldset>
   </fieldset>
-  <button [disabled]="createForm.invalid || state.busy()">Crear administrador</button>
 </form>

@@ -1,0 +1,47 @@
+.profile-body {
+  padding: 1.5rem;
+}
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  > div {
+    min-width: 0;
+  }
+  strong {
+    overflow-wrap: anywhere;
+  }
+  p {
+    margin: 0.25rem 0 0;
+    color: var(--kida-muted);
+    font-size: 0.75rem;
+  }
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--kida-radius);
+  background: var(--ion-background-color);
+  color: var(--ion-color-primary);
+  .i-user {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+.profile-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+.profile-actions button {
+  justify-content: flex-start;
+  text-align: start;
+}
+@media (max-width: 767px) {
+  .profile-body {
+    padding: 1.25rem 1rem;
+  }
+}

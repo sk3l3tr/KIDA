@@ -1,11 +1,128 @@
-app-masonry {
-  grid-column: 1 / -1;
-  --masonry-columns: 2;
-  --masonry-gap: 1.5rem;
+.administrators-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
-
-@media (max-width: 700px) {
-  app-masonry {
-    --masonry-columns: 1;
+.administrators-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  h1 {
+    margin: 0;
+    font-family: var(--kida-heading-font);
+    font-size: clamp(1.8rem, 3vw, 2.375rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+  p {
+    max-width: 65ch;
+    margin: 0.6rem 0 0;
+    color: var(--kida-muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+}
+.create-administrator {
+  flex-shrink: 0;
+}
+.action-icon {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.administrators-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+  gap: 1.5rem;
+  align-items: start;
+}
+.panel {
+  padding: 0;
+  overflow: hidden;
+}
+.panel-heading {
+  padding: 1.25rem 1.5rem;
+  border-bottom: var(--kida-border-width) solid var(--ion-border-color);
+  h2 {
+    margin: 0;
+    font-size: 1.125rem;
+  }
+  p {
+    margin: 0.4rem 0 0;
+    color: var(--kida-muted);
+    font-size: 0.8125rem;
+  }
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.profile-panel .section-title {
+  justify-content: space-between;
+}
+.account-count,
+.own-badge {
+  padding: 0.1rem 0.45rem;
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  font-size: 0.75rem;
+}
+.own-badge {
+  color: var(--ion-color-primary);
+}
+.list-status {
+  padding: 1rem 1.5rem;
+  color: var(--kida-muted);
+  font-size: 0.875rem;
+}
+.list-status .error {
+  margin-top: 0;
+}
+.scope-note,
+.operation-status {
+  margin: 0;
+  color: var(--kida-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.scope-note {
+  display: flex;
+  gap: 0.6rem;
+  max-width: 75ch;
+}
+.scope-note .i {
+  flex-shrink: 0;
+  color: var(--ion-color-primary);
+  margin-top: 0.2rem;
+}
+.editor-description {
+  margin: 0 0 1.5rem;
+  color: var(--kida-muted);
+}
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+p,
+h1,
+h2 {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+  .administrators-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .administrators-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .panel-heading {
+    padding: 1.25rem 1rem;
   }
 }

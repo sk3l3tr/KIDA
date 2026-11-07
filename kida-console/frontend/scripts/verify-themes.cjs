@@ -329,13 +329,15 @@ async function service(page, operation, value) {
           assert.equal(await other.locator('#username').inputValue(), 'preserved');
         }
         await page.goto(`${base}/administrators`);
+        await page.getByRole('button', { name: 'Cambiar nombre de usuario', exact: true }).click();
         await page.locator('#own-username').waitFor();
         await page.locator('#own-username').fill('unsaved-name');
         await page.evaluate(async () => {
           window.accountPage = document.querySelector('app-administrators');
           window.accountView = window.ng.getComponent(window.accountPage);
-          window.accountScroll = await window.accountPage
-            .querySelector('ion-content')
+          window.accountScroll = await document
+            .querySelector('#own-username')
+            .closest('ion-content')
             .getScrollElement();
           window.accountScroll.scrollTop = 150;
           window.accountScrollTop = window.accountScroll.scrollTop;
@@ -343,7 +345,7 @@ async function service(page, operation, value) {
         for (const [id, colorMode] of combinations) {
           await page.evaluate(
             ({ id, colorMode }) => {
-              const themes = window.accountView.auth.themeIdentity.themes;
+              const themes = window.accountView.state.auth.themeIdentity.themes;
               themes.selectTheme(id);
               if (id !== 'tokyo') themes.selectMode(colorMode);
             },

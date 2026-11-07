@@ -1,29 +1,142 @@
 <ion-content class="console-content">
-  <div class="console-layout">
-    <div>
-      <p class="eyebrow">ADMINISTRACIÓN</p>
-      <h1>Cuentas de usuario</h1>
-      <p>Todos los usuarios son administradores.</p>
-    </div>
+  <div class="console-layout administrators-layout">
+    <header class="administrators-heading">
+      <div>
+        <h1>Administradores</h1>
+        <p>
+          Gestiona quién puede acceder a Console. Todas las cuentas tienen permisos de
+          administrador.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="create-administrator"
+        [disabled]="state.busy() || state.loading() || state.pendingDelete() !== null"
+        (click)="state.openPanel('create')"
+      >
+        <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Crear administrador
+      </button>
+    </header>
     @if (state.error()) {
       <p class="error" role="alert">{{ state.error() }}</p>
     }
     @if (state.message()) {
       <p class="success" role="status">{{ state.message() }}</p>
     }
-    <app-masonry>
-      <section appMasonryItem class="panel" aria-labelledby="profile-title">
-        <h2 id="profile-title">Mi cuenta</h2>
+    @if (state.busy() && state.panel() === null) {
+      <p class="operation-status" role="status">
+        Solicitud en curso. Cerrar el panel no cancela la operación enviada.
+      </p>
+    }
+    <div class="administrators-grid">
+      <section
+        class="panel accounts-panel"
+        aria-labelledby="accounts-title"
+        [attr.aria-busy]="state.loading()"
+      >
+        <header class="panel-heading">
+          <div class="section-title">
+            <h2 id="accounts-title" #listHeading tabindex="-1">Cuentas con acceso</h2>
+            <span class="account-count" aria-label="Número de administradores">{{
+              state.loaded() ? state.accounts().length : '—'
+            }}</span>
+          </div>
+          <p>Acceso completo a KIDA Console.</p>
+        </header>
+        @if (state.loading()) {
+          <p class="list-status" role="status">Cargando administradores…</p>
+        }
+        @if (state.listError()) {
+          <div class="list-status">
+            <p class="error" role="alert">{{ state.listError() }}</p>
+            @if (state.loaded()) {
+              <p>Se muestran los datos de la lectura anterior.</p>
+            }
+            <button
+              type="button"
+              class="secondary"
+              [disabled]="state.busy() || state.loading() || state.pendingDelete() !== null"
+              (click)="state.retryLoad()"
+            >
+              Reintentar lectura
+            </button>
+          </div>
+        }
+        @if (state.loaded()) {
+          <app-administrator-list />
+        }
+      </section>
+      <aside class="panel profile-panel" aria-labelledby="profile-title">
+        <header class="panel-heading section-title">
+          <h2 id="profile-title">Mi cuenta</h2>
+          <span class="own-badge">Tú</span>
+        </header>
         <app-administrator-profile />
-      </section>
-      <section appMasonryItem class="panel" aria-labelledby="accounts-title">
-        <h2 id="accounts-title">Administradores</h2>
-        <app-administrator-list />
-      </section>
-      <section appMasonryItem class="panel" aria-labelledby="create-title">
-        <h2 id="create-title">Crear administrador</h2>
-        <app-administrator-create-form />
-      </section>
-    </app-masonry>
+      </aside>
+    </div>
+    <p class="scope-note">
+      <span class="i i-info" aria-hidden="true"></span>Estas cuentas dan acceso a Console. No son
+      usuarios del sistema operativo ni credenciales de CORE o CLI.
+    </p>
   </div>
 </ion-content>
+<app-side-panel
+  [open]="state.panel() !== null"
+  [title]="panelTitle()"
+  [fallbackFocus]="listHeading"
+  (closed)="state.closePanel()"
+>
+  @switch (state.panel()) {
+    @case ('create') {
+      <p class="editor-description">La nueva cuenta tendrá acceso completo a Console.</p>
+      <app-administrator-create-form />
+    }
+    @case ('rename') {
+      <p class="editor-description">Solo se modificará tu propia cuenta.</p>
+      <app-administrator-profile #profileEditor mode="rename" />
+    }
+    @case ('password') {
+      <p class="editor-description">Actualiza la contraseña de tu cuenta.</p>
+      <app-administrator-profile #profileEditor mode="password" />
+    }
+  }
+  @if (state.formError()) {
+    <p class="error" role="alert">{{ state.formError() }}</p>
+  }
+  @if (state.busy()) {
+    <p role="status">Enviando solicitud…</p>
+  }
+  <ng-container panel-actions>
+    <div class="editor-actions">
+      <button type="button" class="secondary" (click)="state.closePanel()">Cancelar</button>
+      @switch (state.panel()) {
+        @case ('create') {
+          <button type="submit" form="create-account-form" [disabled]="!createForm()?.canSubmit()">
+            Crear administrador
+          </button>
+        }
+        @case ('rename') {
+          <button
+            type="submit"
+            form="rename-account-form"
+            [disabled]="!profileEditor()?.canSubmit()"
+          >
+            Guardar nombre
+          </button>
+        }
+        @case ('password') {
+          <button
+            type="submit"
+            form="password-account-form"
+            [disabled]="!profileEditor()?.canSubmit()"
+          >
+            Cambiar contraseña
+          </button>
+        }
+      }
+    </div>
+  </ng-container>
+</app-side-panel>

@@ -1,0 +1,33 @@
+form {
+  max-width: none;
+}
+.form-fields {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  label {
+    margin-top: 1rem;
+  }
+  > label:first-child {
+    margin-top: 0;
+  }
+}
+small {
+  color: var(--kida-muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+fieldset p {
+  color: var(--kida-muted);
+  font-size: 0.8125rem;
+}
+.password-warning {
+  margin: 1.25rem 0 0;
+  padding: 1rem;
+  border: var(--kida-border-width) solid var(--ion-border-color);
+  border-radius: var(--kida-radius);
+  color: var(--ion-text-color);
+  line-height: 1.6;
+}

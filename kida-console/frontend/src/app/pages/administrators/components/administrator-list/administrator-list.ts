@@ -4,6 +4,7 @@ import { AdministratorsFacade } from '../../services/administrators.facade';
 @Component({
   selector: 'app-administrator-list',
   templateUrl: './administrator-list.html',
+  styleUrl: './administrator-list.scss',
 })
 export class AdministratorList {
   readonly state = inject(AdministratorsFacade);

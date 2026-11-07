@@ -1,6 +1,6 @@
-import { Component, OnDestroy, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, inject, viewChild } from '@angular/core';
 import { IonContent } from '@ionic/angular/standalone';
-import { Masonry, MasonryItem } from '../../components/masonry/masonry';
+import { SidePanel } from '../../components/side-panel/side-panel';
 import { AdministratorsFacade } from './services/administrators.facade';
 import { AdministratorProfile } from './components/administrator-profile/administrator-profile';
 import { AdministratorList } from './components/administrator-list/administrator-list';
@@ -10,8 +10,7 @@ import { AdministratorCreateForm } from './components/administrator-create-form/
   selector: 'app-administrators',
   imports: [
     IonContent,
-    Masonry,
-    MasonryItem,
+    SidePanel,
     AdministratorProfile,
     AdministratorList,
     AdministratorCreateForm,
@@ -22,6 +21,26 @@ import { AdministratorCreateForm } from './components/administrator-create-form/
 })
 export class Administrators implements OnDestroy {
   readonly state = inject(AdministratorsFacade);
+  readonly createForm = viewChild(AdministratorCreateForm);
+  readonly profileEditor = viewChild<AdministratorProfile>('profileEditor');
+  private readonly listHeading = viewChild<ElementRef<HTMLElement>>('listHeading');
+
+  constructor() {
+    this.state.focusFallback = () => this.listHeading()?.nativeElement;
+  }
+
+  panelTitle(): string {
+    switch (this.state.panel()) {
+      case 'create':
+        return 'Crear administrador';
+      case 'rename':
+        return 'Cambiar nombre de usuario';
+      case 'password':
+        return 'Cambiar contraseña';
+      default:
+        return 'Administradores';
+    }
+  }
 
   ionViewWillEnter(): void {
     this.state.ionViewWillEnter();

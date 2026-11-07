@@ -1,23 +1,37 @@
 <ul class="accounts-list">
   @for (account of state.accounts(); track account.id) {
     <li>
-      <span
-        >{{ account.username }}
-        @if (account.id === state.auth.user()?.id) {
-          <small>(tú)</small>
-        }
-      </span>
+      <div class="account-identity">
+        <span class="account-avatar" aria-hidden="true"><span class="i i-user"></span></span>
+        <div class="account-name">
+          <strong>{{ account.username }}</strong>
+          @if (account.id === state.auth.user()?.id) {
+            <span class="own-badge">Tú</span>
+          }
+        </div>
+      </div>
       <button
         type="button"
-        class="danger"
-        [disabled]="state.busy() || state.accounts().length <= 1"
+        class="danger delete-account"
+        [attr.aria-label]="'Eliminar a ' + account.username"
+        [attr.aria-describedby]="state.accounts().length <= 1 ? 'accounts-help' : null"
+        [disabled]="
+          state.busy() ||
+          state.loading() ||
+          state.accounts().length <= 1 ||
+          state.pendingDelete() !== null
+        "
         (click)="state.prepareDelete(account)"
       >
-        Eliminar
+        <span class="i i-trash" aria-hidden="true"></span>Eliminar
       </button>
     </li>
   }
 </ul>
-@if (state.accounts().length === 1) {
-  <p>Debe quedar al menos un administrador.</p>
-}
+<p id="accounts-help" class="accounts-help">
+  @if (state.accounts().length === 1) {
+    Debe quedar al menos un administrador. No puedes eliminar esta cuenta.
+  } @else {
+    Solo puedes modificar tus propias credenciales.
+  }
+</p>
