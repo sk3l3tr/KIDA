@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080f17">
+  <title>KIDA Console — Settings · Mockup</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080f17;--panel:#101b26;--panel2:#14232e;--line:#263944;--line2:#36505c;--text:#e8f1f3;--muted:#8da3ae;--soft:#b6c8d0;--teal:#4be1d2;--amber:#e8b87e;font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    :root[data-theme="Neobrutalism"]{--teal:#fff000;--line:#55535a;--line2:#aaa8ad}:root[data-theme="Sakura"]{--teal:#e6a3bf;--line:#483644;--line2:#a87992}:root[data-theme="Tokyo"]{--teal:#42d9e5;--line:#34405a;--line2:#536e9c}
+    :root[data-mode="light"]{color-scheme:light;--bg:#e9eef0;--panel:#fff;--panel2:#f3f6f7;--line:#cad5d9;--line2:#a9bbc1;--text:#17272e;--muted:#536c77;--soft:#334c56}:root[data-mode="light"] .theme[aria-pressed="true"]{background:var(--panel2)}:root[data-mode="light"] .theme:hover{background:var(--panel2)}:root[data-mode="light"] .mode{background:var(--panel)}:root[data-mode="light"] .mode label{color:var(--text)}:root[data-mode="light"] .env,:root[data-mode="light"] .close,:root[data-mode="light"] .scenario select{background:var(--panel);color:var(--text)}:root[data-mode="light"] .host strong{color:var(--text)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 74% -10%,#1a333e70,transparent 55%),var(--bg);color:var(--text)}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--teal);outline-offset:3px}.shell{max-width:1280px;margin:auto;padding:25px 34px 42px}.top{display:flex;justify-content:space-between;align-items:center;padding:4px 0 21px;border-bottom:1px solid var(--line)}.brand{display:flex;gap:12px;align-items:center}.mark{width:34px;height:34px;display:grid;place-items:center;background:var(--teal);color:#041b1a;border-radius:8px;font:800 19px "DejaVu Sans Mono",monospace}.brand-name{font-size:14px;letter-spacing:.15em;font-weight:700}.brand-name span{font-weight:400;color:var(--muted)}.brand-sub,.env{font:12px "DejaVu Sans Mono",monospace;letter-spacing:.12em;color:var(--muted);margin-top:4px}.env{margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:5px;background:#111c26}.heading{padding:31px 0 23px}.eyebrow,.kicker{font:12px "DejaVu Sans Mono",monospace;letter-spacing:.17em;color:var(--teal)}h1{font-size:36px;letter-spacing:-.045em;font-weight:600;margin:7px 0 6px}.heading p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(290px,.85fr);gap:16px;align-items:start}.panel{background:linear-gradient(150deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;overflow:hidden}.panel-head{padding:20px 22px 15px;border-bottom:1px solid var(--line)}.title-row{display:flex;align-items:center;gap:10px}.title-icon{color:var(--teal);display:grid;place-items:center}.ico{width:19px;height:19px;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none}h2{font-size:17px;letter-spacing:-.025em;margin:0;font-weight:600}.panel-head p{font-size:12px;line-height:1.5;color:var(--muted);margin:7px 0 0}.appearance-body{padding:17px 19px 19px}.themes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.theme{padding:9px;text-align:left;border:1px solid var(--line);border-radius:9px;background:var(--panel);transition:border-color .15s,background .15s;min-width:0}.theme:hover{border-color:#52757e;background:#152630}.theme[aria-pressed=true]{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal);background:#14252e}.preview{height:78px;border:1px solid #30434d;border-radius:6px;background:#0d151c;padding:10px;margin-bottom:9px;display:flex;flex-direction:column;gap:9px}.preview-bar{height:9px;width:59%;background:var(--accent);opacity:.9}.preview-row{display:flex;gap:7px;flex:1}.preview-row i{display:block;flex:1;border:1px solid var(--preview-line);border-radius:6px;background:var(--preview-fill)}.professional{--accent:#29c8b7;--preview-line:#30434d;--preview-fill:#18242d}.neo{--accent:#fff000;--preview-line:#aaa8ad;--preview-fill:#302e35}.neo .preview{border-radius:1px;border:3px solid #aaa8ad;background:#17171a}.neo .preview-row i{border-radius:0;box-shadow:3px 3px 0 #aaa8ad}.sakura{--accent:#e6a3bf;--preview-line:#a87992;--preview-fill:#30252d}.sakura .preview{border-radius:18px;background:#211a21}.sakura .preview-row i{border-radius:20px}.tokyo{--accent:#42d9e5;--preview-line:#536e9c;--preview-fill:#222c40}.tokyo .preview{border-radius:4px;background:#111624}.theme-name{display:block;font-size:12px;font-weight:650}.theme-desc{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}.mode{margin:15px 0 0;padding:13px 14px 12px;border:1px solid var(--line);border-radius:8px}.mode legend{font-size:12px;color:var(--soft);padding:0 5px}.mode-options{display:flex;gap:19px}.mode label{display:flex;gap:8px;align-items:center;font-size:12px;color:#c4d2d8}.mode input{accent-color:#20b9aa;width:16px;height:16px}.mode-note,.status-line{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.5}.status-line strong{font-weight:500;color:var(--text)}.device-body{padding:4px 18px 14px}.host{display:flex;justify-content:space-between;gap:10px;padding:15px 2px;border-bottom:1px solid var(--line);font-size:12px}.host span:first-child{color:var(--muted)}.host strong{font:12px "DejaVu Sans Mono",monospace;color:#dce9eb;overflow-wrap:anywhere;text-align:right}.detail-link{display:flex;width:100%;align-items:center;justify-content:space-between;padding:15px 2px;background:transparent;border:0;border-bottom:1px solid var(--line);text-align:left;font-size:12px}.detail-link:last-child{border-bottom:0}.detail-link:hover{color:var(--teal)}.detail-link .right{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px}.chevron{color:var(--teal);font-size:20px;line-height:12px}.device-foot{font-size:12px;color:var(--muted);line-height:1.5;padding:0 2px 2px}.footer{margin-top:21px;display:flex;align-items:center;gap:7px;color:#708994;font:12px "DejaVu Sans Mono",monospace;letter-spacing:.04em}.dot{width:6px;height:6px;background:var(--amber);border-radius:50%}.notice{margin-top:12px;padding:10px 12px;border:1px solid #564833;background:#2c271f;border-radius:7px;color:#e5c18f;font-size:12px;line-height:1.5}.modal-backdrop{position:fixed;inset:0;z-index:5;background:#020810c9;backdrop-filter:blur(4px);display:none;place-items:center;padding:18px}.modal-backdrop.open{display:grid}.modal{width:min(540px,100%);max-height:85vh;overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:12px;box-shadow:0 25px 80px #0009}.modal-head{display:flex;align-items:start;justify-content:space-between;padding:19px 21px;border-bottom:1px solid var(--line)}.modal-head h2{font-size:17px}.close{border:1px solid var(--line);background:#172832;border-radius:6px;padding:6px 10px;font-size:12px}.modal-body{padding:17px 21px 22px}.modal-body p{color:var(--muted);font-size:12px;line-height:1.6;margin:0 0 15px}.details{display:grid;grid-template-columns:minmax(110px,.7fr) 1fr;border-top:1px solid var(--line)}.details span{padding:10px 0;border-bottom:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}.details span:nth-child(odd){color:var(--muted)}.details span:nth-child(even){font-family:"DejaVu Sans Mono",monospace;color:var(--text);text-align:right}.scenario{margin-top:18px;display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}.scenario select{background:#0b1720;color:var(--soft);border:1px solid var(--line2);border-radius:6px;padding:7px;font:inherit;font-size:12px}.loading{padding:18px 20px;color:var(--muted);font-size:12px}.error{color:#edb6ae!important}@media(max-width:800px){.shell{padding:18px 18px 32px}.layout{grid-template-columns:1fr}.device{order:2}}@media(max-width:500px){.shell{padding:15px 13px 27px}.env{font-size:12px}.heading{padding:25px 0 19px}h1{font-size:30px}.themes{gap:8px}.appearance-body{padding:14px}.theme{padding:7px}.preview{height:68px;padding:8px}.panel-head{padding:17px}.mode-options{gap:14px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top"><div class="brand"><div class="mark" aria-hidden="true">K</div><div><div class="brand-name">KIDA <span>/ CONSOLE</span></div><div class="brand-sub">SYSTEM OPERATIONS</div></div></div><span class="env">VISTA DE DISEÑO</span></header>
+    <div class="heading"><h1>Settings</h1><p>Personaliza la apariencia de Console y consulta la información del equipo.</p></div>
+    <div class="layout">
+      <section class="panel" aria-labelledby="appearance-title">
+        <div class="panel-head"><div class="title-row"><span class="title-icon"><svg class="ico" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M12 7h5M12 12h7M12 17h4"/></svg></span><h2 id="appearance-title">Apariencia</h2></div><p>Elige un tema. Los cambios se aplican al instante.</p></div>
+        <div class="appearance-body">
+          <div class="themes" role="group" aria-label="Tema">
+            <button class="theme professional" type="button" aria-pressed="true" data-theme="Professional"><span class="preview" aria-hidden="true"><span class="preview-bar"></span><span class="preview-row"><i></i><i></i></span></span><span class="theme-name">Professional</span><span class="theme-desc">Minimalista y corporativo</span></button>
+            <button class="theme neo" type="button" aria-pressed="false" data-theme="Neobrutalism"><span class="preview" aria-hidden="true"><span class="preview-bar"></span><span class="preview-row"><i></i><i></i></span></span><span class="theme-name">Neobrutalism</span><span class="theme-desc">Contrastes, bordes y sombras</span></button>
+            <button class="theme sakura" type="button" aria-pressed="false" data-theme="Sakura"><span class="preview" aria-hidden="true"><span class="preview-bar"></span><span class="preview-row"><i></i><i></i></span></span><span class="theme-name">Sakura</span><span class="theme-desc">Colores suaves y títulos serif</span></button>
+            <button class="theme tokyo" type="button" aria-pressed="false" data-theme="Tokyo"><span class="preview" aria-hidden="true"><span class="preview-bar"></span><span class="preview-row"><i></i><i></i></span></span><span class="theme-name">Tokyo</span><span class="theme-desc">Monoespaciado y acentos neón</span></button>
+          </div>
+          <fieldset class="mode"><legend>Modo</legend><div class="mode-options"><label><input type="radio" name="mode" value="Claro"> Claro</label><label><input type="radio" name="mode" value="Oscuro" checked> Oscuro</label></div></fieldset>
+          <p class="status-line" role="status">Tema: <strong id="selected">Professional · Oscuro</strong></p>
+        </div>
+      </section>
+      <section class="panel device" aria-labelledby="device-title">
+        <div class="panel-head"><div class="title-row"><span class="title-icon"><svg class="ico" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M8 9h8m-8 4h5"/></svg></span><h2 id="device-title">Equipo</h2></div><p>Información del servidor que ejecuta CORE.</p></div>
+        <div class="device-body" id="device-content"><div class="host"><span>Nombre del equipo</span><strong>kida-server</strong></div><button class="detail-link" type="button" data-detail="system"><span>Sistema operativo</span><span class="right">Ver detalles <span class="chevron" aria-hidden="true">›</span></span></button><button class="detail-link" type="button" data-detail="hardware"><span>Hardware</span><span class="right">Ver detalles <span class="chevron" aria-hidden="true">›</span></span></button></div>
+        <div class="panel-head" style="border:0;padding-top:0"><p class="device-foot">Los detalles se muestran al abrir cada sección.</p><p class="notice" id="device-state" hidden></p></div>
+      </section>
+    </div>
+    <div class="scenario"><label for="state">Estado del equipo en la demo</label><select id="state"><option value="ready">Datos disponibles</option><option value="loading">Cargando</option><option value="error">Error de lectura</option></select></div>
+    <footer class="footer"><span class="dot"></span>MOCKUP INTERACTIVO · DATOS FICTICIOS · SIN CONEXIÓN A KIDA</footer>
+  </main>
+  <div class="modal-backdrop" id="modal" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head"><h2 id="modal-title">Detalles</h2><button class="close" id="close" type="button">Cerrar</button></div><div class="modal-body"><p>Vista representativa. Los valores reales dependen de la información que CORE reporte.</p><div class="details" id="details"></div></div></section></div>
+  <script>
+    const selected = document.querySelector('#selected');
+    const modes = [...document.querySelectorAll('[name="mode"]')];
+    let theme = 'Professional';
+    function updateAppearance(){const mode=modes.find(option=>option.checked).value;document.documentElement.dataset.theme=theme;document.documentElement.dataset.mode=mode==='Claro'?'light':'dark';selected.textContent = `${theme} · ${mode}`;}
+    document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => {
+      theme = button.dataset.theme;
+      document.querySelectorAll('[data-theme]').forEach(option => option.setAttribute('aria-pressed', String(option === button)));
+      updateAppearance();
+    }));
+    modes.forEach(mode => mode.addEventListener('change', updateAppearance));
+    const data = {
+      system: ['Sistema operativo', [['Distribución','Linux'],['Versión','Según datos de CORE'],['Kernel','Según datos de CORE'],['Arquitectura','Según datos de CORE']]],
+      hardware: ['Hardware', [['Procesador','Según datos de CORE'],['Memoria','Según datos de CORE'],['Almacenamiento','Según datos de CORE'],['Placa base','Según datos de CORE']]]
+    };
+    const modal = document.querySelector('#modal'); let modalTrigger;
+    document.querySelectorAll('[data-detail]').forEach(button => button.addEventListener('click', () => {
+      modalTrigger=button;
+      const [title, rows] = data[button.dataset.detail];
+      document.querySelector('#modal-title').textContent = title;
+      document.querySelector('#details').innerHTML = rows.map(([label,value]) => `<span>${label}</span><span>${value}</span>`).join('');
+      modal.classList.add('open'); document.querySelector('#close').focus();
+    }));
+    function closeModal(){if(!modal.classList.contains('open'))return;modal.classList.remove('open');modalTrigger?.focus();}
+    document.querySelector('#close').addEventListener('click', closeModal);
+    modal.addEventListener('click', event => {if(event.target === modal) closeModal();});
+    document.addEventListener('keydown', event => {if(!modal.classList.contains('open'))return;if(event.key === 'Escape'){closeModal();return;}if(event.key==='Tab'){event.preventDefault();document.querySelector('#close').focus();}});
+    document.querySelector('#state').addEventListener('change', event => {
+      const content = document.querySelector('#device-content'), notice = document.querySelector('#device-state');
+      const loading = event.target.value === 'loading', error = event.target.value === 'error';
+      content.hidden = loading || error; notice.hidden = !loading && !error;
+      notice.className = loading ? 'notice' : 'notice error';
+      notice.textContent = loading ? 'Cargando información del equipo…' : 'No se pudo cargar la información del equipo.';
+    });
+  </script>
+</body>
+</html>

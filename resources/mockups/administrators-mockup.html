@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080f17">
+<link rel="icon" href="data:,">
+<title>KIDA Console — Administradores · Mockup</title>
+<style>
+:root{color-scheme:dark;--bg:#080f17;--surface:#101b26;--surface2:#132330;--line:#233441;--muted:#9bb1bd;--text:#e8f1f3;--cyan:#4be1d2;--amber:#e8b87e;--danger:#f1a5a4;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 75% -10%,#1a333e70,transparent 55%),var(--bg);color:var(--text);font-size:14px;line-height:1.55}body:has(dialog[open]){overflow:hidden}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}[hidden]{display:none!important}::selection{background:#245c60;color:#fff}input{caret-color:var(--cyan)}*{scrollbar-color:#35505c #0c151e;scrollbar-width:thin}h1,h2,h3,p{margin:0}h1,h2,h3{text-wrap:balance}h1{font-size:clamp(29px,3vw,38px);font-weight:600;letter-spacing:-.035em;line-height:1.2}h2{font-size:18px;font-weight:600;letter-spacing:-.02em}h3{font-size:14px;font-weight:600}.muted{color:var(--muted)}.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}.mono{font-family:"DejaVu Sans Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.shell{max-width:1390px;margin:auto;padding:24px 34px 44px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding:7px 0 23px}.brand{display:flex;align-items:center;gap:12px}.brand-mark{width:34px;height:34px;display:grid;place-items:center;background:var(--cyan);color:#041b1a;border-radius:8px;font:800 19px "DejaVu Sans Mono",monospace}.brand-title{font-size:15px;font-weight:700;letter-spacing:.15em}.brand-title span{font-weight:400;color:#9bb5c1}.brand-sub{font-size:12px;letter-spacing:.15em;color:var(--muted);margin-top:3px}.tag{border:1px solid var(--line);border-radius:5px;padding:7px 10px;color:var(--amber);font-size:12px;white-space:nowrap}.heading{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:34px 0 28px}.heading p{color:var(--muted);font-size:13px;margin-top:10px;max-width:65ch}.button{display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:40px;border:1px solid #38515d;border-radius:7px;background:#172b35;color:#c6dbe1;font-size:12px;font-weight:600;padding:10px 13px;transition:background .15s,border-color .15s}.button:hover:not(:disabled){background:#1b3941;border-color:#4b8c8a;color:#e4faf5}.button.primary{background:#1a3b3f;color:#66e4d2;border-color:#326d70}.button.primary:hover:not(:disabled){background:#225053}.button.danger{color:#ffd3ce;border-color:#994c4e;background:#5b2930}.button.danger:hover:not(:disabled){background:#78363d}.button.quiet{background:transparent;border-color:var(--line)}.button.delete{background:transparent;border-color:transparent;color:var(--muted);font-weight:500}.button.delete:hover:not(:disabled){color:#ffd3ce;background:#482930;border-color:#a44d54}.button .ico{width:16px;height:16px}.heading>.button{flex:none}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}.panel{border:1px solid var(--line);border-radius:12px;background:linear-gradient(155deg,#121f2a,#101922);min-width:0;overflow:hidden}.panel-head{padding:22px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}.title-row{display:flex;align-items:center;gap:10px}.title-row>.ico{color:var(--cyan)}.panel-head p{font-size:12px;color:var(--muted);margin-top:6px}.count,.badge{display:inline-flex;border:1px solid #34515a;border-radius:5px;font-size:12px;padding:2px 7px;color:#bfd3d9;background:#172a33}.badge{background:#153b3e;border-color:#2c6866;color:#66ead4;font-weight:500}.accounts{list-style:none;margin:0;padding:0}.account{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:21px 24px;border-bottom:1px solid var(--line)}.account:last-child{border:0}.account:hover{background:#172b35}.identity{display:flex;align-items:center;gap:13px;min-width:0}.avatar{width:38px;height:38px;display:grid;place-items:center;border-radius:10px;background:#172b35;color:#93b4bf;flex:none}.avatar.own{color:var(--cyan);background:#153136}.username{display:flex;gap:10px;align-items:center;min-width:0}.username strong{font-size:13px;font-weight:600;overflow-wrap:anywhere;min-width:0}.list-foot{padding:15px 24px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}.own-body{padding:23px 24px}.own-body .identity{margin-bottom:22px}.own-body .identity strong{overflow-wrap:anywhere;min-width:0}.own-body .identity p{font-size:12px;color:var(--muted);margin-top:3px}.own-actions{display:grid;gap:9px}.own-actions .button{justify-content:flex-start;text-align:left}.scope-note{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:12px;margin:20px 2px 0;max-width:75ch}.scope-note .ico{color:#66c4b9;margin-top:2px}.notice{border:1px solid #326d70;background:#102c30;color:#b8e4df;border-radius:8px;padding:13px 16px;margin-bottom:18px;font-size:12px;overflow-wrap:anywhere}.notice.error{border-color:#775048;background:#322527;color:#ffd3ce}.notice.warning{color:#e8cba9;border-color:#634e35;background:#2c271f}.notice p{margin-bottom:9px}.loading{padding:48px 24px;color:var(--muted);font-size:13px}.demo-tools{border-top:1px solid var(--line);margin-top:40px;padding-top:20px;display:flex;align-items:center;gap:13px;flex-wrap:wrap;color:var(--muted);font-size:12px}.demo-tools select{width:auto;max-width:100%;font-size:12px}.footer{color:var(--muted);font-size:12px;margin-top:18px;line-height:1.7}.session-end{padding:36px;max-width:650px}.session-end p{margin:12px 0 24px;color:var(--muted);font-size:13px}
+dialog{color:var(--text);background:#101c26;padding:0;border:0;max-height:none;max-width:none}dialog::backdrop{background:#020810bd;backdrop-filter:blur(4px)}dialog.drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(520px,100%);height:100dvh;border-left:1px solid #344d5a}dialog[open].drawer{display:flex;flex-direction:column;animation:enter .2s cubic-bezier(.16,1,.3,1)}@keyframes enter{from{transform:translateX(20px)}to{transform:translateX(0)}}.drawer-head{padding:26px;display:flex;align-items:start;justify-content:space-between;gap:15px;border-bottom:1px solid var(--line)}.drawer-head h2{font-size:21px}.drawer-head p{font-size:12px;color:var(--muted);margin-top:8px}.icon-button{display:grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid #304650;border-radius:7px;background:#172933;color:#bdd4dc}.icon-button:hover{color:var(--cyan);background:#1a3e42}.drawer-body{overflow:auto;padding:24px 26px;flex:1;min-height:0}.drawer-foot{border-top:1px solid var(--line);padding:18px 26px;display:flex;justify-content:flex-end;gap:9px;background:#111e28}.field-group{margin-bottom:19px}label{display:block;font-size:12px;font-weight:600;margin-bottom:8px}.field{width:100%;border:1px solid #36505e;background:#0b1720;color:var(--text);border-radius:7px;padding:11px 12px;font-size:13px;min-height:42px}.field::placeholder{color:#91a9b5}.help{font-size:12px;line-height:1.65;color:var(--muted);margin-top:7px}fieldset{margin:27px 0 20px;padding:21px 0 0;border:0;border-top:1px solid var(--line);min-width:0}legend{font-size:14px;font-weight:600;padding:0 10px 0 0}fieldset>p{font-size:12px;color:var(--muted);margin:0 0 18px}.form-error{color:#ffd3ce;font-size:12px;line-height:1.6;margin-top:12px;overflow-wrap:anywhere}.dialog{width:min(450px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;border-radius:12px;margin:auto}.dialog-body{padding:27px}.dialog-body h2{font-size:21px}.dialog-body>p{margin-top:15px;color:#bfd1d8;font-size:13px;overflow-wrap:anywhere}.dialog .drawer-foot{padding:17px 27px;flex-wrap:wrap}.target-name{display:block;color:var(--text);font-size:17px;margin:17px 0 0;overflow-wrap:anywhere}.session-note{font-size:12px;color:var(--amber);margin-top:16px}.dialog-hint{font-size:12px;color:var(--muted);margin-top:17px}
+@media(max-width:960px){.layout{grid-template-columns:minmax(0,1fr) 280px;gap:16px}.panel-head,.account,.own-body{padding:19px}.list-foot{padding:14px 19px}}
+@media(max-width:700px){.shell{padding:18px 18px 32px}.brand-sub{display:none}.brand-title{font-size:12px;letter-spacing:.08em}.tag{font-size:12px;padding:6px}.heading{align-items:start;flex-direction:column;padding:28px 0 22px;gap:18px}.layout{grid-template-columns:1fr}.heading>.button{width:100%}.account{gap:10px;padding:18px 16px}.account>.button{padding:9px;min-height:44px}.avatar{width:34px;height:34px}.identity{gap:10px}.username{flex-wrap:wrap;gap:5px 8px}.username strong{font-size:12px}.drawer-head,.drawer-body{padding:22px}.drawer-foot{padding:16px 22px}.panel-head{padding:19px 16px}.own-body{padding:20px 16px}.demo-tools{margin-top:28px}.session-end{padding:24px}.button{min-height:44px}.icon-button{width:44px;height:44px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" hidden><defs>
+<symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6ZM13 6l5 5"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-3-3 3-3m-6 0 3-3"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></symbol>
+</defs></svg>
+<main class="shell" id="app">
+<header class="top"><div class="brand"><div class="brand-mark" aria-hidden="true">K</div><div><div class="brand-title">KIDA <span>/ CONSOLE</span></div><div class="brand-sub">SYSTEM OPERATIONS</div></div></div><span class="tag">DEMO SIN CONEXIÓN</span></header>
+<div class="heading"><div><h1>Administradores</h1><p>Gestiona quién puede acceder a Console. Todas las cuentas tienen permisos de administrador.</p></div><button class="button primary" data-open="create" id="create-button"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Crear administrador</button></div>
+<div id="feedback" class="notice" role="status" hidden></div>
+<div id="read-error" class="notice error" role="alert" hidden><p>No se pudo actualizar el listado. Se muestran las cuentas del ejemplo anterior.</p><button class="button quiet" id="retry">Reintentar lectura</button></div>
+<div class="layout" id="workspace">
+<section class="panel" aria-labelledby="accounts-title"><div class="panel-head"><div><div class="title-row"><svg class="ico" aria-hidden="true"><use href="#i-users"/></svg><h2 id="accounts-title">Cuentas con acceso</h2><span class="count" id="count" aria-label="Número de administradores">3</span></div><p>Acceso completo a KIDA Console.</p></div></div>
+<div id="loading" class="loading" role="status" hidden>Cargando administradores…</div><ul class="accounts" id="accounts"></ul><p class="list-foot" id="list-foot">Solo puedes modificar tus propias credenciales.</p></section>
+<aside class="panel" aria-labelledby="own-title"><div class="panel-head"><div class="title-row"><h2 id="own-title">Mi cuenta</h2></div><span class="badge">Tú</span></div><div class="own-body"><div class="identity"><span class="avatar own" aria-hidden="true"><svg class="ico"><use href="#i-user"/></svg></span><div style="min-width:0"><strong id="own-name">admin</strong><p>Administrador de Console</p></div></div><div class="own-actions"><button class="button quiet" data-open="rename"><svg class="ico" aria-hidden="true"><use href="#i-edit"/></svg>Cambiar nombre de usuario</button><button class="button quiet" data-open="password"><svg class="ico" aria-hidden="true"><use href="#i-key"/></svg>Cambiar contraseña</button></div></div></aside>
+</div>
+<p class="scope-note" id="scope-note"><svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>Estas cuentas dan acceso a Console. No son usuarios del sistema operativo ni credenciales de CORE o CLI.</p>
+<section class="panel session-end" id="session-end" aria-labelledby="session-title" hidden><h2 id="session-title">Sesión finalizada</h2><p id="session-copy"></p><button class="button primary" id="restart">Restablecer demostración</button></section>
+<div class="demo-tools"><label for="scenario" style="margin:0">Escenario del mockup</label><select class="field" id="scenario"><option value="data">Datos de ejemplo</option><option value="single">Último administrador</option><option value="loading">Cargando listado</option><option value="error">Error de lectura · datos anteriores</option><option value="write-error">Error al guardar</option></select><span>Solo cambia la demostración local.</span></div>
+<footer class="footer">VISTA DE DISEÑO · Datos ficticios · Sin conexión a KIDA. No introduzcas credenciales reales. Recargar restablece los ejemplos.</footer>
+</main>
+<dialog class="drawer" id="editor" aria-labelledby="editor-title" aria-describedby="editor-desc"><div class="drawer-head"><div><h2 id="editor-title"></h2><p id="editor-desc"></p></div><button class="icon-button" id="close-editor" aria-label="Cerrar panel"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div><div class="drawer-body"><form id="account-form"><div id="form-fields"></div><p class="form-error" role="alert" id="form-error" hidden></p></form></div><div class="drawer-foot"><button class="button quiet" id="cancel-editor">Cancelar</button><button class="button primary" type="submit" form="account-form" id="save">Crear administrador</button></div></dialog>
+<dialog class="dialog" id="confirmation" aria-labelledby="confirm-title" aria-describedby="confirm-desc"><div class="dialog-body"><h2 id="confirm-title">Eliminar administrador</h2><strong class="target-name" id="target-name"></strong><p id="confirm-desc">Se eliminará su acceso a Console y se cerrarán todas sus sesiones. Esta acción no se puede deshacer.</p><p class="session-note" id="self-warning" hidden>Estás eliminando tu propia cuenta. Tu sesión también se cerrará.</p><p class="form-error" id="delete-error" role="alert" hidden></p><p class="dialog-hint">Simulación local. No se eliminará ninguna cuenta real.</p></div><div class="drawer-foot"><button class="button quiet" id="cancel-delete" autofocus>Cancelar</button><button class="button danger" id="confirm-delete">Eliminar administrador</button></div></dialog>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const icon = name => `<svg class="ico" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+let accounts, ownId = 1, nextId, mode, targetId, signedOut = false;
+function seed(single = false) {
+  accounts = [{id:1,username:'admin'}];
+  if (!single) accounts.push({id:2,username:'marta'},{id:3,username:'srv.backups'});
+  nextId = 4; signedOut = false;
+}
+function currentUser() { return accounts.find(account => account.id === ownId); }
+function announce(text) { $('feedback').textContent = text; $('feedback').hidden = false; }
+function render() {
+  const loading = $('scenario').value === 'loading';
+  $('workspace').hidden = signedOut; $('scope-note').hidden = signedOut; $('session-end').hidden = !signedOut;
+  $('create-button').hidden = signedOut; $('read-error').hidden = signedOut || $('scenario').value !== 'error';
+  if (signedOut) return;
+  $('own-name').textContent = currentUser().username;
+  $('count').textContent = loading ? '—' : accounts.length;
+  $('accounts').hidden = loading; $('loading').hidden = !loading;
+  $('accounts').parentElement.setAttribute('aria-busy', String(loading));
+  $('accounts').innerHTML = accounts.map(account => `<li class="account"><div class="identity"><span class="avatar ${account.id === ownId ? 'own' : ''}" aria-hidden="true">${icon('user')}</span><div class="username"><strong>${escapeHtml(account.username)}</strong>${account.id === ownId ? '<span class="badge">Tú</span>' : ''}</div></div><button class="button delete" data-delete="${account.id}" aria-label="Eliminar a ${escapeHtml(account.username)}" ${accounts.length <= 1 ? 'disabled aria-describedby="list-foot"' : ''}>${icon('trash')}Eliminar</button></li>`).join('');
+  $('list-foot').textContent = 'Solo puedes modificar tus propias credenciales.';
+  if (accounts.length === 1) $('list-foot').textContent = 'Debe quedar al menos un administrador. No puedes eliminar esta cuenta.';
+}
+function field(id, label, type = 'text', value = '', help = '') {
+  let rules = 'required maxlength="128" autocomplete="current-password"';
+  if (type === 'text') rules = 'required minlength="3" maxlength="64" pattern="[a-zA-Z0-9_.\\-]{3,64}" autocomplete="off"';
+  if (id === 'new-password' || id === 'repeat-password') rules = 'required minlength="12" maxlength="128" autocomplete="new-password"';
+  return `<div class="field-group"><label for="${id}">${label}</label><input class="field" id="${id}" name="${id}" type="${type}" value="${escapeHtml(value)}" ${rules} ${help ? `aria-describedby="${id}-help"` : ''}>${help ? `<p class="help" id="${id}-help">${help}</p>` : ''}</div>`;
+}
+function openEditor(action) {
+  if (signedOut) return;
+  mode = action;
+  const usernameHelp = '3–64 caracteres: letras, números, punto, guion o guion bajo.';
+  const passwordHelp = 'Entre 12 y 128 caracteres.';
+  let title, description, fields, save;
+  switch (mode) {
+    case 'create':
+      title = 'Crear administrador'; description = 'La nueva cuenta tendrá acceso completo a Console.'; save = 'Crear administrador';
+      fields = field('username','Nombre de usuario','text','',usernameHelp) + field('new-password','Contraseña de la nueva cuenta','password','',passwordHelp)
+        + `<fieldset><legend>Confirma tu identidad</legend><p>Introduce tus credenciales para autorizar la creación.</p>${field('admin-username','Tu nombre de usuario','text',currentUser().username)}${field('admin-password','Tu contraseña','password')}</fieldset>`;
+      break;
+    case 'rename':
+      title = 'Cambiar nombre de usuario'; description = 'Solo se modificará tu propia cuenta.'; save = 'Guardar nombre';
+      fields = field('username','Nombre de usuario','text',currentUser().username,usernameHelp);
+      break;
+    case 'password':
+      title = 'Cambiar contraseña'; description = 'Actualiza la contraseña de tu cuenta.'; save = 'Cambiar contraseña';
+      fields = field('current-password','Contraseña actual','password') + field('new-password','Nueva contraseña','password','',passwordHelp) + field('repeat-password','Repetir nueva contraseña','password') + '<p id="mismatch" class="form-error" role="status" hidden>Las contraseñas no coinciden.</p><div class="notice warning">Se cerrarán todas tus sesiones, incluida la actual. Tendrás que volver a iniciar sesión.</div>';
+      break;
+    default: return;
+  }
+  $('editor-title').textContent = title; $('editor-desc').textContent = description;
+  $('form-fields').innerHTML = fields + '<p class="help">Demostración sin conexión: utiliza datos ficticios. No se comprueban contraseñas reales.</p>';
+  const adminUsername = $('admin-username');
+  if (adminUsername) { adminUsername.setAttribute('autocomplete','username'); adminUsername.removeAttribute('pattern'); adminUsername.minLength = 1; }
+  $('form-error').hidden = true; $('save').textContent = save;
+  validate(); $('editor').showModal(); $('form-fields').querySelector('input').focus();
+}
+function validate() {
+  const repeat = $('repeat-password');
+  if (repeat) {
+    const mismatch = repeat.value !== $('new-password').value;
+    repeat.setCustomValidity(mismatch ? 'Las contraseñas no coinciden.' : '');
+    $('mismatch').hidden = !repeat.value || !mismatch;
+    repeat.setAttribute('aria-invalid', String(Boolean(repeat.value) && mismatch));
+    repeat.setAttribute('aria-describedby', 'mismatch');
+  }
+  let unchanged = false;
+  if (mode === 'rename') unchanged = $('username').value === currentUser().username;
+  $('save').disabled = !$('account-form').checkValidity() || unchanged;
+}
+function clearPasswords() { $('account-form').querySelectorAll('input[type="password"]').forEach(input => input.value = ''); }
+function formError(text) { clearPasswords(); $('form-error').textContent = text; $('form-error').hidden = false; validate(); }
+function endSession(text) {
+  signedOut = true; $('feedback').hidden = true; $('session-copy').textContent = text; render(); $('restart').focus();
+}
+$('account-form').addEventListener('input', validate);
+$('account-form').addEventListener('submit', event => {
+  event.preventDefault(); validate();
+  if ($('save').disabled || !$('account-form').reportValidity()) return;
+  if ($('scenario').value === 'write-error') { formError('No se pudo guardar el cambio simulado. Revisa los datos y vuelve a introducir las contraseñas para reintentar.'); return; }
+  const username = $('username')?.value;
+  if (mode === 'create' && $('admin-username').value.toLowerCase() !== currentUser().username.toLowerCase()) { formError('Utiliza el nombre de tu propia cuenta para confirmar tu identidad.'); return; }
+  if (username && accounts.some(account => account.username.toLowerCase() === username.toLowerCase() && (mode === 'create' || account.id !== ownId))) { formError('Este nombre de usuario ya está en uso. Elige otro.'); return; }
+  switch (mode) {
+    case 'create': accounts.push({id:nextId++,username}); accounts.sort((a,b) => a.username.localeCompare(b.username)); break;
+    case 'rename': currentUser().username = username; accounts.sort((a,b) => a.username.localeCompare(b.username)); break;
+  }
+  $('editor').close();
+  if (mode === 'password') { endSession('Cambio de contraseña simulado. En Console se cerrarían todas tus sesiones y tendrías que volver a iniciar sesión.'); return; }
+  render();
+  announce(mode === 'create' ? 'Administrador creado en la demostración.' : 'Nombre de usuario actualizado en la demostración.');
+});
+$('editor').addEventListener('close', () => { $('account-form').reset(); $('form-fields').replaceChildren(); });
+$('close-editor').onclick = () => $('editor').close();
+$('cancel-editor').onclick = () => $('editor').close();
+$('app').addEventListener('click', event => {
+  const open = event.target.closest('[data-open]');
+  if (open) openEditor(open.dataset.open);
+  const remove = event.target.closest('[data-delete]');
+  if (!remove || accounts.length <= 1) return;
+  targetId = Number(remove.dataset.delete);
+  const target = accounts.find(account => account.id === targetId);
+  if (!target) return;
+  $('target-name').textContent = target.username; $('self-warning').hidden = targetId !== ownId; $('delete-error').hidden = true;
+  $('confirmation').showModal(); $('cancel-delete').focus();
+});
+$('cancel-delete').onclick = () => $('confirmation').close();
+$('confirmation').addEventListener('close', () => targetId = undefined);
+$('confirm-delete').onclick = () => {
+  if (accounts.length <= 1 || !accounts.some(account => account.id === targetId)) return;
+  if ($('scenario').value === 'write-error') { $('delete-error').textContent = 'No se pudo eliminar la cuenta simulada. No se ha modificado el listado. Puedes reintentar o cancelar.'; $('delete-error').hidden = false; return; }
+  const self = targetId === ownId;
+  accounts = accounts.filter(account => account.id !== targetId);
+  $('confirmation').close();
+  if (self) { endSession('Has eliminado tu cuenta en la demostración. En Console perderías el acceso y se cerrarían todas tus sesiones.'); return; }
+  render(); announce('Administrador eliminado en la demostración. Se cerrarían todas sus sesiones.');
+  $('create-button').focus();
+};
+$('scenario').onchange = () => { seed($('scenario').value === 'single'); $('feedback').hidden = true; render(); };
+$('retry').onclick = () => { $('scenario').value = 'data'; render(); announce('Listado de ejemplo actualizado.'); $('create-button').focus(); };
+$('restart').onclick = () => { $('scenario').value = 'data'; seed(); render(); $('create-button').focus(); };
+seed(); render();
+</script>
+</body>
+</html>
