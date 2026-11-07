@@ -1,8 +1,12 @@
 <ion-content class="console-content">
   <main class="settings-layout">
-    <p class="eyebrow">KIDA CONSOLE</p>
-    <h1>Settings</h1>
-    <app-settings-appearance />
-    <app-system-equipment [value]="state.info()" [loading]="state.loading()" />
+    <header class="settings-heading">
+      <h1>Settings</h1>
+      <p>Personaliza la apariencia de Console y consulta la información del equipo.</p>
+    </header>
+    <div class="settings-panels">
+      <app-settings-appearance />
+      <app-system-equipment [value]="state.info()" [loading]="state.loading()" />
+    </div>
   </main>
 </ion-content>

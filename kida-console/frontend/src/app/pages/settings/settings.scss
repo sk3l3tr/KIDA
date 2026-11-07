@@ -1,3 +1,30 @@
-app-system-equipment {
-  margin-top: 2rem;
+.settings-heading {
+  margin-bottom: 1.5rem;
+  h1 {
+    margin: 0 0 0.5rem;
+    font-size: clamp(1.875rem, 3vw, 2.375rem);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+  }
+  p {
+    margin: 0;
+    max-width: 65ch;
+    color: var(--kida-muted);
+    line-height: 1.6;
+  }
+}
+.settings-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 0.85fr);
+  align-items: start;
+  gap: 1rem;
+  > * {
+    min-width: 0;
+  }
+}
+@media (max-width: 800px) {
+  .settings-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -2,12 +2,36 @@
   display: block;
   min-width: 0;
 }
+.equipment-heading {
+  h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.125rem;
+  }
+  p {
+    margin: 0 0 1rem;
+    color: var(--kida-muted);
+    line-height: 1.6;
+  }
+}
+.equipment-state {
+  margin: 0;
+  padding-block: 1rem;
+  color: var(--kida-muted);
+  line-height: 1.6;
+}
 .equipment-list {
   background: transparent;
-  border: var(--kida-border-width) solid var(--ion-border-color);
-  border-radius: var(--kida-radius);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   padding: 0;
+}
+.equipment-list ion-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+}
+.hostname-row .value-row > span:last-child {
+  font-weight: 600;
 }
 .equipment-details ion-accordion-group {
   background: transparent;

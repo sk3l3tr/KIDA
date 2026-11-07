@@ -1,5 +1,15 @@
-<section class="equipment-panel" aria-label="Equipo" [attr.aria-busy]="loading()">
-  @if (value() !== null) {
+<section
+  class="equipment-panel panel"
+  aria-labelledby="equipment-title"
+  [attr.aria-busy]="loading()"
+>
+  <header class="equipment-heading">
+    <h2 id="equipment-title">Equipo</h2>
+    <p>Información del servidor que ejecuta CORE.</p>
+  </header>
+  @if (loading()) {
+    <p class="equipment-state" role="status">Cargando información del equipo…</p>
+  } @else if (value() !== null) {
     <ion-list class="equipment-list" lines="none">
       <ion-item class="hostname-row">
         <ion-label class="value-row">
@@ -14,6 +24,8 @@
         <ion-label>Hardware</ion-label>
       </ion-item>
     </ion-list>
+  } @else {
+    <p class="equipment-state" role="status">La información del equipo no está disponible.</p>
   }
 </section>
 
